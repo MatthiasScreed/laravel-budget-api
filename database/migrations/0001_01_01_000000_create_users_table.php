@@ -17,14 +17,32 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('avatar')->nullable();
+            $table->string('phone')->nullable();
+            $table->date('date_of_birth')->nullable();
+            $table->string('currency', 3)->default('EUR');
+            $table->string('timezone')->default('Europe/Paris');
+            $table->string('language', 2)->default('fr');
+            $table->json('preferences')->nullable();
+            $table->timestamp('last_login_at')->nullable();
+            $table->timestamp('last_activity_at')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
+
+            // Index pour les recherches fréquentes
+            $table->index(['email', 'deleted_at']);
+            $table->index(['is_active', 'deleted_at']);
+            $table->index('last_login_at');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
+
+            $table->index('created_at');
         });
 
         Schema::create('sessions', function (Blueprint $table) {
