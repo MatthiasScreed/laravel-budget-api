@@ -3,12 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Streak;
 use App\Models\Transaction;
+use App\Services\StreakService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class TransactionController extends Controller
 {
+    protected StreakService $streakService;
+
+    public function __construct(StreakService $streakService)
+    {
+        $this->streakService = $streakService;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -32,7 +41,25 @@ class TransactionController extends Controller
             'recurrence' => 'nullable|string',
         ]);
 
-        return Auth::user()->transactions()->create($data);
+        $transaction = Auth::user()->transactions()->create($validatedData);
+
+        // 🔥 AJOUTER JUSTE CETTE LIGNE !
+        $streakResult = $this->streakService->triggerStreak(
+            Auth::user(),
+            Streak::TYPE_DAILY_TRANSACTION
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'transaction' => $transaction->load('category'),
+
+                // 🔥 NOUVELLES DONNÉES STREAK
+                'streak_result' => $streakResult,
+                'updated_streaks' => $this->streakService->getUserStreaks(Auth::user())
+            ],
+            'message' => $streakResult['message'] ?? 'Transaction créée avec succès !'
+        ]);
     }
 
     /**

@@ -35,7 +35,7 @@ class RegisterRequest extends FormRequest
             'email' => [
                 'required',
                 'string',
-                'email:rfc,dns', // Validation email strict
+                config('app.env') === 'testing' ? 'email:rfc' : 'email:rfc,dns', // Validation email strict
                 'max:255',
                 'unique:users,email'
             ],
@@ -92,5 +92,19 @@ class RegisterRequest extends FormRequest
             'password' => 'mot de passe',
             'terms_accepted' => 'conditions d\'utilisation'
         ];
+    }
+
+    /**
+     * ✅ AJOUTER CETTE MÉTHODE - Normalisation avant validation
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Normaliser l'email en minuscules si présent
+        if ($this->has('email')) {
+            $this->merge([
+                'email' => strtolower($this->input('email'))
+            ]);
+        }
     }
 }

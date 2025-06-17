@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
 class ChangePasswordRequest extends FormRequest
@@ -12,7 +13,7 @@ class ChangePasswordRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     /**
@@ -23,26 +24,15 @@ class ChangePasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'current_password' => [
-                'required',
-                'string'
-            ],
+            'current_password' => 'required|string',
             'new_password' => [
                 'required',
-                'string',
                 'confirmed',
-                'different:current_password', // Différent de l'ancien
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised()
+                'min:8',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
+                'different:current_password'
             ],
-            'revoke_other_tokens' => [
-                'sometimes',
-                'boolean'
-            ]
+            'revoke_other_tokens' => 'boolean'
         ];
     }
 
@@ -52,10 +42,24 @@ class ChangePasswordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'current_password.required' => 'Le mot de passe actuel est obligatoire.',
-            'new_password.required' => 'Le nouveau mot de passe est obligatoire.',
+            'current_password.required' => 'Le mot de passe actuel est requis.',
+            'new_password.required' => 'Le nouveau mot de passe est requis.',
             'new_password.confirmed' => 'La confirmation du nouveau mot de passe ne correspond pas.',
-            'new_password.different' => 'Le nouveau mot de passe doit être différent de l\'ancien.'
+            'new_password.min' => 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+            'new_password.regex' => 'Le nouveau mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',
+            'new_password.different' => 'Le nouveau mot de passe doit être différent de l\'ancien.',
         ];
+    }
+
+    /**
+     * ✅ Validation personnalisée pour vérifier le mot de passe actuel
+     */
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            if ($this->user() && !Hash::check($this->current_password, $this->user()->password)) {
+                $validator->errors()->add('current_password', 'Le mot de passe actuel est incorrect.');
+            }
+        });
     }
 }

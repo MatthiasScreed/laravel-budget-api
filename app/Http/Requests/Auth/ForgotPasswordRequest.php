@@ -22,12 +22,7 @@ class ForgotPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255'
-            ]
+            'email' => 'required|email|exists:users,email',
         ];
     }
 
@@ -37,9 +32,9 @@ class ForgotPasswordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.required' => 'L\'adresse email est obligatoire.',
+            'email.required' => 'L\'adresse email est requise.',
             'email.email' => 'L\'adresse email doit être valide.',
-            'email.max' => 'L\'adresse email ne peut pas dépasser 255 caractères.'
+            'email.exists' => 'Aucun compte n\'est associé à cette adresse email.',
         ];
     }
 

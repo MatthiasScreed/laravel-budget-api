@@ -36,13 +36,15 @@ class Streak extends Model
     /**
      * Types de séries
      */
+    public const TYPE_DAILY_LOGIN = 'daily_login';
     public const TYPE_DAILY_TRANSACTION = 'daily_transaction';
-    public const TYPE_WEEKLY_GOAL = 'weekly_goal';
+    public const TYPE_WEEKLY_BUDGET = 'weekly_budget';
     public const TYPE_MONTHLY_SAVING = 'monthly_saving';
 
     public const TYPES = [
+        self::TYPE_DAILY_LOGIN => 'Connexion quotidienne',
         self::TYPE_DAILY_TRANSACTION => 'Transaction quotidienne',
-        self::TYPE_WEEKLY_GOAL => 'Objectif hebdomadaire',
+        self::TYPE_WEEKLY_BUDGET => 'Budget hebdomadaire',
         self::TYPE_MONTHLY_SAVING => 'Épargne mensuelle'
     ];
 
@@ -54,13 +56,6 @@ class Streak extends Model
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Scope pour les séries actives
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
 
     /**
      * Incrémenter la série
@@ -69,30 +64,136 @@ class Streak extends Model
     {
         $today = now()->toDateString();
 
-        // Vérifier si déjà fait aujourd'hui
+        // Déjà fait aujourd'hui ?
         if ($this->last_activity_date && $this->last_activity_date->toDateString() === $today) {
-            return false; // Déjà fait aujourd'hui
+            return false; // Déjà comptabilisé aujourd'hui
         }
 
-        // Vérifier si la série continue
         $yesterday = now()->subDay()->toDateString();
-        if (!$this->last_activity_date || $this->last_activity_date->toDateString() === $yesterday) {
+
+        // Vérifier la continuité
+        if (!$this->last_activity_date) {
+            // Première fois
+            $this->current_count = 1;
+        } elseif ($this->last_activity_date->toDateString() === $yesterday) {
+            // Streak continue
             $this->current_count++;
         } else {
-            // Série brisée, recommencer
+            // Streak brisée, recommencer
             $this->current_count = 1;
         }
 
-        // Mettre à jour le meilleur score
+        // Mettre à jour le record
         if ($this->current_count > $this->best_count) {
             $this->best_count = $this->current_count;
         }
 
         $this->last_activity_date = now();
+        $this->is_active = true;
         $this->save();
 
         return true;
     }
+
+    /**
+     * Vérifier si streak peut être réclamée
+     */
+    public function canClaimBonus(): bool
+    {
+        if ($this->current_count < 3) return false; // Minimum 3 jours
+
+        // Bonus disponible chaque semaine (7 jours)
+        if ($this->current_count % 7 === 0) {
+            $lastClaim = $this->bonus_claimed_at;
+            if (!$lastClaim || $lastClaim->diffInDays(now()) >= 7) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    public function calculateBonusXp(): int
+    {
+        if (!$this->canClaimBonus()) return 0;
+
+        $baseBonus = 20;
+        $streakMultiplier = floor($this->current_count / 7);
+        $typeBonus = match($this->type) {
+            self::TYPE_DAILY_LOGIN => 5,
+            self::TYPE_DAILY_TRANSACTION => 15,
+            self::TYPE_WEEKLY_BUDGET => 25,
+            self::TYPE_MONTHLY_SAVING => 50,
+            default => 10
+        };
+
+        return $baseBonus + ($streakMultiplier * 10) + $typeBonus;
+    }
+
+    /**
+     * Réclamer le bonus
+     */
+    public function claimBonus(): int
+    {
+        if (!$this->canClaimBonus()) return 0;
+
+        $bonusXp = $this->calculateBonusXp();
+        $this->bonus_claimed_at = now();
+        $this->save();
+
+        return $bonusXp;
+    }
+
+
+
+
+    /**
+     * Obtenir les milestones
+     */
+    public function getMilestones(): array
+    {
+        return [3, 7, 14, 21, 30, 60, 100, 365];
+    }
+
+    /**
+     * Prochain milestone
+     */
+    public function getNextMilestone(): ?int
+    {
+        foreach ($this->getMilestones() as $milestone) {
+            if ($this->current_count < $milestone) {
+                return $milestone;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Vérifier si streak est à un milestone important
+     */
+    public function isAtMilestone(): bool
+    {
+        return in_array($this->current_count, $this->getMilestones());
+    }
+
+    /**
+     * Risque de perdre la streak
+     */
+    public function getRiskLevel(): string
+    {
+        if (!$this->last_activity_date) return 'none';
+
+        $hoursSinceLastActivity = $this->last_activity_date->diffInHours(now());
+
+        return match(true) {
+            $hoursSinceLastActivity > 20 => 'critical', // Plus de 20h
+            $hoursSinceLastActivity > 12 => 'high',     // Plus de 12h
+            $hoursSinceLastActivity > 6 => 'medium',    // Plus de 6h
+            default => 'low'
+        };
+    }
+
 
     /**
      * Vérifier si la série est brisée
@@ -123,6 +224,23 @@ class Streak extends Model
         $this->is_active = true;
         $this->current_count = 0;
         $this->save();
+    }
+
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeOfType($query, $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    public function scopeWithRisk($query, $level)
+    {
+        // Logique pour filtrer par niveau de risque
+        return $query->where('is_active', true);
     }
 
 

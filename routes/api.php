@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\FinancialGoalController;
 use App\Http\Controllers\Api\GoalContributionController;
+use App\Http\Controllers\Api\StreakController;
 use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\Api\TransactionController;
 
@@ -24,6 +25,10 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+
+    // ✅ ROUTES DE GESTION DES MOTS DE PASSE (MANQUANTES)
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 
@@ -36,9 +41,27 @@ Route::middleware('auth:sanctum')->group( function () {
     // AUTHENTIFICATION
     // ==========================================
     Route::prefix('auth')->group(function () {
+        Route::get('/user', [AuthController::class, 'user']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/logout-all', [AuthController::class, 'logoutAll']);
-        Route::get('/user', [AuthController::class, 'user']);
+
+        // 📝 Profil (optionnel)
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
+        Route::put('/change-password', [AuthController::class, 'changePassword']);
+
+        // 📋 Gestion des sessions
+        Route::get('/sessions', [AuthController::class, 'sessions']);
+        Route::delete('/sessions/{sessionId}', [AuthController::class, 'revokeSession']);
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
+        // Révoquer une session spécifique
+
+    });
+
+    // 🔥 NOUVELLES ROUTES STREAK
+    Route::prefix('streaks')->name('streaks.')->group(function () {
+        Route::get('/', [StreakController::class, 'index'])->name('index');
+        Route::post('/{streakType}/claim-bonus', [StreakController::class, 'claimBonus'])->name('claim');
+        Route::get('/leaderboard', [StreakController::class, 'leaderboard'])->name('leaderboard');
     });
 
     // ==========================================

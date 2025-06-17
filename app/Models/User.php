@@ -246,6 +246,10 @@ class User extends Authenticatable
      */
     public function getTotalBalance(): float
     {
+        if (!class_exists('\App\Models\Transaction')) {
+            return 0.0;
+        }
+
         $income = $this->transactions()->income()->completed()->sum('amount');
         $expenses = $this->transactions()->expense()->completed()->sum('amount');
 
