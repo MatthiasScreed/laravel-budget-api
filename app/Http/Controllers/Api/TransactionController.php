@@ -36,30 +36,30 @@ class TransactionController extends Controller
             'type' => 'required|in:income,expense',
             'amount' => 'required|numeric',
             'description' => 'nullable|string',
-            'date' => 'required|date',
+            'transaction_date' => 'required|date',
             'is_recurring' => 'boolean',
             'recurrence' => 'nullable|string',
         ]);
 
-        $transaction = Auth::user()->transactions()->create($validatedData);
+        $user = auth()->user();
+        $transaction = $user->transactions()->create($data);
 
-        // 🔥 AJOUTER JUSTE CETTE LIGNE !
-        $streakResult = $this->streakService->triggerStreak(
-            Auth::user(),
-            Streak::TYPE_DAILY_TRANSACTION
-        );
+        // 🔥 DÉCLENCHER LA STREAK DE TRANSACTION
+        $streakResult = $this->streakService->triggerStreak($user, Streak::TYPE_DAILY_TRANSACTION);
+
+        // 🏆 VÉRIFIER LES SUCCÈS
+        $unlockedAchievements = $user->checkAndUnlockAchievements();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'transaction' => $transaction->load('category'),
-
-                // 🔥 NOUVELLES DONNÉES STREAK
                 'streak_result' => $streakResult,
-                'updated_streaks' => $this->streakService->getUserStreaks(Auth::user())
+                'updated_streaks' => $this->streakService->getUserStreaks($user),
+                'unlocked_achievements' => $unlockedAchievements
             ],
-            'message' => $streakResult['message'] ?? 'Transaction créée avec succès !'
-        ]);
+            'message' => $streakResult['message'] ?? 'Transaction créée avec succès'
+        ], 201);
     }
 
     /**

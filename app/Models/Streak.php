@@ -17,13 +17,15 @@ class Streak extends Model
         'current_count',
         'best_count',
         'last_activity_date',
-        'is_active'
+        'is_active',
+        'bonus_claimed_at' // ✅ AJOUTÉ
     ];
 
     protected $casts = [
         'current_count' => 'integer',
         'best_count' => 'integer',
         'last_activity_date' => 'date',
+        'bonus_claimed_at' => 'datetime', // ✅ AJOUTÉ
         'is_active' => 'boolean'
     ];
 
@@ -56,11 +58,10 @@ class Streak extends Model
         return $this->belongsTo(User::class);
     }
 
-
     /**
      * Incrémenter la série
      */
-    public function increment(): bool
+    public function incrementStreak(): bool
     {
         $today = now()->toDateString();
 
@@ -113,7 +114,6 @@ class Streak extends Model
         return false;
     }
 
-
     public function calculateBonusXp(): int
     {
         if (!$this->canClaimBonus()) return 0;
@@ -144,9 +144,6 @@ class Streak extends Model
 
         return $bonusXp;
     }
-
-
-
 
     /**
      * Obtenir les milestones
@@ -193,7 +190,6 @@ class Streak extends Model
             default => 'low'
         };
     }
-
 
     /**
      * Vérifier si la série est brisée
@@ -242,6 +238,4 @@ class Streak extends Model
         // Logique pour filtrer par niveau de risque
         return $query->where('is_active', true);
     }
-
-
 }

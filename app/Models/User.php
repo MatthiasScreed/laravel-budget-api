@@ -237,6 +237,35 @@ class User extends Authenticatable
         return !is_null($this->email_verified_at);
     }
 
+    public function streaks(): HasMany
+    {
+        return $this->hasMany(Streak::class);
+    }
+
+    /**
+     * Obtenir les streaks actives
+     */
+    public function activeStreaks(): HasMany
+    {
+        return $this->streaks()->where('is_active', true);
+    }
+
+    /**
+     * Obtenir une streak spécifique par type
+     */
+    public function getStreak(string $type): ?\App\Models\Streak
+    {
+        return $this->streaks()->where('type', $type)->first();
+    }
+
+    /**
+     * Obtenir la meilleure streak de l'utilisateur
+     */
+    public function getBestStreak(): int
+    {
+        return $this->streaks()->max('best_count') ?? 0;
+    }
+
     // ==========================================
     // MÉTHODES MÉTIER
     // ==========================================

@@ -11,6 +11,9 @@
 |
 */
 
+use App\Models\User;
+use Tests\TestCase;
+
 pest()->extend(Tests\TestCase::class)
  // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
@@ -41,7 +44,39 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+// ✅ FUNCTIONS HELPER POUR LES TESTS
+function createTestUser(array $attributes = []): \App\Models\User
 {
-    // ..
+    return \App\Models\User::factory()->create($attributes);
+}
+
+function createTestStreak(\App\Models\User $user, string $type, array $attributes = []): \App\Models\Streak
+{
+    return \App\Models\Streak::factory()->create(array_merge([
+        'user_id' => $user->id,
+        'type' => $type,
+    ], $attributes));
+}
+
+
+function actingAsTestUser(?array $attributes = null): \App\Models\User
+{
+    $user = createTestUser($attributes ?? []);
+    \Laravel\Sanctum\Sanctum::actingAs($user);
+    return $user;
+}
+
+function createAuthenticatedUser(array $attributes = []): User
+{
+    $user = User::factory()->create($attributes);
+    \Laravel\Sanctum\Sanctum::actingAs($user);
+    return $user;
+}
+
+function createStreakForUser(User $user, string $type, array $attributes = []): \App\Models\Streak
+{
+    return \App\Models\Streak::factory()->create(array_merge([
+        'user_id' => $user->id,
+        'type' => $type,
+    ], $attributes));
 }

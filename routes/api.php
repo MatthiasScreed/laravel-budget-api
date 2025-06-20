@@ -55,14 +55,29 @@ Route::middleware('auth:sanctum')->group( function () {
         Route::put('/profile', [AuthController::class, 'updateProfile']);
         // Révoquer une session spécifique
 
+
     });
 
-    // 🔥 NOUVELLES ROUTES STREAK
+    // Auth Controller - Ajouter streak au login
+    Route::post('/auth/login', [AuthController::class, 'loginWithStreak']); // Nouvelle méthode
+
+    // Transaction Controller - Ajouter streak aux transactions
+    Route::post('/transactions', [TransactionController::class, 'storeWithStreak']); // Nouvel
+
+
+    // ==========================================
+    // STREAKS ROUTES
+    // ==========================================
     Route::prefix('streaks')->name('streaks.')->group(function () {
         Route::get('/', [StreakController::class, 'index'])->name('index');
-        Route::post('/{streakType}/claim-bonus', [StreakController::class, 'claimBonus'])->name('claim');
         Route::get('/leaderboard', [StreakController::class, 'leaderboard'])->name('leaderboard');
+        Route::get('/check-expired', [StreakController::class, 'checkExpired'])->name('check-expired');
+        Route::get('/{type}', [StreakController::class, 'show'])->name('show');
+        Route::post('/{type}/trigger', [StreakController::class, 'trigger'])->name('trigger');
+        Route::post('/{type}/claim-bonus', [StreakController::class, 'claimBonus'])->name('claim-bonus');
+        Route::post('/{type}/reactivate', [StreakController::class, 'reactivate'])->name('reactivate');
     });
+
 
     // ==========================================
     // RESOURCES FINANCIÈRES

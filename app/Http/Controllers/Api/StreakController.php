@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Streak;
 use App\Services\StreakService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StreakController extends Controller
@@ -17,30 +18,130 @@ class StreakController extends Controller
     }
 
     /**
-     * 📊 Voir toutes ses streaks
+     * Obtenir toutes les streaks de l'utilisateur
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $streaks = $this->streakService->getUserStreaks($user);
+        $streakData = $this->streakService->getUserStreaks($user);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'streaks' => $streaks,
-                'total_active' => count($streaks),
-                'best_streak' => collect($streaks)->max('best_count') ?? 0
-            ]
+            'data' => $streakData,
+            'message' => 'Streaks récupérées avec succès'
         ]);
     }
 
     /**
-     * 🎁 Réclamer bonus d'une streak
+     * Déclencher manuellement une streak
+     *
+     * @param Request $request
+     * @param string $type
+     * @return JsonResponse
      */
-    public function claimBonus(Request $request, string $streakType)
+    public function trigger(Request $request, string $type): JsonResponse
     {
         $user = $request->user();
-        $streak = $user->streaks()->where('type', $streakType)->first();
+
+        if (!in_array($type, array_keys(Streak::TYPES))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Type de streak invalide'
+            ], 400);
+        }
+
+        $result = $this->streakService->triggerStreak($user, $type);
+
+        return response()->json([
+            'success' => $result['success'],
+            'data' => $result,
+            'message' => $result['message']
+        ], $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Réclamer le bonus d'une streak
+     *
+     * @param Request $request
+     * @param string $type
+     * @return JsonResponse
+     */
+    public function claimBonus(Request $request, string $type): JsonResponse
+    {
+        $user = $request->user();
+        $result = $this->streakService->claimStreakBonus($user, $type);
+
+        return response()->json([
+            'success' => $result['success'],
+            'data' => $result,
+            'message' => $result['message']
+        ], $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Obtenir le leaderboard des streaks
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function leaderboard(Request $request): JsonResponse
+    {
+        $type = $request->get('type', Streak::TYPE_DAILY_LOGIN);
+        $limit = min($request->get('limit', 10), 50);
+
+        if (!in_array($type, array_keys(Streak::TYPES))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Type de streak invalide'
+            ], 400);
+        }
+
+        $leaderboardData = $this->streakService->getLeaderboard($type, $limit);
+        $userRank = $this->streakService->getUserRank($request->user(), $type);
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge($leaderboardData, [
+                'your_rank' => $userRank
+            ]),
+            'message' => 'Leaderboard récupéré avec succès'
+        ]);
+    }
+
+    /**
+     * Vérifier les streaks expirées
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function checkExpired(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $result = $this->streakService->checkExpiredStreaks($user);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+            'message' => $result['count'] > 0
+                ? "{$result['count']} streak(s) expirée(s)"
+                : 'Aucune streak expirée'
+        ]);
+    }
+
+    /**
+     * Obtenir les détails d'une streak spécifique
+     *
+     * @param Request $request
+     * @param string $type
+     * @return JsonResponse
+     */
+    public function show(Request $request, string $type): JsonResponse
+    {
+        $user = $request->user();
+        $streak = $user->streaks()->where('type', $type)->first();
 
         if (!$streak) {
             return response()->json([
@@ -49,72 +150,63 @@ class StreakController extends Controller
             ], 404);
         }
 
-        if (!$streak->canClaimBonus()) {
+        $streakData = [
+            'id' => $streak->id,
+            'type' => $streak->type,
+            'type_name' => Streak::TYPES[$streak->type] ?? $streak->type,
+            'current_count' => $streak->current_count,
+            'best_count' => $streak->best_count,
+            'last_activity_date' => $streak->last_activity_date?->toDateString(),
+            'is_active' => $streak->is_active,
+            'risk_level' => $streak->getRiskLevel(),
+            'next_milestone' => $streak->getNextMilestone(),
+            'is_at_milestone' => $streak->isAtMilestone(),
+            'can_claim_bonus' => $streak->canClaimBonus(),
+            'bonus_xp_available' => $streak->calculateBonusXp(),
+            'milestones' => $streak->getMilestones(),
+            'bonus_claimed_at' => $streak->bonus_claimed_at?->toDateTimeString()
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'streak' => $streakData
+            ],
+            'message' => 'Détails de la streak récupérés'
+        ]);
+    }
+
+    /**
+     * Réactiver une streak
+     *
+     * @param Request $request
+     * @param string $type
+     * @return JsonResponse
+     */
+    public function reactivate(Request $request, string $type): JsonResponse
+    {
+        $user = $request->user();
+        $streak = $user->streaks()->where('type', $type)->first();
+
+        if (!$streak) {
             return response()->json([
                 'success' => false,
-                'message' => 'Aucun bonus disponible pour cette streak'
-            ], 400);
+                'message' => 'Streak non trouvée'
+            ], 404);
         }
 
-        $bonusXp = $streak->claimBonus();
-        $user->addXp($bonusXp);
+        $streak->reactivate();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'bonus_xp' => $bonusXp,
-                'new_total_xp' => $user->getTotalXp(),
-                'new_level' => $user->getCurrentLevel(),
-                'streak' => $this->streakService->getStreak($user, $streakType)
-            ],
-            'message' => "🎁 Bonus de {$bonusXp} XP réclamé !"
-        ]);
-    }
-
-    /**
-     * 📈 Leaderboard des streaks
-     */
-    public function leaderboard(Request $request)
-    {
-        $streakType = $request->get('type', Streak::TYPE_DAILY_LOGIN);
-
-        $topStreaks = Streak::where('type', $streakType)
-            ->with('user:id,name')
-            ->orderBy('best_count', 'desc')
-            ->limit(20)
-            ->get()
-            ->map(function($streak, $index) {
-                return [
-                    'rank' => $index + 1,
-                    'user_name' => $streak->user->name,
-                    'best_count' => $streak->best_count,
+                'streak' => [
+                    'type' => $streak->type,
                     'current_count' => $streak->current_count,
                     'is_active' => $streak->is_active
-                ];
-            });
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'leaderboard' => $topStreaks,
-                'streak_type' => $streakType,
-                'your_rank' => $this->getUserRank($request->user(), $streakType)
-            ]
+                ]
+            ],
+            'message' => 'Streak réactivée avec succès'
         ]);
     }
-
-    /**
-     * Obtenir le rang de l'utilisateur
-     */
-    protected function getUserRank($user, $streakType): ?int
-    {
-        $userStreak = $user->streaks()->where('type', $streakType)->first();
-        if (!$userStreak) return null;
-
-        return Streak::where('type', $streakType)
-                ->where('best_count', '>', $userStreak->best_count)
-                ->count() + 1;
-    }
-
-
 }

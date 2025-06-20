@@ -14,15 +14,29 @@ return new class extends Migration
         Schema::create('streaks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->enum('type', ['daily_transaction', 'weekly_goal', 'monthly_saving'])->comment('Type de série');
-            $table->unsignedInteger('current_count')->default(0)->comment('Série actuelle');
-            $table->unsignedInteger('best_count')->default(0)->comment('Meilleure série');
-            $table->date('last_activity_date')->nullable()->comment('Dernière activité');
-            $table->boolean('is_active')->default(true)->comment('Série active');
+
+            // ✅ CORRECTION : Enum avec toutes les valeurs possibles
+            $table->enum('type', [
+                'daily_login',
+                'daily_transaction',
+                'weekly_budget',
+                'monthly_saving'
+            ])->index();
+
+            $table->integer('current_count')->default(0);
+            $table->integer('best_count')->default(0);
+            $table->date('last_activity_date')->nullable();
+            $table->boolean('is_active')->default(true);
+
+            // ✅ AJOUT : Colonne bonus_claimed_at manquante
+            $table->timestamp('bonus_claimed_at')->nullable();
+
             $table->timestamps();
 
+            // Index composé pour performance
             $table->unique(['user_id', 'type']);
-            $table->index(['user_id', 'is_active']);
+            $table->index(['is_active', 'type']);
+            $table->index(['best_count', 'type']); // Pour les leaderboards
         });
     }
 
