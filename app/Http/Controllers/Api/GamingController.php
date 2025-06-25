@@ -17,6 +17,10 @@ class GamingController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // ✅ S'assurer que le UserLevel existe avant de récupérer les stats
+        $this->ensureUserLevelExists($user);
+
         $stats = $user->getGamingStats();
 
         return response()->json([
@@ -34,72 +38,93 @@ class GamingController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        // Statistiques principales
-        $stats = $user->getGamingStats();
+            // ✅ S'assurer que le UserLevel existe et recharger la relation
+            $this->ensureUserLevelExists($user);
 
-        // Succès récents (7 derniers jours)
-        $recentAchievements = $user->achievements()
-            ->wherePivot('unlocked_at', '>=', now()->subDays(7))
-            ->orderByPivot('unlocked_at', 'desc')
-            ->limit(5)
-            ->get(['achievements.id', 'achievements.name', 'achievements.icon', 'achievements.points', 'achievements.rarity'])
-            ->map(function ($achievement) {
-                return [
-                    'id' => $achievement->id,
-                    'name' => $achievement->name,
-                    'icon' => $achievement->icon,
-                    'points' => $achievement->points,
-                    'rarity' => $achievement->rarity,
-                    'rarity_name' => $achievement->rarity_name,
-                    'rarity_color' => $achievement->rarity_color,
-                    'unlocked_at' => $achievement->pivot->unlocked_at
-                ];
-            });
+            // Informations de niveau (avec relation fraîche)
+            $levelInfo = [
+                'current_level' => $user->level->level,
+                'total_xp' => $user->level->total_xp,
+                'current_level_xp' => $user->level->current_level_xp,
+                'next_level_xp' => $user->level->next_level_xp,
+                'progress_percentage' => round($user->level->getProgressPercentage(), 2),
+                'title' => $user->level->getTitle(),
+                'xp_to_next_level' => max(0, $user->level->next_level_xp - $user->level->current_level_xp)
+            ];
 
-        // Prochains succès à débloquer
-        $nextAchievements = \App\Models\Achievement::active()
-            ->whereNotIn('id', $user->achievements()->pluck('achievements.id'))
-            ->orderBy('points')
-            ->limit(3)
-            ->get(['id', 'name', 'description', 'icon', 'points', 'rarity'])
-            ->map(function ($achievement) use ($user) {
-                return [
-                    'id' => $achievement->id,
-                    'name' => $achievement->name,
-                    'description' => $achievement->description,
-                    'icon' => $achievement->icon,
-                    'points' => $achievement->points,
-                    'rarity' => $achievement->rarity,
-                    'rarity_name' => $achievement->rarity_name,
-                    'can_unlock' => $achievement->checkCriteria($user)
-                ];
-            });
+            // Compter les achievements
+            $achievementsCount = $user->achievements()->count();
 
-        // Activité récente (gaming)
-        $activitySummary = [
-            'transactions_this_week' => $user->transactions()
-                ->where('transaction_date', '>=', now()->subWeek())
-                ->count(),
-            'xp_gained_this_week' => $user->achievements()
-                ->wherePivot('unlocked_at', '>=', now()->subWeek())
-                ->sum('points'),
-            'achievements_this_month' => $user->achievements()
-                ->wherePivot('unlocked_at', '>=', now()->subMonth())
-                ->count()
-        ];
+            // Streaks actifs (si disponible)
+            $activeStreaks = [];
+            if (class_exists(\App\Models\Streak::class)) {
+                try {
+                    $activeStreaks = $user->streaks()
+                        ->where('current_count', '>', 0)
+                        ->get(['type', 'current_count', 'best_count', 'last_activity_date']);
+                } catch (\Exception $e) {
+                    $activeStreaks = [];
+                }
+            }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'stats' => $stats,
-                'recent_achievements' => $recentAchievements,
-                'next_achievements' => $nextAchievements,
-                'activity_summary' => $activitySummary
-            ],
-            'message' => 'Dashboard gaming récupéré avec succès'
-        ]);
+            // ✅ FIX: Achievements récents avec préfixe de table pour éviter l'ambiguïté
+            $recentAchievements = $user->achievements()
+                ->wherePivot('unlocked_at', '>=', now()->subDays(7))
+                ->orderByPivot('unlocked_at', 'desc')
+                ->limit(5)
+                ->get([
+                    'achievements.id',           // ✅ Préfixe ajouté
+                    'achievements.name',         // ✅ Préfixe ajouté
+                    'achievements.description',  // ✅ Préfixe ajouté
+                    'achievements.icon',         // ✅ Préfixe ajouté
+                    'achievements.points',       // ✅ Préfixe ajouté
+                    'achievements.rarity'        // ✅ Préfixe ajouté
+                ])
+                ->map(function ($achievement) {
+                    return [
+                        'id' => $achievement->id,
+                        'name' => $achievement->name,
+                        'description' => $achievement->description,
+                        'icon' => $achievement->icon,
+                        'points' => $achievement->points,
+                        'rarity' => $achievement->rarity,
+                        'unlocked_at' => $achievement->pivot->unlocked_at
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'level_info' => $levelInfo,
+                    'achievements_count' => $achievementsCount,
+                    'active_streaks' => $activeStreaks,
+                    'recent_achievements' => $recentAchievements,
+                    'stats' => [
+                        'total_transactions' => $user->transactions()->count(),
+                        'total_goals' => $user->financialGoals()->count(),
+                        'weekly_xp' => $user->achievements()
+                            ->wherePivot('unlocked_at', '>=', now()->subWeek())
+                            ->sum('achievements.points')  // ✅ Préfixe ajouté ici aussi
+                    ]
+                ],
+                'message' => 'Dashboard gaming récupéré avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Gaming dashboard error: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération du dashboard gaming',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
     }
 
     /**
@@ -150,5 +175,34 @@ class GamingController extends Controller
             ],
             'message' => count($unlockedAchievements) . ' nouveau(x) succès débloqué(s) !'
         ]);
+    }
+
+    /**
+     * S'assurer que le UserLevel existe pour l'utilisateur
+     *
+     * Cette méthode gère le cas où le UserLevel a été supprimé
+     * mais que Laravel garde en cache la relation
+     *
+     * @param \App\Models\User $user
+     * @return void
+     */
+    protected function ensureUserLevelExists(\App\Models\User $user): void
+    {
+        // ✅ Recharger la relation level depuis la base de données
+        $user->load('level');
+
+        // ✅ Vérifier si le UserLevel existe vraiment en base
+        if (!$user->level || !$user->level->exists) {
+            // Créer un nouveau UserLevel avec les valeurs par défaut
+            $user->level()->create([
+                'level' => 1,
+                'total_xp' => 0,
+                'current_level_xp' => 0,
+                'next_level_xp' => 100
+            ]);
+
+            // ✅ Recharger la relation fraîche
+            $user->load('level');
+        }
     }
 }

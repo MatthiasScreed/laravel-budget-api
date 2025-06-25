@@ -17,56 +17,53 @@ class AchievementController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        // Récupérer tous les succès actifs
-        $achievements = Achievement::active()
-            ->orderBy('rarity')
-            ->orderBy('points')
-            ->get();
+            // Récupérer tous les achievements actifs
+            $achievements = \App\Models\Achievement::where('is_active', true)
+                ->orderBy('rarity')
+                ->orderBy('points')
+                ->get();
 
-        // IDs des succès débloqués par l'utilisateur
-        $unlockedIds = $user->achievements()->pluck('achievements.id')->toArray();
+            // Récupérer les achievements débloqués par l'utilisateur
+            $unlockedAchievementIds = $user->achievements()->pluck('achievements.id')->toArray();
 
-        $formattedAchievements = $achievements->map(function ($achievement) use ($user, $unlockedIds) {
-            $isUnlocked = in_array($achievement->id, $unlockedIds);
+            // Formater les achievements
+            $formattedAchievements = $achievements->map(function ($achievement) use ($unlockedAchievementIds, $user) {
+                $isUnlocked = in_array($achievement->id, $unlockedAchievementIds);
 
-            return [
-                'id' => $achievement->id,
-                'name' => $achievement->name,
-                'description' => $achievement->description,
-                'icon' => $achievement->icon,
-                'points' => $achievement->points,
-                'type' => $achievement->type,
-                'type_name' => $achievement->type_name,
-                'rarity' => $achievement->rarity,
-                'rarity_name' => $achievement->rarity_name,
-                'rarity_color' => $achievement->rarity_color,
-                'is_unlocked' => $isUnlocked,
-                'can_unlock' => !$isUnlocked && $achievement->checkCriteria($user),
-                'unlocked_at' => $isUnlocked ?
-                    $user->achievements()->find($achievement->id)->pivot->unlocked_at :
-                    null
-            ];
-        });
+                return [
+                    'id' => $achievement->id,
+                    'name' => $achievement->name,
+                    'description' => $achievement->description,
+                    'icon' => $achievement->icon,
+                    'points' => $achievement->points,
+                    'type' => $achievement->type,
+                    'rarity' => $achievement->rarity,
+                    'color' => $achievement->color,
+                    'is_unlocked' => $isUnlocked,
+                    'can_unlock' => !$isUnlocked && $achievement->checkCriteria($user),
+                    'unlocked_at' => $isUnlocked ?
+                        $user->achievements()->find($achievement->id)->pivot->unlocked_at :
+                        null
+                ];
+            });
 
-        // Statistiques des succès
-        $stats = [
-            'total_achievements' => $achievements->count(),
-            'unlocked_count' => count($unlockedIds),
-            'available_to_unlock' => $formattedAchievements->where('can_unlock', true)->count(),
-            'completion_percentage' => $achievements->count() > 0 ?
-                round((count($unlockedIds) / $achievements->count()) * 100, 1) : 0
-        ];
+            return response()->json([
+                'success' => true,
+                'data' => $formattedAchievements,
+                'message' => 'Liste des achievements récupérée avec succès'
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'achievements' => $formattedAchievements,
-                'stats' => $stats
-            ],
-            'message' => 'Liste des succès récupérée avec succès'
-        ]);
+        } catch (\Exception $e) {
+            \Log::error('Achievements list error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des achievements'
+            ], 500);
+        }
     }
 
     /**
@@ -80,7 +77,7 @@ class AchievementController extends Controller
         $user = $request->user();
 
         $availableAchievements = Achievement::active()
-            ->whereNotIn('id', $user->achievements()->pluck('achievements.id'))
+            ->whereNotIn('id', $user->achievements()->pluck('achievements.id'))  // ✅ Fix: préfixe ajouté
             ->orderBy('points')
             ->get();
 

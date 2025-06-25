@@ -44,39 +44,51 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-// ✅ FUNCTIONS HELPER POUR LES TESTS
-function createTestUser(array $attributes = []): \App\Models\User
+
+/**
+ * Helper function pour créer un utilisateur avec niveau gaming
+ */
+function createUserWithLevel(array $attributes = []): \App\Models\User
 {
-    return \App\Models\User::factory()->create($attributes);
+    $user = \App\Models\User::factory()->create($attributes);
+
+    if (!$user->level) {
+        $user->level()->create([
+            'level' => 1,
+            'total_xp' => 0,
+            'current_level_xp' => 0,
+            'next_level_xp' => 100
+        ]);
+    }
+
+    return $user->fresh('level');
 }
 
-function createTestStreak(\App\Models\User $user, string $type, array $attributes = []): \App\Models\Streak
+/**
+ * Helper function pour vérifier les structures JSON gaming
+ */
+function assertGamingStructure(\Illuminate\Testing\TestResponse $response): void
 {
-    return \App\Models\Streak::factory()->create(array_merge([
-        'user_id' => $user->id,
-        'type' => $type,
-    ], $attributes));
+    $response->assertJsonStructure([
+        'success',
+        'data' => [
+            'level_info' => [
+                'current_level',
+                'total_xp',
+                'progress_percentage'
+            ]
+        ]
+    ]);
 }
 
-
-function actingAsTestUser(?array $attributes = null): \App\Models\User
+/**
+ * Helper function pour débugger les réponses de test
+ */
+function debugResponse(\Illuminate\Testing\TestResponse $response): void
 {
-    $user = createTestUser($attributes ?? []);
-    \Laravel\Sanctum\Sanctum::actingAs($user);
-    return $user;
-}
-
-function createAuthenticatedUser(array $attributes = []): User
-{
-    $user = User::factory()->create($attributes);
-    \Laravel\Sanctum\Sanctum::actingAs($user);
-    return $user;
-}
-
-function createStreakForUser(User $user, string $type, array $attributes = []): \App\Models\Streak
-{
-    return \App\Models\Streak::factory()->create(array_merge([
-        'user_id' => $user->id,
-        'type' => $type,
-    ], $attributes));
+    dump([
+        'status' => $response->status(),
+        'headers' => $response->headers->all(),
+        'content' => $response->getContent()
+    ]);
 }
