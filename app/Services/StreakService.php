@@ -258,4 +258,28 @@ class StreakService
 
         return $betterCount + 1;
     }
+
+    /**
+     * Mettre à jour une série pour un utilisateur
+     *
+     * ✅ Déléguer au StreakService au lieu de gérer directement
+     *
+     * @param User $user Utilisateur concerné
+     * @param string $streakType Type de série
+     * @return bool Série mise à jour avec succès
+     */
+    public function updateStreak(User $user, string $streakType): bool
+    {
+        try {
+            // ✅ Utiliser le StreakService dédié
+            $streakService = app(\App\Services\StreakService::class);
+            $result = $streakService->triggerStreak($user, $streakType);
+
+            return $result['success'] ?? false;
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating streak {$streakType} for user {$user->id}: " . $e->getMessage());
+            return false;
+        }
+    }
 }

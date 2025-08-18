@@ -12,10 +12,28 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        // ✅ CORS en premier !
+        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
+
+       $middleware->append(\App\Http\Middleware\CorsMiddleware::class);
+        // ==========================================
+        // SANCTUM CONFIGURATION
+        // ==========================================
+        $middleware->statefulApi();
+
+        // ==========================================
+        // RATE LIMITING
+        // ==========================================
+        $middleware->throttleApi();
+
+        // ==========================================
+        // MIDDLEWARE PERSONNALISÉS (optionnel)
+        // ==========================================
+        $middleware->alias([
+            'cors' => \Illuminate\Http\Middleware\HandleCors::class,
         ]);
     })
+
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

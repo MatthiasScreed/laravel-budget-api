@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Events\GoalCreated;
 use App\Models\Transaction;
 use App\Models\Category;
 use App\Models\FinancialGoal;
@@ -46,15 +47,14 @@ class BudgetService
                 'status' => 'completed'
             ]);
 
-            // Déclencher les événements gaming
-            event(new TransactionCreated($user, $transaction));
-
-            // Mettre à jour les séries
-            $this->gamingService->updateStreak($user, 'daily_transaction');
-
-            // Ajouter XP pour la transaction
-            $xpAmount = $this->calculateTransactionXp($transaction);
-            $this->gamingService->addExperience($user, $xpAmount, 'transaction');
+            // 🎮 GAMING SÉCURISÉ
+            try {
+                event(new TransactionCreated($user, $transaction));
+                $xpAmount = $this->calculateTransactionXp($transaction);
+                $this->gamingService->addExperience($user, $xpAmount, 'transaction');
+            } catch (\Exception $gamingError) {
+                \Log::warning('Gaming error: ' . $gamingError->getMessage());
+            }
 
             DB::commit();
             return $transaction;
@@ -71,7 +71,7 @@ class BudgetService
      * @param Transaction $transaction Transaction concernée
      * @return int Points d'expérience
      */
-    protected function calculateTransactionXp(Transaction $transaction): int
+    public function calculateTransactionXp(Transaction $transaction): int
     {
         $baseXp = 5; // XP de base pour toute transaction
         $amountBonus = min(50, floor($transaction->amount / 100)); // 1 XP par 100€
@@ -472,5 +472,80 @@ class BudgetService
         }
 
         return $patterns;
+    }
+
+    /**
+     * Mettre à jour une série (stub pour éviter les erreurs)
+     */
+    public function updateStreak(User $user, string $streakType): void
+    {
+        // TODO: Implémenter la logique des séries plus tard
+        \Log::info("Streak update called for user {$user->id}, type: {$streakType}");
+    }
+
+    /**
+     * Créer un nouvel objectif financier avec événements gaming
+     *
+     * @param User $user Utilisateur concerné
+     * @param array $data Données de l'objectif
+     * @return FinancialGoal Objectif créé
+     */
+    public function createGoal(User $user, array $data): FinancialGoal
+    {
+        DB::beginTransaction();
+
+        try {
+            $data['user_id'] = $user->id;
+
+            // Calculer la date de début si pas fournie
+            if (!isset($data['start_date'])) {
+                $data['start_date'] = now()->toDateString();
+            }
+
+            // Calculer next_automatic_date si nécessaire
+            if ($data['is_automatic'] ?? false) {
+                $data['next_automatic_date'] = $this->calculateNextAutomaticDate(
+                    $data['automatic_frequency'] ?? 'monthly'
+                );
+            }
+
+            // Créer l'objectif
+            $goal = FinancialGoal::create($data);
+
+            // ✅ Déclencher l'événement GoalCreated
+            event(new GoalCreated($user, $goal));
+
+            // ✅ Ajouter XP pour la création d'objectif
+            $this->gamingService->addExperience($user, 25, 'goal_created');
+
+            // ✅ Mettre à jour les séries
+            $this->gamingService->updateStreak($user, 'goal_creation');
+
+            // ✅ Vérifier les achievements
+            $this->gamingService->checkAchievements($user);
+
+            DB::commit();
+            return $goal;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Calculer la prochaine date de contribution automatique
+     *
+     * @param string $frequency Fréquence des contributions
+     * @return string Date au format Y-m-d
+     */
+    protected function calculateNextAutomaticDate(string $frequency): string
+    {
+        return match($frequency) {
+            'weekly' => now()->addWeek()->toDateString(),
+            'monthly' => now()->addMonth()->toDateString(),
+            'quarterly' => now()->addQuarter()->toDateString(),
+            default => now()->addMonth()->toDateString()
+        };
     }
 }

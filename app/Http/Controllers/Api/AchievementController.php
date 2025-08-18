@@ -17,53 +17,53 @@ class AchievementController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $user = $request->user();
+        $user = $request->user();
 
-            // Récupérer tous les achievements actifs
-            $achievements = \App\Models\Achievement::where('is_active', true)
-                ->orderBy('rarity')
-                ->orderBy('points')
-                ->get();
+        // Récupérer tous les succès actifs
+        $achievements = Achievement::active()
+            ->orderBy('rarity')
+            ->orderBy('points')
+            ->get();
 
-            // Récupérer les achievements débloqués par l'utilisateur
-            $unlockedAchievementIds = $user->achievements()->pluck('achievements.id')->toArray();
+        // IDs des succès débloqués par l'utilisateur
+        $unlockedIds = $user->achievements()->pluck('achievements.id')->toArray();
 
-            // Formater les achievements
-            $formattedAchievements = $achievements->map(function ($achievement) use ($unlockedAchievementIds, $user) {
-                $isUnlocked = in_array($achievement->id, $unlockedAchievementIds);
+        $formattedAchievements = $achievements->map(function ($achievement) use ($user, $unlockedIds) {
+            $isUnlocked = in_array($achievement->id, $unlockedIds);
 
-                return [
-                    'id' => $achievement->id,
-                    'name' => $achievement->name,
-                    'description' => $achievement->description,
-                    'icon' => $achievement->icon,
-                    'points' => $achievement->points,
-                    'type' => $achievement->type,
-                    'rarity' => $achievement->rarity,
-                    'color' => $achievement->color,
-                    'is_unlocked' => $isUnlocked,
-                    'can_unlock' => !$isUnlocked && $achievement->checkCriteria($user),
-                    'unlocked_at' => $isUnlocked ?
-                        $user->achievements()->find($achievement->id)->pivot->unlocked_at :
-                        null
-                ];
-            });
+            return [
+                'id' => $achievement->id,
+                'name' => $achievement->name,
+                'description' => $achievement->description,
+                'icon' => $achievement->icon,
+                'points' => $achievement->points,
+                'type' => $achievement->type,
+                'rarity' => $achievement->rarity,
+                'is_unlocked' => $isUnlocked,
+                'can_unlock' => !$isUnlocked && $achievement->checkCriteria($user),
+                'unlocked_at' => $isUnlocked ?
+                    $user->achievements()->find($achievement->id)->pivot->unlocked_at :
+                    null
+            ];
+        });
 
-            return response()->json([
-                'success' => true,
-                'data' => $formattedAchievements,
-                'message' => 'Liste des achievements récupérée avec succès'
-            ]);
+        // Statistiques des succès
+        $stats = [
+            'total_achievements' => $achievements->count(),
+            'unlocked_count' => count($unlockedIds),
+            'available_to_unlock' => $formattedAchievements->where('can_unlock', true)->count(),
+            'completion_percentage' => $achievements->count() > 0 ?
+                round((count($unlockedIds) / $achievements->count()) * 100, 1) : 0
+        ];
 
-        } catch (\Exception $e) {
-            \Log::error('Achievements list error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la récupération des achievements'
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'achievements' => $formattedAchievements, // 👈 Clé que le test attend
+                'stats' => $stats
+            ],
+            'message' => 'Liste des succès récupérée avec succès'
+        ]);
     }
 
     /**

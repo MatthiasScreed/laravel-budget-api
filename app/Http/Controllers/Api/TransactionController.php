@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class TransactionController extends Controller
 {
@@ -69,65 +70,66 @@ class TransactionController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:categories,id',
             'type' => 'required|in:income,expense',
             'amount' => 'required|numeric|min:0.01',
-            'description' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
             'transaction_date' => 'required|date',
-            'payment_method' => 'nullable|string|max:100',
+            'payment_method' => 'nullable|string|max:50',
             'reference' => 'nullable|string|max:100',
-            'is_recurring' => 'boolean',
-            'recurring_frequency' => 'nullable|in:daily,weekly,monthly,yearly',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50'
         ]);
 
-        // Vérifier que la catégorie appartient à l'utilisateur
-        $category = Category::where('id', $data['category_id'])
-            ->where('user_id', Auth::id())
-            ->first();
-
-        if (!$category) {
-            return $this->notFoundResponse('Catégorie non trouvée');
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation',
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        // Vérifier que le type correspond à la catégorie
-        if ($data['type'] !== $category->type) {
-            return $this->errorResponse('Le type de transaction ne correspond pas au type de catégorie');
-        }
+        $data = $validator->validated();
+        $user = $request->user();
 
         try {
-            DB::beginTransaction();
+            // 🎮 UTILISER LE BUDGET SERVICE POUR L'XP ET GAMING
+            $transaction = $this->budgetService->createTransaction($user, $data);
 
-            $data['user_id'] = Auth::id();
-            $data['status'] = 'completed';
-            $data['is_recurring'] = $data['is_recurring'] ?? false;
+            // Calculer l'XP gagné pour l'afficher
+            $xpGained = $this->budgetService->calculateTransactionXp($transaction);
 
-            $transaction = Transaction::create($data);
+            // Stats gaming mises à jour
+            $gamingStats = $user->fresh()->getGamingStats();
 
-            // Traiter les tags si fournis
-            if (isset($data['tags']) && !empty($data['tags'])) {
-                $transaction->syncTags($data['tags']);
-            }
-
-            // Utiliser le service pour les actions gaming
-            $this->budgetService->createTransaction(Auth::user(), $data);
-
-            DB::commit();
-
-            // Charger les relations pour la réponse
-            $transaction->load(['category', 'tags']);
-
-            return $this->createdResponse($transaction, 'Transaction créée avec succès');
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $transaction->id,
+                    'amount' => $transaction->amount,
+                    'description' => $transaction->description,
+                    'type' => $transaction->type,
+                    'transaction_date' => $transaction->transaction_date,
+                    'status' => $transaction->status,
+                    'category' => [
+                        'id' => $transaction->category->id,
+                        'name' => $transaction->category->name,
+                        'type' => $transaction->category->type,
+                    ],
+                    // 🎮 DONNÉES GAMING AJOUTÉES
+                    'gaming' => [
+                        'xp_gained' => $xpGained,
+                        'total_xp' => $gamingStats['level_info']['total_xp'],
+                        'current_level' => $gamingStats['level_info']['current_level']
+                    ]
+                ],
+                'message' => 'Transaction créée avec succès (+' . $xpGained . ' XP!)'
+            ], 201);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-
-            return $this->errorResponse(
-                'Erreur lors de la création de la transaction: ' . $e->getMessage(),
-                500
-            );
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la création: ' . $e->getMessage()
+            ], 500);
         }
     }
 

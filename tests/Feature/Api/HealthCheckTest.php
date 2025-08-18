@@ -2,10 +2,33 @@
 
 namespace Tests\Feature\Api;
 
-use Tests\TestCase;
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Tests\CreatesApplication;
 
-class HealthCheckTest extends TestCase
+class HealthCheckTest extends BaseTestCase
 {
+    use CreatesApplication;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // 🎯 CONFIGURATION MINIMALE POUR LES TESTS DE HEALTH CHECK
+        // On ne veut pas créer d'achievements ici !
+
+        config([
+            'database.default' => 'testing',
+            'database.connections.testing' => [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+                'foreign_key_constraints' => false,
+            ],
+            'app.env' => 'testing',
+            'cache.default' => 'array',
+        ]);
+    }
+
     /** @test */
     public function api_health_check_returns_ok()
     {

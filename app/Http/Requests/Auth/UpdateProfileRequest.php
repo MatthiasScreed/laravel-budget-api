@@ -35,7 +35,7 @@ class UpdateProfileRequest extends FormRequest
             'email' => [
                 'sometimes',
                 'string',
-                'email:rfc,dns',
+                'email:rfc', // ✅ Plus de validation DNS
                 'max:255',
                 Rule::unique('users', 'email')->ignore($userId)
             ],

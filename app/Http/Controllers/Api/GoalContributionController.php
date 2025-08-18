@@ -84,5 +84,40 @@ class GoalContributionController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * Obtenir les contributions d'un objectif spécifique
+     */
+    public function getByGoal(Request $request, FinancialGoal $financialGoal): JsonResponse
+    {
+        // Vérifier que l'objectif appartient à l'utilisateur connecté
+        if ($financialGoal->user_id !== $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès non autorisé à cet objectif financier'
+            ], 403);
+        }
+
+        $contributions = $financialGoal->contributions()
+            ->with(['transaction'])
+            ->orderBy('date', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'goal' => [
+                    'id' => $financialGoal->id,
+                    'name' => $financialGoal->name,
+                    'target_amount' => $financialGoal->target_amount,
+                    'current_amount' => $financialGoal->current_amount
+                ],
+                'contributions' => $contributions,
+                'total_contributions' => $contributions->sum('amount'),
+                'contributions_count' => $contributions->count()
+            ],
+            'message' => 'Contributions récupérées avec succès'
+        ]);
+    }
+
 
 }

@@ -38,93 +38,80 @@ class GamingController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
-        try {
-            $user = $request->user();
+        $user = $request->user();
 
-            // ✅ S'assurer que le UserLevel existe et recharger la relation
-            $this->ensureUserLevelExists($user);
+        // Statistiques principales
+        $stats = $user->getGamingStats();
 
-            // Informations de niveau (avec relation fraîche)
-            $levelInfo = [
-                'current_level' => $user->level->level,
-                'total_xp' => $user->level->total_xp,
-                'current_level_xp' => $user->level->current_level_xp,
-                'next_level_xp' => $user->level->next_level_xp,
-                'progress_percentage' => round($user->level->getProgressPercentage(), 2),
-                'title' => $user->level->getTitle(),
-                'xp_to_next_level' => max(0, $user->level->next_level_xp - $user->level->current_level_xp)
-            ];
+        // Succès récents (7 derniers jours)
+        $recentAchievements = $user->achievements()
+            ->wherePivot('unlocked_at', '>=', now()->subDays(7))
+            ->orderByPivot('unlocked_at', 'desc')
+            ->limit(5)
+            ->get(['achievements.id', 'achievements.name', 'achievements.icon', 'achievements.points', 'achievements.rarity'])
+            ->map(function ($achievement) {
+                return [
+                    'id' => $achievement->id,
+                    'name' => $achievement->name,
+                    'icon' => $achievement->icon,
+                    'points' => $achievement->points,
+                    'rarity' => $achievement->rarity,
+                    'rarity_name' => $achievement->rarity_name ?? ucfirst($achievement->rarity),
+                    'rarity_color' => $achievement->rarity_color ?? '#3B82F6',
+                    'unlocked_at' => $achievement->pivot->unlocked_at
+                ];
+            });
 
-            // Compter les achievements
-            $achievementsCount = $user->achievements()->count();
-
-            // Streaks actifs (si disponible)
-            $activeStreaks = [];
-            if (class_exists(\App\Models\Streak::class)) {
+        // Prochains succès à débloquer
+        $nextAchievements = \App\Models\Achievement::active()
+            ->whereNotIn('id', $user->achievements()->pluck('achievements.id'))
+            ->orderBy('points')
+            ->limit(3)
+            ->get(['id', 'name', 'description', 'icon', 'points', 'rarity'])
+            ->map(function ($achievement) use ($user) {
+                $canUnlock = false;
                 try {
-                    $activeStreaks = $user->streaks()
-                        ->where('current_count', '>', 0)
-                        ->get(['type', 'current_count', 'best_count', 'last_activity_date']);
+                    $canUnlock = $achievement->checkCriteria($user);
                 } catch (\Exception $e) {
-                    $activeStreaks = [];
+                    // Si checkCriteria lève une exception, on met false
+                    $canUnlock = false;
                 }
-            }
 
-            // ✅ FIX: Achievements récents avec préfixe de table pour éviter l'ambiguïté
-            $recentAchievements = $user->achievements()
-                ->wherePivot('unlocked_at', '>=', now()->subDays(7))
-                ->orderByPivot('unlocked_at', 'desc')
-                ->limit(5)
-                ->get([
-                    'achievements.id',           // ✅ Préfixe ajouté
-                    'achievements.name',         // ✅ Préfixe ajouté
-                    'achievements.description',  // ✅ Préfixe ajouté
-                    'achievements.icon',         // ✅ Préfixe ajouté
-                    'achievements.points',       // ✅ Préfixe ajouté
-                    'achievements.rarity'        // ✅ Préfixe ajouté
-                ])
-                ->map(function ($achievement) {
-                    return [
-                        'id' => $achievement->id,
-                        'name' => $achievement->name,
-                        'description' => $achievement->description,
-                        'icon' => $achievement->icon,
-                        'points' => $achievement->points,
-                        'rarity' => $achievement->rarity,
-                        'unlocked_at' => $achievement->pivot->unlocked_at
-                    ];
-                });
+                return [
+                    'id' => $achievement->id,
+                    'name' => $achievement->name,
+                    'description' => $achievement->description,
+                    'icon' => $achievement->icon,
+                    'points' => $achievement->points,
+                    'rarity' => $achievement->rarity,
+                    'rarity_name' => ucfirst($achievement->rarity),
+                    'can_unlock' => $canUnlock
+                ];
+            });
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'level_info' => $levelInfo,
-                    'achievements_count' => $achievementsCount,
-                    'active_streaks' => $activeStreaks,
-                    'recent_achievements' => $recentAchievements,
-                    'stats' => [
-                        'total_transactions' => $user->transactions()->count(),
-                        'total_goals' => $user->financialGoals()->count(),
-                        'weekly_xp' => $user->achievements()
-                            ->wherePivot('unlocked_at', '>=', now()->subWeek())
-                            ->sum('achievements.points')  // ✅ Préfixe ajouté ici aussi
-                    ]
-                ],
-                'message' => 'Dashboard gaming récupéré avec succès'
-            ]);
+        // Activité récente (gaming)
+        $activitySummary = [
+            'transactions_this_week' => $user->transactions()
+                ->where('transaction_date', '>=', now()->subWeek())
+                ->count(),
+            'xp_gained_this_week' => $user->achievements()
+                ->wherePivot('unlocked_at', '>=', now()->subWeek())
+                ->sum('points'),
+            'achievements_this_month' => $user->achievements()
+                ->wherePivot('unlocked_at', '>=', now()->subMonth())
+                ->count()
+        ];
 
-        } catch (\Exception $e) {
-            \Log::error('Gaming dashboard error: ' . $e->getMessage(), [
-                'user_id' => $request->user()->id,
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la récupération du dashboard gaming',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'stats' => $stats,
+                'recent_achievements' => $recentAchievements,
+                'next_achievements' => $nextAchievements, // 🎯 Cette clé est bien là !
+                'activity_summary' => $activitySummary
+            ],
+            'message' => 'Dashboard gaming récupéré avec succès'
+        ]);
     }
 
     /**
@@ -144,6 +131,7 @@ class GamingController extends Controller
                 'success' => true,
                 'data' => [
                     'unlocked_achievements' => [],
+                    'count' => 0, // 👈 AJOUTER CETTE CLÉ MANQUANTE
                     'xp_gained' => 0
                 ],
                 'message' => 'Aucun nouveau succès à débloquer'
@@ -160,8 +148,8 @@ class GamingController extends Controller
                 'icon' => $achievement->icon,
                 'points' => $achievement->points,
                 'rarity' => $achievement->rarity,
-                'rarity_name' => $achievement->rarity_name,
-                'rarity_color' => $achievement->rarity_color
+                'rarity_name' => $achievement->rarity_name ?? ucfirst($achievement->rarity),
+                'rarity_color' => $achievement->rarity_color ?? '#3B82F6'
             ];
         }, $unlockedAchievements);
 

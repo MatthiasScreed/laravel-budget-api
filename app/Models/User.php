@@ -614,5 +614,15 @@ class User extends Authenticatable
         });
     }
 
+    public function bankConnections():hasMany
+    {
+        return $this->hasMany(BankConnection::class);
+    }
 
+    public function hasActiveBankConnections(): bool
+    {
+        return $this->bankConnections()
+            ->where('status', BankConnection::STATUS_ACTIVE)
+            ->exists();
+    }
 }

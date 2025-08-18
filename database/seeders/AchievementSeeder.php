@@ -150,6 +150,43 @@ class AchievementSeeder extends Seeder
                 'criteria' => ['min_savings_amount' => 20000],
                 'points' => 300,
                 'rarity' => 'legendary'
+            ],
+            [
+                'name' => 'Banquier Connecté',
+                'description' => 'Connecte ton premier compte bancaire',
+                'icon' => '🏦',
+                'type' => 'one_time',
+                'xp_reward' => 100,
+                'criteria' => json_encode(['bank_connections_count' => 1])
+            ],
+            [
+                'name' => 'Synchroniseur Pro',
+                'description' => 'Synchronise tes comptes 10 fois',
+                'icon' => '🔄',
+                'type' => 'cumulative',
+                'xp_reward' => 75,
+                'criteria' => json_encode(['sync_count' => 10])
+            ],
+            [
+                'name' => 'Premier Pas Digital',
+                'description' => 'Connecte ton premier compte bancaire',
+                'icon' => '🏦',
+                'xp_reward' => 100,
+                'criteria' => json_encode(['bank_connections' => 1])
+            ],
+            [
+                'name' => 'Synchroniseur',
+                'description' => 'Effectue 10 synchronisations',
+                'icon' => '🔄',
+                'xp_reward' => 75,
+                'criteria' => json_encode(['sync_count' => 10])
+            ],
+            [
+                'name' => 'Organisateur Pro',
+                'description' => 'Catégorise 50 transactions importées',
+                'icon' => '📊',
+                'xp_reward' => 150,
+                'criteria' => json_encode(['categorized_transactions' => 50])
             ]
 
         ];

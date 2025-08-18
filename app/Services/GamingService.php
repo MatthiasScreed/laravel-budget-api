@@ -129,12 +129,40 @@ class GamingService
         $streak = $user->streaks()->where('type', $streakType)->first();
 
         if (!$streak) {
-            $streak = $user->streaks()->create(['type' => $streakType]);
+            $streak = $user->streaks()->create([
+                'type' => $streakType,
+                'current_count' => 0,
+                'best_count' => 0,
+                'last_activity_date' => now()
+            ]);
         }
 
-        $updated = $streak->increment();
+        // ✅ FIX: Spécifier la colonne à incrémenter
+        $today = now()->toDateString();
+        $lastActivityDate = $streak->last_activity_date ?
+            $streak->last_activity_date->toDateString() : null;
 
-        if ($updated) {
+        // Vérifier si c'est un nouveau jour
+        if ($lastActivityDate !== $today) {
+            // Vérifier si la série continue (hier) ou se remet à zéro
+            $yesterday = now()->subDay()->toDateString();
+
+            if ($lastActivityDate === $yesterday) {
+                // Série continue - incrémenter
+                $streak->increment('current_count');
+            } else {
+                // Série cassée - recommencer à 1
+                $streak->update(['current_count' => 1]);
+            }
+
+            // Mettre à jour la meilleure série si nécessaire
+            if ($streak->current_count > $streak->best_count) {
+                $streak->update(['best_count' => $streak->current_count]);
+            }
+
+            // Mettre à jour la date de dernière activité
+            $streak->update(['last_activity_date' => now()]);
+
             event(new StreakUpdated($user, $streak));
 
             // XP bonus pour les séries importantes
@@ -142,9 +170,11 @@ class GamingService
             if ($bonusXp > 0) {
                 $this->addExperience($user, $bonusXp, 'streak_bonus');
             }
+
+            return true;
         }
 
-        return $updated;
+        return false; // Pas de mise à jour (déjà fait aujourd'hui)
     }
 
     /**
@@ -340,6 +370,37 @@ class GamingService
                 ->limit(3)
                 ->get()
         ];
+    }
+
+    public function handleBankSync(User $user, int $transactionsImported): void
+    {
+        // XP pour sync
+        $this->addXP($user, min(50, $transactionsImported * 2), 'bank_sync');
+
+        // Vérifier achievements
+        $this->checkAchievements($user);
+
+        // Streak pour syncs régulières
+        $this->updateStreak($user, 'bank_sync');
+    }
+
+    // Dans GamingService.php, ajouter méthode :
+    public function handleBankEvent(User $user, string $event, array $data = []): void
+    {
+        $xpMap = [
+            'bank_connection' => 100,
+            'first_sync' => 50,
+            'auto_sync' => 20,
+            'manual_sync' => 10,
+            'process_transaction' => 5
+        ];
+
+        $xp = $xpMap[$event] ?? 0;
+        if ($xp > 0) {
+            $this->addXP($user, $xp, $event);
+        }
+
+        $this->checkAchievements($user);
     }
 
 

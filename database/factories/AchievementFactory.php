@@ -2,92 +2,70 @@
 
 namespace Database\Factories;
 
+use App\Models\Achievement;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Achievement>
- */
 class AchievementFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Achievement::class;
+
     public function definition(): array
     {
+        $name = $this->faker->words(2, true);
+
         return [
-            // ✅ Champs obligatoires ajoutés
-            'name' => $this->faker->words(3, true),
-            'slug' => $this->faker->unique()->slug(),
+            'name' => $name,
+            'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1000, 9999),
             'description' => $this->faker->sentence(),
-            'icon' => $this->faker->randomElement([
-                'star', 'trophy', 'medal', 'crown', 'fire', 'heart',
-                'target', 'check-circle', 'trending-up', 'zap'
-            ]),
-            'color' => $this->faker->randomElement([
-                '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'
-            ]),
-            'type' => $this->faker->randomElement([
-                'transaction', 'goal', 'streak', 'milestone', 'social'
-            ]),
-            'criteria' => [
-                'min_transactions' => $this->faker->numberBetween(1, 100)
-            ],
-            'points' => $this->faker->numberBetween(10, 500),
-            'rarity' => $this->faker->randomElement([
-                'common', 'rare', 'epic', 'legendary'
-            ]),
-            'is_active' => true
+            'icon' => $this->faker->randomElement(['🎯', '🏆', '⭐', '🎉', '💪', '🔥', '⚡', '🌟']),
+            'color' => $this->faker->randomElement(['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']),
+            'type' => $this->faker->randomElement(['transaction', 'goal', 'milestone', 'streak']),
+            'criteria' => ['min_transactions' => $this->faker->numberBetween(1, 10)],
+            'points' => $this->faker->numberBetween(5, 100),
+            'rarity' => $this->faker->randomElement(['common', 'rare', 'epic', 'legendary']),
+            'is_active' => true,
         ];
     }
 
     /**
-     * State pour un achievement simple
+     * Achievement simple pour les tests
      */
     public function simple(): static
     {
         return $this->state(fn (array $attributes) => [
-            'name' => 'Test Achievement',
-            'description' => 'A simple test achievement',
             'type' => 'transaction',
             'criteria' => ['min_transactions' => 1],
             'points' => 10,
-            'rarity' => 'common'
+            'rarity' => 'common',
+            'color' => '#3B82F6'
         ]);
     }
 
     /**
-     * State pour un achievement de transaction
+     * Achievement difficile
+     */
+    public function rare(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => 'milestone',
+            'criteria' => ['min_transactions' => 100],
+            'points' => 500,
+            'rarity' => 'rare',
+            'color' => '#8B5CF6'
+        ]);
+    }
+
+    /**
+     * Achievement de transaction
      */
     public function transaction(): static
     {
         return $this->state(fn (array $attributes) => [
             'type' => 'transaction',
-            'criteria' => ['min_transactions' => $this->faker->numberBetween(1, 50)]
+            'criteria' => ['min_transactions' => $this->faker->numberBetween(1, 5)],
+            'points' => $this->faker->numberBetween(10, 50),
+            'rarity' => 'common'
         ]);
     }
-
-    /**
-     * State pour un achievement d'objectif
-     */
-    public function goal(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'type' => 'goal',
-            'criteria' => ['min_goals_completed' => $this->faker->numberBetween(1, 10)]
-        ]);
-    }
-
-    /**
-     * State pour un achievement rare
-     */
-    public function rare(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'rarity' => 'rare',
-            'points' => $this->faker->numberBetween(50, 200)
-        ]);
-    }
-
 }

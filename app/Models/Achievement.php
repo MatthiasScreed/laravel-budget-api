@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Str;
 
 class Achievement extends Model
 {
@@ -405,5 +406,26 @@ class Achievement extends Model
                 'rarity' => self::RARITY_COMMON
             ]
         ];
+    }
+
+    // 🔧 AUTO-GÉNÉRER LE SLUG
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function ($achievement) {
+            if (empty($achievement->slug)) {
+                $achievement->slug = Str::slug($achievement->name);
+
+                // Assurer l'unicité
+                $originalSlug = $achievement->slug;
+                $counter = 1;
+
+                while (static::where('slug', $achievement->slug)->exists()) {
+                    $achievement->slug = $originalSlug . '-' . $counter;
+                    $counter++;
+                }
+            }
+        });
     }
 }

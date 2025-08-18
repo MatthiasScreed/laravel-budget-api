@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BankController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\FinancialGoalController;
 use App\Http\Controllers\Api\GoalContributionController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\StreakController;
 use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\Api\TransactionController;
@@ -21,6 +23,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/health', [HealthController::class, 'health'])->name('health');
+Route::get('/docs', [HealthController::class, 'docs'])->name('docs');
 // ==========================================
 // ROUTES PUBLIQUES
 // ==========================================
@@ -31,6 +35,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
+Route::post('/webhooks/bridge', [BankController::class, 'webhook'])->name('bridge.webhook');
 // ==========================================
 // ROUTES PROTÉGÉES
 // ==========================================
@@ -59,10 +64,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('transactions', TransactionController::class);
     Route::get('transactions/{transaction}/statistics', [TransactionController::class, 'statistics']);
 
+
+    // ✅ Routes additionnelles pour FinancialGoal
+    Route::prefix('financial-goals')->name('financial-goals.')->group(function () {
+        // Statistiques des objectifs
+        Route::get('/statistics', [FinancialGoalController::class, 'statistics'])->name('statistics');
+
+        // Contributions à un objectif spécifique
+        Route::post('/{financialGoal}/contributions', [FinancialGoalController::class, 'addContribution'])->name('add-contribution');
+
+        // Obtenir les contributions d'un objectif
+        Route::get('/{financialGoal}/contributions', [GoalContributionController::class, 'getByGoal'])->name('get-contributions');
+    });
+
     Route::apiResource('financial-goals', FinancialGoalController::class);
-    Route::post('financial-goals/{financialGoal}/contributions', [FinancialGoalController::class, 'addContribution']);
-    Route::get('financial-goals/statistics', [FinancialGoalController::class, 'statistics']);
-    Route::patch('financial-goals/{financialGoal}/toggle-status', [FinancialGoalController::class, 'toggleStatus']);
+
+
 
     Route::apiResource('categories', CategoryController::class);
     Route::get('categories/statistics', [CategoryController::class, 'statistics']);
@@ -72,7 +89,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('goal-contributions', GoalContributionController::class);
 
     // Routes additionnelles spécifiques
-    Route::get('financial-goals/{goal}/contributions', [GoalContributionController::class, 'getByGoal']);
     Route::get('categories/{category}/transactions', [TransactionController::class, 'getByCategory']);
 
     // ==========================================
@@ -138,6 +154,17 @@ Route::middleware('auth:sanctum')->group(function () {
             ],
             'message' => 'Dashboard récupéré avec succès'
         ]);
+    });
+
+    // Gestion bancaire
+    Route::prefix('bank')->name('bank.')->group(function () {
+        Route::get('/connections', [BankController::class, 'index']);
+        Route::post('/initiate', [BankController::class, 'initiate']);
+        Route::post('/connections/{connection}/sync', [BankController::class, 'sync']);
+        Route::get('/pending-transactions', [BankController::class, 'pendingTransactions']);
+        Route::post('/transactions/{bankTransaction}/convert', [BankController::class, 'convertTransaction']);
+        Route::post('/transactions/{bankTransaction}/ignore', [BankController::class, 'ignoreTransaction']);
+        Route::delete('/connections/{connection}', [BankController::class, 'destroy']);
     });
 
     // ==========================================
@@ -353,80 +380,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->name('admin.')->g
     });
 });
 
-// ==========================================
-// ROUTE DE SANTÉ DE L'API
-// ==========================================
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'OK',
-        'timestamp' => now(),
-        'version' => '1.0.0',
-        'services' => [
-            'database' => \DB::connection()->getPdo() ? 'OK' : 'ERROR',
-            'gaming_system' => \App\Models\Achievement::count() > 0 ? 'OK' : 'NO_ACHIEVEMENTS',
-            'cache' => \Cache::store()->getStore() ? 'OK' : 'ERROR'
-        ],
-        'environment' => app()->environment()
-    ]);
-});
 
-// ==========================================
-// DOCUMENTATION API (pour le développement)
-// ==========================================
-Route::get('/docs', function () {
-    return response()->json([
-        'api_version' => '1.0.0',
-        'documentation' => 'https://documenter.getpostman.com/view/YOUR_COLLECTION_ID',
-        'endpoints' => [
-            'auth' => [
-                'POST /api/auth/register' => 'Inscription utilisateur',
-                'POST /api/auth/login' => 'Connexion utilisateur',
-                'GET /api/auth/user' => 'Informations utilisateur',
-                'PUT /api/auth/profile' => 'Mise à jour profil',
-                'POST /api/auth/logout' => 'Déconnexion',
-            ],
-            'transactions' => [
-                'GET /api/transactions' => 'Liste paginée des transactions',
-                'POST /api/transactions' => 'Créer une transaction',
-                'GET /api/transactions/{id}' => 'Détails d\'une transaction',
-                'PUT /api/transactions/{id}' => 'Modifier une transaction',
-                'DELETE /api/transactions/{id}' => 'Supprimer une transaction',
-            ],
-            'financial_goals' => [
-                'GET /api/financial-goals' => 'Liste paginée des objectifs',
-                'POST /api/financial-goals' => 'Créer un objectif',
-                'GET /api/financial-goals/{id}' => 'Détails d\'un objectif',
-                'PUT /api/financial-goals/{id}' => 'Modifier un objectif',
-                'DELETE /api/financial-goals/{id}' => 'Supprimer un objectif',
-            ],
-            'analytics' => [
-                'GET /api/analytics/dashboard' => 'Dashboard analytique complet',
-                'GET /api/analytics/monthly-report' => 'Rapport mensuel',
-                'GET /api/analytics/yearly-report' => 'Rapport annuel',
-                'GET /api/analytics/category-breakdown' => 'Analyse par catégories',
-            ],
-            'gaming' => [
-                'GET /api/gaming/dashboard' => 'Dashboard gaming complet',
-                'GET /api/gaming/achievements' => 'Liste des succès',
-                'GET /api/gaming/level' => 'Informations de niveau',
-            ]
-        ],
-        'authentication' => 'Bearer token required (Sanctum)',
-        'response_format' => [
-            'success' => 'boolean',
-            'data' => 'object|array',
-            'message' => 'string',
-            'pagination' => 'object (when applicable)'
-        ],
-        'pagination_params' => [
-            'page' => 'Page number (default: 1)',
-            'per_page' => 'Items per page (default: 15, max: 100)',
-            'search' => 'Global search term',
-            'sort_by' => 'Sort column (default: created_at)',
-            'sort_direction' => 'Sort direction: asc|desc (default: desc)'
-        ]
-    ]);
-});
+
 
 // ==========================================
 // ROUTE DE FALLBACK POUR 404 API
