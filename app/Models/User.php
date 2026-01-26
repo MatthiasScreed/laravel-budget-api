@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Carbon\Carbon;
 
 class User extends Authenticatable
 {
@@ -36,7 +35,7 @@ class User extends Authenticatable
         'timezone',
         'language',
         'email_verified_at',
-        'preferences'
+        'preferences',
     ];
 
     /**
@@ -60,7 +59,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'date_of_birth' => 'date',
             'password' => 'hashed',
-            'preferences' => 'array'
+            'preferences' => 'array',
         ];
     }
 
@@ -70,9 +69,8 @@ class User extends Authenticatable
     protected $attributes = [
         'currency' => 'EUR',
         'timezone' => 'Europe/Paris',
-        'language' => 'fr'
+        'language' => 'fr',
     ];
-
 
     // ==========================================
     // RELATIONS
@@ -166,7 +164,7 @@ class User extends Authenticatable
     public function achievements(): BelongsToMany
     {
         return $this->belongsToMany(Achievement::class, 'user_achievements')
-            ->withPivot(['unlocked_at'])  // Supprimer 'metadata'
+            ->withPivot(['unlocked_at', 'metadata'])  // ✅ Maintenant cohérent avec Achievement.php
             ->withTimestamps();
     }
 
@@ -208,11 +206,11 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): string
     {
         if ($this->avatar) {
-            return asset('storage/avatars/' . $this->avatar);
+            return asset('storage/avatars/'.$this->avatar);
         }
 
         // Avatar par défaut avec initiales
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=3B82F6&color=ffffff';
+        return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=3B82F6&color=ffffff';
     }
 
     /**
@@ -236,7 +234,7 @@ class User extends Authenticatable
      */
     public function getIsEmailVerifiedAttribute(): bool
     {
-        return !is_null($this->email_verified_at);
+        return ! is_null($this->email_verified_at);
     }
 
     public function streaks(): HasMany
@@ -277,7 +275,7 @@ class User extends Authenticatable
      */
     public function getTotalBalance(): float
     {
-        if (!class_exists('\App\Models\Transaction')) {
+        if (! class_exists('\App\Models\Transaction')) {
             return 0.0;
         }
 
@@ -370,18 +368,18 @@ class User extends Authenticatable
             'current_month' => [
                 'income' => $this->getMonthlyIncome($currentMonth),
                 'expenses' => $this->getMonthlyExpenses($currentMonth),
-                'savings' => $this->getMonthlyIncome($currentMonth) - $this->getMonthlyExpenses($currentMonth)
+                'savings' => $this->getMonthlyIncome($currentMonth) - $this->getMonthlyExpenses($currentMonth),
             ],
             'previous_month' => [
                 'income' => $this->getMonthlyIncome($previousMonth),
                 'expenses' => $this->getMonthlyExpenses($previousMonth),
-                'savings' => $this->getMonthlyIncome($previousMonth) - $this->getMonthlyExpenses($previousMonth)
+                'savings' => $this->getMonthlyIncome($previousMonth) - $this->getMonthlyExpenses($previousMonth),
             ],
             'total_savings' => $this->getTotalSavings(),
             'active_goals_count' => $this->financialGoals()->active()->count(),
             'completed_goals_count' => $this->financialGoals()->completed()->count(),
             'categories_count' => $this->categories()->active()->count(),
-            'transactions_count' => $this->transactions()->count()
+            'transactions_count' => $this->transactions()->count(),
         ];
     }
 
@@ -391,6 +389,7 @@ class User extends Authenticatable
     public function getPreference(string $key, $default = null)
     {
         $preferences = $this->preferences ?? [];
+
         return $preferences[$key] ?? $default;
     }
 
@@ -423,21 +422,31 @@ class User extends Authenticatable
         $score = 0;
 
         // Bonus pour avoir des catégories (organisation)
-        if ($this->categories()->count() >= 3) $score += 20;
+        if ($this->categories()->count() >= 3) {
+            $score += 20;
+        }
 
         // Bonus pour avoir des objectifs financiers
-        if ($this->financialGoals()->active()->count() >= 1) $score += 25;
+        if ($this->financialGoals()->active()->count() >= 1) {
+            $score += 25;
+        }
 
         // Bonus pour épargne régulière
         $monthlyIncome = $this->getMonthlyIncome();
         $monthlyExpenses = $this->getMonthlyExpenses();
-        if ($monthlyIncome > $monthlyExpenses) $score += 30;
+        if ($monthlyIncome > $monthlyExpenses) {
+            $score += 30;
+        }
 
         // Bonus pour diversité des transactions
-        if ($this->transactions()->count() >= 10) $score += 15;
+        if ($this->transactions()->count() >= 10) {
+            $score += 15;
+        }
 
         // Bonus pour contributions régulières aux objectifs
-        if ($this->goalContributions()->count() >= 3) $score += 10;
+        if ($this->goalContributions()->count() >= 3) {
+            $score += 10;
+        }
 
         return min(100, $score);
     }
@@ -448,6 +457,7 @@ class User extends Authenticatable
     public function refreshApiToken(): string
     {
         $this->tokens()->delete();
+
         return $this->createToken('auth_token')->plainTextToken;
     }
 
@@ -458,12 +468,13 @@ class User extends Authenticatable
     /**
      * Ajouter de l'XP à l'utilisateur
      *
-     * @param int $xp Points d'expérience à ajouter
+     * @param  int  $xp  Points d'expérience à ajouter
      * @return array Résultat de l'ajout d'XP
      */
     public function addXp(int $xp): array
     {
         $userLevel = $this->level ?? $this->createUserLevel();
+
         return $userLevel->addXp($xp);
     }
 
@@ -534,7 +545,7 @@ class User extends Authenticatable
     /**
      * Obtenir les succès récents
      *
-     * @param int $limit Nombre maximum de succès
+     * @param  int  $limit  Nombre maximum de succès
      * @return EloquentCollection Succès récents
      */
     public function getRecentAchievements(int $limit = 5): EloquentCollection
@@ -548,7 +559,7 @@ class User extends Authenticatable
                 'achievements.description',
                 'achievements.icon',
                 'achievements.points',
-                'achievements.rarity'
+                'achievements.rarity',
             ]);
     }
 
@@ -563,7 +574,7 @@ class User extends Authenticatable
         $this->load('level');
 
         // ✅ Si pas de level ou level supprimé, utiliser des valeurs par défaut
-        if (!$this->level || !$this->level->exists) {
+        if (! $this->level || ! $this->level->exists) {
             $levelStats = [
                 'current_level' => 1,
                 'total_xp' => 0,
@@ -572,7 +583,7 @@ class User extends Authenticatable
                 'progress_percentage' => 0,
                 'title' => 'Débutant',
                 'level_color' => '#6B7280',
-                'xp_to_next_level' => 100
+                'xp_to_next_level' => 100,
             ];
         } else {
             $levelStats = $this->level->getDetailedStats();
@@ -584,7 +595,7 @@ class User extends Authenticatable
             'recent_achievements' => $this->getRecentAchievements(3),
             'active_challenges' => 0,  // Sera mis à jour plus tard
             'completed_challenges' => 0, // Sera mis à jour plus tard
-            'best_streak' => 0 // Sera mis à jour plus tard
+            'best_streak' => 0, // Sera mis à jour plus tard
         ];
     }
 
@@ -614,15 +625,143 @@ class User extends Authenticatable
         });
     }
 
-    public function bankConnections():hasMany
+    public function bankConnections(): hasMany
     {
         return $this->hasMany(BankConnection::class);
     }
 
-    public function hasActiveBankConnections(): bool
+    /**
+     * Connexions bancaires actives uniquement
+     */
+    public function activeBankConnections(): HasMany
     {
-        return $this->bankConnections()
-            ->where('status', BankConnection::STATUS_ACTIVE)
-            ->exists();
+        return $this->hasMany(BankConnection::class)
+            ->where('status', BankConnection::STATUS_ACTIVE);
+    }
+
+    /**
+     * Toutes les transactions bancaires importées
+     */
+    public function bankTransactions(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            BankTransaction::class,
+            BankConnection::class,
+            'user_id',     // FK sur bank_connections
+            'bank_connection_id', // FK sur bank_transactions
+            'id',          // Clé locale sur users
+            'id'           // Clé locale sur bank_connections
+        );
+    }
+
+    /**
+     * Transactions bancaires en attente de traitement
+     */
+    public function pendingBankTransactions(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            BankTransaction::class,
+            BankConnection::class,
+            'user_id',
+            'bank_connection_id',
+            'id',
+            'id'
+        )->whereIn('bank_transactions.processing_status', [
+            BankTransaction::STATUS_IMPORTED,
+            BankTransaction::STATUS_CATEGORIZED,
+        ]);
+    }
+
+    /**
+     * Vérifier si l'utilisateur a des connexions bancaires
+     */
+    public function hasBankConnections(): bool
+    {
+        return $this->bankConnections()->exists();
+    }
+
+    /**
+     * Obtenir le statut global des connexions bancaires
+     */
+    public function getBankingHealthAttribute(): string
+    {
+        $connections = $this->bankConnections;
+
+        if ($connections->isEmpty()) {
+            return 'none';
+        }
+
+        $errorCount = $connections->where('status', BankConnection::STATUS_ERROR)->count();
+        $totalCount = $connections->count();
+
+        if ($errorCount === 0) {
+            return 'healthy';
+        }
+
+        return $errorCount / $totalCount > 0.5 ? 'critical' : 'warning';
+    }
+
+    /**
+     * Nombre de transactions en attente
+     */
+    public function getPendingTransactionsCountAttribute(): int
+    {
+        return $this->pendingBankTransactions()->count();
+    }
+
+    /**
+     * Obtenir toutes les catégories disponibles pour cet utilisateur
+     * (catégories système + catégories personnalisées)
+     *
+     * @param  string|null  $type  Filtrer par type (income|expense)
+     * @param  bool  $activeOnly  Uniquement les catégories actives
+     */
+    public function getAllCategories(
+        ?string $type = null,
+        bool $activeOnly = true
+    ): \Illuminate\Database\Eloquent\Collection {
+        $query = Category::query()
+            ->where(function ($q) {
+                // Catégories système (user_id = null)
+                // OU catégories de cet utilisateur
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', $this->id);
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name');
+
+        // Filtrer par type si spécifié
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        // Uniquement les actives si demandé
+        if ($activeOnly) {
+            $query->where('is_active', true);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Obtenir les catégories de revenus disponibles
+     *
+     * @param  bool  $activeOnly  Uniquement les catégories actives
+     */
+    public function getIncomeCategories(
+        bool $activeOnly = true
+    ): \Illuminate\Database\Eloquent\Collection {
+        return $this->getAllCategories('income', $activeOnly);
+    }
+
+    /**
+     * Obtenir les catégories de dépenses disponibles
+     *
+     * @param  bool  $activeOnly  Uniquement les catégories actives
+     */
+    public function getExpenseCategories(
+        bool $activeOnly = true
+    ): \Illuminate\Database\Eloquent\Collection {
+        return $this->getAllCategories('expense', $activeOnly);
     }
 }

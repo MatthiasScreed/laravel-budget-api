@@ -21,28 +21,32 @@ class Achievement extends Model
         'criteria',
         'points',
         'rarity',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [
         'criteria' => 'array',
         'points' => 'integer',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
     ];
 
     protected $attributes = [
         'color' => '#3B82F6',
         'rarity' => 'common',
-        'is_active' => true
+        'is_active' => true,
     ];
 
     /**
      * Types de succès
      */
     public const TYPE_TRANSACTION = 'transaction';
+
     public const TYPE_GOAL = 'goal';
+
     public const TYPE_STREAK = 'streak';
+
     public const TYPE_MILESTONE = 'milestone';
+
     public const TYPE_SOCIAL = 'social';
 
     public const TYPES = [
@@ -50,22 +54,25 @@ class Achievement extends Model
         self::TYPE_GOAL => 'Objectif',
         self::TYPE_STREAK => 'Série',
         self::TYPE_MILESTONE => 'Étape',
-        self::TYPE_SOCIAL => 'Social'
+        self::TYPE_SOCIAL => 'Social',
     ];
 
     /**
      * Niveaux de rareté
      */
     public const RARITY_COMMON = 'common';
+
     public const RARITY_RARE = 'rare';
+
     public const RARITY_EPIC = 'epic';
+
     public const RARITY_LEGENDARY = 'legendary';
 
     public const RARITIES = [
         self::RARITY_COMMON => 'Commun',
         self::RARITY_RARE => 'Rare',
         self::RARITY_EPIC => 'Épique',
-        self::RARITY_LEGENDARY => 'Légendaire'
+        self::RARITY_LEGENDARY => 'Légendaire',
     ];
 
     /**
@@ -75,7 +82,7 @@ class Achievement extends Model
         self::RARITY_COMMON => '#6B7280',
         self::RARITY_RARE => '#3B82F6',
         self::RARITY_EPIC => '#8B5CF6',
-        self::RARITY_LEGENDARY => '#F59E0B'
+        self::RARITY_LEGENDARY => '#F59E0B',
     ];
 
     /**
@@ -116,6 +123,36 @@ class Achievement extends Model
         return $query->where('rarity', $rarity);
     }
 
+    /**
+     * Vérifier un critère individuel
+     *
+     * @param  mixed  $value
+     */
+    protected function checkSingleCriterion(User $user, string $criterion, $value): bool
+    {
+        return match ($criterion) {
+            'min_level' => $user->level && $user->level->level >= $value,
+            'min_transactions' => $user->transactions()->count() >= $value,
+            'min_goals' => $user->financialGoals()->count() >= $value,
+            'min_savings' => $user->financialGoals()->sum('current_amount') >= $value,
+            default => true
+        };
+    }
+
+    /**
+     * Accesseur : Nom de la rareté formaté
+     */
+    public function getRarityNameAttribute(): string
+    {
+        return match ($this->rarity) {
+            'common' => 'Commun',
+            'rare' => 'Rare',
+            'epic' => 'Épique',
+            'legendary' => 'Légendaire',
+            default => ucfirst($this->rarity)
+        };
+    }
+
     // ==========================================
     // ACCESSORS
     // ==========================================
@@ -126,14 +163,6 @@ class Achievement extends Model
     public function getTypeNameAttribute(): string
     {
         return self::TYPES[$this->type] ?? $this->type;
-    }
-
-    /**
-     * Accessor pour le nom de la rareté
-     */
-    public function getRarityNameAttribute(): string
-    {
-        return self::RARITIES[$this->rarity] ?? $this->rarity;
     }
 
     /**
@@ -151,7 +180,7 @@ class Achievement extends Model
     /**
      * Vérifier si un utilisateur a débloqué ce succès
      *
-     * @param User $user Utilisateur à vérifier
+     * @param  User  $user  Utilisateur à vérifier
      * @return bool Succès débloqué ou non
      */
     public function isUnlockedBy(User $user): bool
@@ -162,8 +191,8 @@ class Achievement extends Model
     /**
      * Débloquer le succès pour un utilisateur
      *
-     * @param User $user Utilisateur concerné
-     * @param array $metadata Données additionnelles
+     * @param  User  $user  Utilisateur concerné
+     * @param  array  $metadata  Données additionnelles
      * @return bool Déblocage réussi
      */
     public function unlockFor(User $user, array $metadata = []): bool
@@ -176,7 +205,7 @@ class Achievement extends Model
         $this->users()->attach($user->id, [
             'unlocked_at' => now(),
             'created_at' => now(),
-            'updated_at' => now()
+            'updated_at' => now(),
         ]);
 
         $this->grantXpToUser($user);
@@ -187,8 +216,8 @@ class Achievement extends Model
     /**
      * Attacher l'utilisateur avec métadonnées
      *
-     * @param User $user Utilisateur concerné
-     * @param array $metadata Métadonnées
+     * @param  User  $user  Utilisateur concerné
+     * @param  array  $metadata  Métadonnées
      */
     protected function attachUserWithMetadata(User $user, array $metadata): void
     {
@@ -196,14 +225,14 @@ class Achievement extends Model
             'unlocked_at' => now(),
             'metadata' => empty($metadata) ? null : json_encode($metadata), // Conversion en JSON
             'created_at' => now(),
-            'updated_at' => now()
+            'updated_at' => now(),
         ]);
     }
 
     /**
      * Accorder les points XP à l'utilisateur
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      */
     protected function grantXpToUser(User $user): void
     {
@@ -212,20 +241,19 @@ class Achievement extends Model
         }
     }
 
-
     /**
      * Vérifier si les critères sont remplis pour un utilisateur
      *
-     * @param User $user Utilisateur à vérifier
+     * @param  User  $user  Utilisateur à vérifier
      * @return bool Critères remplis
      */
     public function checkCriteria(User $user): bool
     {
-        if (!$this->is_active || !$this->criteria) {
+        if (! $this->is_active || ! $this->criteria) {
             return false;
         }
 
-        return match($this->type) {
+        return match ($this->type) {
             self::TYPE_TRANSACTION => $this->checkTransactionCriteria($user),
             self::TYPE_GOAL => $this->checkGoalCriteria($user),
             self::TYPE_MILESTONE => $this->checkMilestoneCriteria($user),
@@ -236,7 +264,7 @@ class Achievement extends Model
     /**
      * Vérifier les critères de transaction
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return bool Critères validés
      */
     protected function checkTransactionCriteria(User $user): bool
@@ -245,11 +273,13 @@ class Achievement extends Model
 
         if (isset($criteria['min_transactions'])) {
             $count = $user->transactions()->where('status', 'completed')->count();
+
             return $count >= $criteria['min_transactions'];
         }
 
         if (isset($criteria['min_amount'])) {
             $total = $user->transactions()->where('status', 'completed')->sum('amount');
+
             return $total >= $criteria['min_amount'];
         }
 
@@ -259,7 +289,7 @@ class Achievement extends Model
     /**
      * Vérifier les critères d'objectif
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return bool Critères validés
      */
     protected function checkGoalCriteria(User $user): bool
@@ -268,11 +298,13 @@ class Achievement extends Model
 
         if (isset($criteria['min_goals_completed'])) {
             $count = $user->financialGoals()->where('status', 'completed')->count();
+
             return $count >= $criteria['min_goals_completed'];
         }
 
         if (isset($criteria['min_savings_amount'])) {
             $total = $user->getTotalSavings();
+
             return $total >= $criteria['min_savings_amount'];
         }
 
@@ -282,7 +314,7 @@ class Achievement extends Model
     /**
      * Vérifier les critères d'étape
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return bool Critères validés
      */
     protected function checkMilestoneCriteria(User $user): bool
@@ -291,17 +323,18 @@ class Achievement extends Model
 
         if (isset($criteria['financial_health_score'])) {
             $score = $user->getFinancialHealthScore();
+
             return $score >= $criteria['financial_health_score'];
         }
 
         if (isset($criteria['min_level'])) {
             $level = $user->getCurrentLevel();
+
             return $level >= $criteria['min_level'];
         }
 
         return false;
     }
-
 
     // ==========================================
     // MÉTHODES STATIQUES
@@ -339,7 +372,7 @@ class Achievement extends Model
                 'type' => self::TYPE_TRANSACTION,
                 'criteria' => ['min_transactions' => 1],
                 'points' => 10,
-                'rarity' => self::RARITY_COMMON
+                'rarity' => self::RARITY_COMMON,
             ],
             [
                 'name' => 'Actif',
@@ -349,7 +382,7 @@ class Achievement extends Model
                 'type' => self::TYPE_TRANSACTION,
                 'criteria' => ['min_transactions' => 10],
                 'points' => 25,
-                'rarity' => self::RARITY_COMMON
+                'rarity' => self::RARITY_COMMON,
             ],
             [
                 'name' => 'Expert comptable',
@@ -359,7 +392,7 @@ class Achievement extends Model
                 'type' => self::TYPE_TRANSACTION,
                 'criteria' => ['min_transactions' => 100],
                 'points' => 100,
-                'rarity' => self::RARITY_EPIC
+                'rarity' => self::RARITY_EPIC,
             ],
 
             // Succès d'objectifs
@@ -371,7 +404,7 @@ class Achievement extends Model
                 'type' => self::TYPE_GOAL,
                 'criteria' => ['min_goals_created' => 1],
                 'points' => 15,
-                'rarity' => self::RARITY_COMMON
+                'rarity' => self::RARITY_COMMON,
             ],
             [
                 'name' => 'Réalisateur',
@@ -381,7 +414,7 @@ class Achievement extends Model
                 'type' => self::TYPE_GOAL,
                 'criteria' => ['min_goals_completed' => 1],
                 'points' => 50,
-                'rarity' => self::RARITY_RARE
+                'rarity' => self::RARITY_RARE,
             ],
 
             // Succès d'étapes
@@ -393,7 +426,7 @@ class Achievement extends Model
                 'type' => self::TYPE_MILESTONE,
                 'criteria' => ['min_savings_amount' => 1000],
                 'points' => 30,
-                'rarity' => self::RARITY_COMMON
+                'rarity' => self::RARITY_COMMON,
             ],
             [
                 'name' => 'Montée en grade',
@@ -403,8 +436,8 @@ class Achievement extends Model
                 'type' => self::TYPE_MILESTONE,
                 'criteria' => ['min_level' => 5],
                 'points' => 25,
-                'rarity' => self::RARITY_COMMON
-            ]
+                'rarity' => self::RARITY_COMMON,
+            ],
         ];
     }
 
@@ -422,7 +455,7 @@ class Achievement extends Model
                 $counter = 1;
 
                 while (static::where('slug', $achievement->slug)->exists()) {
-                    $achievement->slug = $originalSlug . '-' . $counter;
+                    $achievement->slug = $originalSlug.'-'.$counter;
                     $counter++;
                 }
             }

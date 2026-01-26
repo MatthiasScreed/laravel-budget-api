@@ -132,6 +132,14 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => 14,
         ],
+
+        'banking' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/banking.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 14,
+        ],
+
     ],
 
 ];

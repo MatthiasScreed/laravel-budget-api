@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'bridge' => [
+        'client_id' => env('BRIDGE_CLIENT_ID'),
+        'client_secret' => env('BRIDGE_CLIENT_SECRET'),
+        'base_url' => env('BRIDGE_BASE_URL', 'https://api.bridgeapi.io'),
+        'version' => env('BRIDGE_VERSION', '2025-01-15'),
+        'redirect_uri' => env('BRIDGE_REDIRECT_URI'),
+        'webhook_url' => env('BRIDGE_WEBHOOK_URL'),
+        'webhook_secret' => env('BRIDGE_WEBHOOK_SECRET'),
+    ],
 ];

@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\LevelUp;
-use App\Services\GamingService;
 use App\Notifications\LevelUpNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -28,16 +28,33 @@ class HandleLevelUp implements ShouldQueue
     public function handle(LevelUp $event): void
     {
         $user = $event->user;
-        $userLevel = $event->userLevel;
-        $newLevel = $event->newLevel;
+        $levelData = $event->levelData;
+
+        // ✅ Extraire les données du tableau levelData
+        $newLevel = $levelData['new_level'] ?? 1;
+        $previousLevel = $newLevel - ($levelData['levels_gained'] ?? 1);
+        $totalXp = $levelData['total_xp'] ?? 0;
 
         try {
             // 1. Bonus XP pour le niveau atteint
             $levelBonus = $this->calculateLevelBonus($newLevel);
             $this->gamingService->addExperience($user, $levelBonus, 'level_bonus');
 
-            // 2. Notification de félicitations
-            $user->notify(new LevelUpNotification($userLevel, $event->previousLevel, $newLevel));
+            // 2. Notification de félicitations (si la classe existe)
+            try {
+                $userLevel = $user->level;
+                if ($userLevel && class_exists(LevelUpNotification::class)) {
+                    $user->notify(new LevelUpNotification(
+                        $userLevel,
+                        $previousLevel,
+                        $newLevel
+                    ));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Notification LevelUp impossible', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // 3. Débloquer contenu exclusif selon le niveau
             $this->unlockLevelRewards($user, $newLevel);
@@ -48,19 +65,19 @@ class HandleLevelUp implements ShouldQueue
             // 5. Mettre à jour les permissions/accès utilisateur
             $this->updateUserPermissions($user, $newLevel);
 
-            \Log::info("Montée de niveau - Récompenses distribuées", [
+            \Log::info('Montée de niveau - Récompenses distribuées', [
                 'user_id' => $user->id,
-                'previous_level' => $event->previousLevel,
+                'previous_level' => $previousLevel,
                 'new_level' => $newLevel,
-                'total_xp' => $userLevel->total_xp,
-                'level_bonus' => $levelBonus
+                'total_xp' => $totalXp,
+                'level_bonus' => $levelBonus,
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Erreur lors du traitement de la montée de niveau", [
+            \Log::error('Erreur lors du traitement de la montée de niveau', [
                 'user_id' => $user->id,
                 'new_level' => $newLevel,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -93,7 +110,7 @@ class HandleLevelUp implements ShouldQueue
             // Ici vous pourriez débloquer des fonctionnalités premium
             \Log::info("Récompense débloquée au niveau {$level}", [
                 'user_id' => $user->id,
-                'reward' => $rewards[$level]
+                'reward' => $rewards[$level],
             ]);
         }
     }
@@ -133,11 +150,11 @@ class HandleLevelUp implements ShouldQueue
         }
 
         // Sauvegarder les permissions (vous pourriez avoir une table user_permissions)
-        if (!empty($permissions)) {
-            \Log::info("Permissions mises à jour", [
+        if (! empty($permissions)) {
+            \Log::info('Permissions mises à jour', [
                 'user_id' => $user->id,
                 'level' => $level,
-                'new_permissions' => $permissions
+                'new_permissions' => $permissions,
             ]);
         }
     }
@@ -147,10 +164,13 @@ class HandleLevelUp implements ShouldQueue
      */
     public function failed(LevelUp $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement LevelUp", [
+        $levelData = $event->levelData;
+        $newLevel = $levelData['new_level'] ?? '?';
+
+        \Log::error('Échec du traitement LevelUp', [
             'user_id' => $event->user->id,
-            'new_level' => $event->newLevel,
-            'error' => $exception->getMessage()
+            'new_level' => $newLevel,
+            'error' => $exception->getMessage(),
         ]);
     }
 }

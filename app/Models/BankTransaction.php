@@ -9,38 +9,41 @@ class BankTransaction extends Model
 {
     protected $fillable = [
         'bank_connection_id',
-        'external_id', // ID unique de la banque
+        'external_id',
         'amount',
         'description',
         'transaction_date',
         'value_date',
-        'account_balance_after',
+        'account_balance_after',  // ✅ C'est dans ta table
         'merchant_name',
         'merchant_category',
-        'raw_data', // JSON des données brutes de l'API bancaire
+        'raw_data',  // ✅ Pas "metadata" !
         'processing_status',
+        'suggested_category_id',
+        'confidence_score',
+        'converted_transaction_id',
         'imported_at',
         'categorized_at',
-        'suggested_category_id',
-        'confidence_score' // Score de confiance de l'IA pour la catégorisation
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'account_balance_after' => 'decimal:2',
         'transaction_date' => 'date',
         'value_date' => 'date',
         'imported_at' => 'datetime',
         'categorized_at' => 'datetime',
-        'raw_data' => 'array',
-        'confidence_score' => 'decimal:2'
+        'confidence_score' => 'float',
+        'raw_data' => 'array',  // ✅ JSON → Array
     ];
 
     // Status de traitement
     public const STATUS_IMPORTED = 'imported';
+
     public const STATUS_CATEGORIZED = 'categorized';
+
     public const STATUS_CONVERTED = 'converted'; // Convertie en Transaction
+
     public const STATUS_IGNORED = 'ignored';
+
     public const STATUS_DUPLICATE = 'duplicate';
 
     /**

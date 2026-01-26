@@ -3,164 +3,103 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Achievement;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class HealthController extends Controller
 {
     /**
      * Health check de l'API
-     *
-     * @return JsonResponse
      */
     public function health(): JsonResponse
     {
-        $services = [
-            'database' => $this->checkDatabase(),
-            'gaming_system' => $this->checkGamingSystem()
-        ];
-
-        $overallStatus = in_array('ERROR', $services) ? 'ERROR' : 'OK';
-
-        return response()->json([
-            'status' => $overallStatus,
-            'timestamp' => now()->toISOString(),
-            'services' => $services,
-            'version' => config('app.version', '1.0.0'),
-            'environment' => config('app.env')
-        ]);
-    }
-
-    /**
-     * Documentation de l'API
-     *
-     * @return JsonResponse
-     */
-    public function docs(): JsonResponse
-    {
-        return response()->json([
-            'api_version' => '1.0.0',
-            'name' => 'Budget Gaming API',
-            'description' => 'API de gestion de budget avec système de gamification',
-            'base_url' => config('app.url') . '/api',
-            'authentication' => [
-                'type' => 'Bearer Token (Sanctum)',
-                'header' => 'Authorization: Bearer {token}',
-                'login_endpoint' => '/auth/login',
-                'register_endpoint' => '/auth/register'
-            ],
-            'response_format' => [
-                'success_format' => [
-                    'success' => true,
-                    'data' => '{}',
-                    'message' => 'string'
-                ],
-                'error_format' => [
-                    'success' => false,
-                    'message' => 'string',
-                    'errors' => '{}'
-                ]
-            ],
-            'endpoints' => [
-                'authentication' => [
-                    'POST /auth/register' => 'Créer un compte',
-                    'POST /auth/login' => 'Se connecter',
-                    'POST /auth/logout' => 'Se déconnecter',
-                    'GET /auth/user' => 'Profil utilisateur'
-                ],
-                'transactions' => [
-                    'GET /transactions' => 'Lister les transactions',
-                    'POST /transactions' => 'Créer une transaction',
-                    'GET /transactions/{id}' => 'Détails d\'une transaction',
-                    'PUT /transactions/{id}' => 'Modifier une transaction',
-                    'DELETE /transactions/{id}' => 'Supprimer une transaction'
-                ],
-                'categories' => [
-                    'GET /categories' => 'Lister les catégories',
-                    'POST /categories' => 'Créer une catégorie',
-                    'GET /categories/{id}' => 'Détails d\'une catégorie',
-                    'PUT /categories/{id}' => 'Modifier une catégorie',
-                    'DELETE /categories/{id}' => 'Supprimer une catégorie'
-                ],
-                'financial_goals' => [
-                    'GET /financial-goals' => 'Lister les objectifs financiers',
-                    'POST /financial-goals' => 'Créer un objectif',
-                    'GET /financial-goals/{id}' => 'Détails d\'un objectif',
-                    'PUT /financial-goals/{id}' => 'Modifier un objectif',
-                    'DELETE /financial-goals/{id}' => 'Supprimer un objectif'
-                ],
-                'gaming' => [
-                    'GET /gaming/stats' => 'Statistiques gaming utilisateur',
-                    'GET /gaming/dashboard' => 'Dashboard gaming complet',
-                    'GET /gaming/achievements' => 'Liste des succès',
-                    'GET /gaming/achievements/unlocked' => 'Succès débloqués',
-                    'POST /gaming/check-achievements' => 'Vérifier les nouveaux succès',
-                    'GET /gaming/level' => 'Informations de niveau',
-                    'POST /gaming/actions/add-xp' => 'Ajouter XP manuellement (debug)'
-                ],
-                'dashboard' => [
-                    'GET /dashboard/stats' => 'Statistiques générales du tableau de bord'
-                ],
-                'utilities' => [
-                    'GET /health' => 'Health check de l\'API',
-                    'GET /docs' => 'Documentation de l\'API'
-                ]
-            ]
-        ]);
-    }
-
-    /**
-     * Vérifier le statut de la base de données
-     *
-     * @return string
-     */
-    private function checkDatabase(): string
-    {
         try {
-            DB::connection()->getPdo();
+            $startTime = microtime(true);
 
-            // Test simple de requête
-            $result = DB::select('SELECT 1 as test');
+            $services = [
+                'database' => $this->testDatabase(),
+                'cache' => $this->testCache(),
+                'gaming' => $this->testGamingSystem(),
+                'api' => true,
+            ];
 
-            return ($result && $result[0]->test === 1) ? 'OK' : 'ERROR';
+            $responseTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            // ✅ RÉPONSE SIMPLE - Le middleware HandleCors ajoute les headers
+            return response()->json([
+                'success' => true,
+                'message' => 'CoinQuest API is running',
+                'timestamp' => now()->toISOString(),
+                'environment' => app()->environment(),
+                'version' => '1.0.0',
+                'response_time_ms' => $responseTime,
+                'services' => $services,
+                'server_info' => [
+                    'php_version' => PHP_VERSION,
+                    'laravel_version' => app()->version(),
+                    'memory_usage_mb' => round(memory_get_usage() / 1024 / 1024, 2),
+                ],
+            ]);
+
         } catch (\Exception $e) {
-            return 'ERROR';
+            return response()->json([
+                'success' => false,
+                'message' => 'API health check failed',
+                'error' => app()->environment('local') ? $e->getMessage() : 'Service temporarily unavailable',
+                'timestamp' => now()->toISOString(),
+            ], 500);
         }
     }
 
     /**
-     * Vérifier le statut du système gaming
-     *
-     * @return string
+     * Test de connexion base de données
      */
-    private function checkGamingSystem(): string
+    private function testDatabase(): bool
     {
         try {
-            // 🔧 VÉRIFIER QUE LA TABLE EXISTE D'ABORD
-            if (!Schema::hasTable('achievements')) {
-                return 'TABLE_NOT_EXISTS';
-            }
+            DB::connection()->getPdo();
+            DB::select('SELECT 1');
 
-            // Vérifier que la table achievements existe et a du contenu
-            $achievementCount = Achievement::count();
-
-            if ($achievementCount === 0) {
-                return 'NO_ACHIEVEMENTS';
-            }
-
-            // Vérifier qu'au moins un achievement est actif
-            $activeAchievements = Achievement::where('is_active', true)->count();
-
-            if ($activeAchievements === 0) {
-                return 'NO_ACTIVE_ACHIEVEMENTS';
-            }
-
-            return 'OK';
+            return true;
         } catch (\Exception $e) {
-            return 'ERROR';
+            return false;
+        }
+    }
+
+    /**
+     * Test du système de cache
+     */
+    private function testCache(): bool
+    {
+        try {
+            $testKey = 'health_test_'.time();
+            Cache::put($testKey, 'ok', 60);
+            $value = Cache::get($testKey);
+            Cache::forget($testKey);
+
+            return $value === 'ok';
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Test du système gaming
+     */
+    private function testGamingSystem(): bool
+    {
+        try {
+            $tables = ['user_levels', 'achievements', 'gaming_actions'];
+            foreach ($tables as $table) {
+                if (! DB::getSchemaBuilder()->hasTable($table)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            return false;
         }
     }
 }

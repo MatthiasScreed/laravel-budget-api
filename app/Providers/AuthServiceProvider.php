@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\BankConnection;
+use App\Models\BankTransaction;
+use App\Policies\BankConnectionPolicy;
+use App\Policies\BankTransactionPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -13,6 +17,8 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
+        BankConnection::class => BankConnectionPolicy::class,
+        BankTransaction::class => BankTransactionPolicy::class,
         // Exemple de policies pour votre app budget gaming
         // 'App\Models\Transaction' => 'App\Policies\TransactionPolicy',
         // 'App\Models\FinancialGoal' => 'App\Policies\FinancialGoalPolicy',

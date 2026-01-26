@@ -7,35 +7,38 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | Here you may configure your settings for cross-origin resource sharing
-    | or "CORS". This determines what cross-origin operations may execute
-    | in web browsers. You are free to adjust these settings as needed.
-    |
-    | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    | Détermine quelles opérations cross-origin peuvent être effectuées dans
+    | les navigateurs web. Configuration pour permettre à Vue.js (frontend)
+    | de communiquer avec Laravel (backend API).
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'up'],
+    'paths' => [
+        'api/*',
+        'sanctum/csrf-cookie',
+        'api/bank/*',           // ✅ Ajoute ceci
+        'api/auth/*',           // ✅ Ajoute ceci
+        'api/gaming/*',         // ✅ Ajoute ceci
+    ],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://budget-gaming-frontend.test',   // Ton frontend Herd
-        'http://localhost:5173',                // Vue.js dev server
-        'http://127.0.0.1:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-    ],
+    'allowed_origins' => ['*'], // ⚠️ Pour le dev, ensuite restreindre
+
     'allowed_origins_patterns' => [
-        '/^https?:\/\/.*\.test$/',       // Tous les domaines .test (Herd)
+        '/^https:\/\/.*\.sharedwithexpose\.com$/',  // ✅ Pattern pour Expose
+        '/^https:\/\/coinquest.*\.sharedwithexpose\.com$/',
     ],
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => [
+        'Authorization',
+        'Content-Type',
+    ],
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => true,  // ✅ Important pour Sanctum
 
 ];

@@ -1,395 +1,316 @@
 <?php
 
+// routes/api.php - VERSION OPTIMISÉE AVEC CATÉGORISATION INTELLIGENTE
+
+use App\Http\Controllers\Api\AchievementController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankController;
+use App\Http\Controllers\Api\BankWebhookController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinancialGoalController;
+use App\Http\Controllers\Api\GamingActionController;
+use App\Http\Controllers\Api\GamingController;
 use App\Http\Controllers\Api\GoalContributionController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\ProjectionController;
 use App\Http\Controllers\Api\StreakController;
 use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\Api\TransactionController;
-
-// ==========================================
-// GAMING CONTROLLERS
-// ==========================================
-use App\Http\Controllers\Api\GamingController;
-use App\Http\Controllers\Api\AchievementController;
 use App\Http\Controllers\Api\UserLevelController;
-use App\Http\Controllers\Api\GamingActionController;
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', [HealthController::class, 'health'])->name('health');
-Route::get('/docs', [HealthController::class, 'docs'])->name('docs');
+/*
+|--------------------------------------------------------------------------
+| API Routes - CoinQuest
+|--------------------------------------------------------------------------
+*/
+
 // ==========================================
-// ROUTES PUBLIQUES
+// ROUTES PUBLIQUES (NO AUTH)
 // ==========================================
-Route::prefix('auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
+Route::options('/{any}', fn () => response('', 200))
+    ->where('any', '.*')
+    ->name('cors.preflight');
+
+Route::get('/', function () {
+    return response()->json([
+        'success' => true,
+        'app' => config('app.name', 'CoinQuest API'),
+        'version' => config('app.version', '1.0.0'),
+        'timestamp' => now()->toISOString(),
+        'endpoints' => [
+            'health' => '/api/health',
+            'docs' => '/api/docs',
+            'auth' => '/api/auth/*',
+            'banking' => '/api/bank/*',
+            'gaming' => '/api/gaming/*',
+        ],
+    ]);
+})->name('api.root');
+
+Route::get('/ping', fn () => response()->json([
+    'pong' => true,
+    'timestamp' => now()->toISOString(),
+]))->name('api.ping');
+
+Route::get('/health', [HealthController::class, 'health'])
+    ->name('api.health');
+
+// ==========================================
+// AUTHENTICATION (PUBLIC)
+// ==========================================
+
+Route::prefix('auth')->name('auth.')->group(function () {
+    Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
 });
 
-Route::post('/webhooks/bridge', [BankController::class, 'webhook'])->name('bridge.webhook');
 // ==========================================
-// ROUTES PROTÉGÉES
+// 🏦 BANKING - WEBHOOKS & CALLBACKS (PUBLIC)
 // ==========================================
-Route::middleware('auth:sanctum')->group(function () {
+
+Route::post('/webhooks/bridge', [BankWebhookController::class, 'handleWebhook'])
+    ->name('webhooks.bridge');
+
+Route::match(['get', 'post'], '/bank/callback', [BankController::class, 'callback'])
+    ->middleware('throttle:60,1')
+    ->name('bank.callback');
+
+// ==========================================
+// ROUTES PROTÉGÉES (AUTH REQUIRED)
+// ==========================================
+
+Route::middleware(['auth:sanctum'])->group(function () {
 
     // ==========================================
-    // AUTHENTIFICATION ET PROFIL
+    // AUTH USER (PROTECTED)
     // ==========================================
-    Route::prefix('auth')->group(function () {
-        Route::get('/user', [AuthController::class, 'user']);
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::post('/logout-all', [AuthController::class, 'logoutAll']);
-        Route::put('/profile', [AuthController::class, 'updateProfile']);
-        Route::put('/change-password', [AuthController::class, 'changePassword']);
-        Route::post('/upload-avatar', [AuthController::class, 'uploadAvatar']);
-        Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
 
-        // Gestion des sessions
-        Route::get('/sessions', [AuthController::class, 'sessions']);
-        Route::delete('/sessions/{sessionId}', [AuthController::class, 'revokeSession']);
+    Route::prefix('auth')->name('auth.')->group(function () {
+        Route::get('/user', [AuthController::class, 'user'])->name('user');
+        Route::get('/me', [AuthController::class, 'user'])->name('me');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::put('/profile', [AuthController::class, 'updateProfile'])->name('update-profile');
+        Route::put('/password', [AuthController::class, 'updatePassword'])->name('update-password');
     });
 
     // ==========================================
-    // RESOURCES FINANCIÈRES AVEC PAGINATION
+    // 📊 DASHBOARD (PROTECTED)
     // ==========================================
+
+    Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        Route::get('/stats', [DashboardController::class, 'getStats'])->name('stats');
+        Route::get('/savings-capacity', [DashboardController::class, 'getSavingsCapacity'])->name('savings-capacity');
+        Route::get('/goal-distribution', [DashboardController::class, 'getGoalDistribution'])->name('goal-distribution');
+        Route::get('/gaming', [DashboardController::class, 'getGamingDashboard'])->name('gaming');
+        Route::get('/suggestions', [DashboardController::class, 'getSuggestions'])->name('suggestions');
+        Route::post('/refresh', [DashboardController::class, 'refreshAll'])->name('refresh');
+        Route::post('/check-achievements', [DashboardController::class, 'checkAchievements'])->name('check-achievements');
+    });
+
+    // ==========================================
+    // 🏦 BANKING (PROTECTED)
+    // ==========================================
+
+    Route::prefix('bank')->name('bank.')->group(function () {
+        Route::get('/providers', [BankController::class, 'listProviders'])->name('providers');
+        Route::get('/health', [BankController::class, 'healthCheck'])->name('health');
+        Route::post('/initiate', [BankController::class, 'initiate'])->name('initiate');
+
+        Route::get('/connections', [BankController::class, 'index'])->name('connections.index');
+        Route::get('/connections/{connection}', [BankController::class, 'show'])->name('connections.show');
+        Route::get('/connections/{connection}/transactions', [BankController::class, 'getTransactions'])->name('connections.transactions');
+        Route::post('/connections/{connection}/sync', [BankController::class, 'sync'])->name('connections.sync');
+        Route::delete('/connections/{connection}', [BankController::class, 'destroy'])->name('connections.destroy');
+        Route::post('/sync-all', [BankController::class, 'syncAll'])->name('sync-all');
+
+        Route::get('/pending-transactions', [BankController::class, 'pendingTransactions'])->name('transactions.pending');
+        Route::post('/transactions/{bankTx}/convert', [BankController::class, 'convertTransaction'])->name('transactions.convert');
+        Route::post('/transactions/{bankTx}/ignore', [BankController::class, 'ignoreTransaction'])->name('transactions.ignore');
+        Route::get('/stats', [BankController::class, 'getStats'])->name('stats');
+    });
+
+    // ==========================================
+    // 💰 TRANSACTIONS (PROTECTED) - OPTIMISÉ
+    // ==========================================
+
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+
+        // ✅ STATISTIQUES
+        Route::get('stats', [TransactionController::class, 'stats'])->name('stats');
+
+        // ✅ TRANSACTIONS EN ATTENTE
+        Route::get('pending', [TransactionController::class, 'pending'])->name('pending');
+
+        // ✅ SYNCHRONISATION BRIDGE (NOUVEAU)
+        Route::post('sync', [TransactionController::class, 'sync'])->name('sync');
+        Route::get('sync/{batchId}/status', [TransactionController::class, 'syncStatus'])->name('sync.status');
+
+        // ✅ CATÉGORISATION AUTOMATIQUE
+        Route::post('auto-categorize', [TransactionController::class, 'autoCategorizeAll'])->name('auto-categorize');
+
+        // ✅ SUGGESTIONS
+        Route::post('suggest-category', [TransactionController::class, 'suggestCategory'])->name('suggest-category');
+
+        // ✅ QUALITÉ DE CATÉGORISATION (NOUVEAU)
+        Route::get('quality', [TransactionController::class, 'quality'])->name('quality');
+
+        // ✅ RECHERCHE
+        Route::get('search', [TransactionController::class, 'search'])->name('search');
+
+        // ✅ EXPORT
+        Route::get('export/csv', [TransactionController::class, 'exportCsv'])->name('export.csv');
+
+        // ✅ ACTIONS EN MASSE
+        Route::post('bulk/categorize', [TransactionController::class, 'bulkCategorize'])->name('bulk.categorize');
+        Route::post('bulk/delete', [TransactionController::class, 'bulkDelete'])->name('bulk.delete');
+        Route::post('bulk/recurring', [TransactionController::class, 'bulkRecurring'])->name('bulk.recurring');
+    });
+
+    // ✅ CRUD de base
     Route::apiResource('transactions', TransactionController::class);
-    Route::get('transactions/{transaction}/statistics', [TransactionController::class, 'statistics']);
 
+    // ✅ Routes avec {id}
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+        Route::put('{id}/categorize', [TransactionController::class, 'categorize'])->name('categorize');
+        Route::post('{id}/auto-categorize', [TransactionController::class, 'autoCategorize'])->name('auto-categorize-single');
 
-    // ✅ Routes additionnelles pour FinancialGoal
-    Route::prefix('financial-goals')->name('financial-goals.')->group(function () {
-        // Statistiques des objectifs
-        Route::get('/statistics', [FinancialGoalController::class, 'statistics'])->name('statistics');
-
-        // Contributions à un objectif spécifique
-        Route::post('/{financialGoal}/contributions', [FinancialGoalController::class, 'addContribution'])->name('add-contribution');
-
-        // Obtenir les contributions d'un objectif
-        Route::get('/{financialGoal}/contributions', [GoalContributionController::class, 'getByGoal'])->name('get-contributions');
+        // ✅ SUGGESTIONS POUR UNE TRANSACTION (NOUVEAU)
+        Route::get('{transaction}/suggestions', [TransactionController::class, 'suggestions'])->name('suggestions');
     });
 
-    Route::apiResource('financial-goals', FinancialGoalController::class);
-
-
+    // ==========================================
+    // 🏷️ CATÉGORIES (PROTECTED)
+    // ==========================================
 
     Route::apiResource('categories', CategoryController::class);
-    Route::get('categories/statistics', [CategoryController::class, 'statistics']);
-    Route::patch('categories/{category}/toggle-active', [CategoryController::class, 'toggleActive']);
 
-    Route::apiResource('suggestions', SuggestionController::class);
+    Route::prefix('categories')->name('categories.')->group(function () {
+        Route::get('stats', [CategoryController::class, 'stats'])->name('stats');
+        Route::patch('{category}/toggle-active', [CategoryController::class, 'toggleActive'])->name('toggle-active');
+    });
+
+    // ==========================================
+    // 🎯 OBJECTIFS FINANCIERS (PROTECTED)
+    // ==========================================
+
+    Route::apiResource('financial-goals', FinancialGoalController::class);
     Route::apiResource('goal-contributions', GoalContributionController::class);
 
-    // Routes additionnelles spécifiques
-    Route::get('categories/{category}/transactions', [TransactionController::class, 'getByCategory']);
+    // ==========================================
+    // 🎮 GAMING (PROTECTED)
+    // ==========================================
 
-    // ==========================================
-    // ANALYTICS ET RAPPORTS
-    // ==========================================
-    Route::prefix('analytics')->name('analytics.')->group(function () {
-        Route::get('/dashboard', [AnalyticsController::class, 'dashboard']);
-        Route::get('/monthly-report', [AnalyticsController::class, 'monthlyReport']);
-        Route::get('/yearly-report', [AnalyticsController::class, 'yearlyReport']);
-        Route::get('/category-breakdown', [AnalyticsController::class, 'categoryBreakdown']);
-        Route::get('/spending-trends', [AnalyticsController::class, 'spendingTrends']);
-        Route::get('/budget-analysis', [AnalyticsController::class, 'budgetAnalysis']);
-    });
-
-    // ==========================================
-    // DASHBOARD GÉNÉRAL AMÉLIORÉ
-    // ==========================================
-    Route::get('dashboard/stats', function (Request $request) {
-        $user = $request->user();
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'financial' => [
-                    'balance' => $user->transactions()->selectRaw('
-                        SUM(CASE WHEN type = "income" THEN amount ELSE -amount END) as balance
-                    ')->value('balance') ?? 0,
-                    'monthly_income' => $user->transactions()
-                        ->where('type', 'income')
-                        ->whereMonth('transaction_date', now()->month)
-                        ->sum('amount'),
-                    'monthly_expenses' => $user->transactions()
-                        ->where('type', 'expense')
-                        ->whereMonth('transaction_date', now()->month)
-                        ->sum('amount'),
-                    'total_transactions' => $user->transactions()->count(),
-                ],
-                'goals' => [
-                    'total_goals' => $user->financialGoals()->count(),
-                    'active_goals' => $user->financialGoals()->where('status', 'active')->count(),
-                    'completed_goals' => $user->financialGoals()->where('status', 'completed')->count(),
-                    'total_saved' => $user->financialGoals()->sum('current_amount'),
-                    'total_target' => $user->financialGoals()->sum('target_amount'),
-                ],
-                'gaming' => [
-                    'level' => $user->level?->level ?? 1,
-                    'total_xp' => $user->level?->total_xp ?? 0,
-                    'achievements_count' => $user->achievements()->count(),
-                    'active_streaks' => $user->streaks()->where('is_active', true)->count(),
-                ],
-                'recent_activity' => [
-                    'recent_transactions' => $user->transactions()
-                        ->with('category')
-                        ->latest()
-                        ->limit(5)
-                        ->get(),
-                    'recent_achievements' => $user->achievements()
-                        ->wherePivot('unlocked_at', '>=', now()->subDays(7))
-                        ->latest('user_achievements.unlocked_at')
-                        ->limit(3)
-                        ->get(),
-                ]
-            ],
-            'message' => 'Dashboard récupéré avec succès'
-        ]);
-    });
-
-    // Gestion bancaire
-    Route::prefix('bank')->name('bank.')->group(function () {
-        Route::get('/connections', [BankController::class, 'index']);
-        Route::post('/initiate', [BankController::class, 'initiate']);
-        Route::post('/connections/{connection}/sync', [BankController::class, 'sync']);
-        Route::get('/pending-transactions', [BankController::class, 'pendingTransactions']);
-        Route::post('/transactions/{bankTransaction}/convert', [BankController::class, 'convertTransaction']);
-        Route::post('/transactions/{bankTransaction}/ignore', [BankController::class, 'ignoreTransaction']);
-        Route::delete('/connections/{connection}', [BankController::class, 'destroy']);
-    });
-
-    // ==========================================
-    // SYSTÈME GAMING
-    // ==========================================
     Route::prefix('gaming')->name('gaming.')->group(function () {
-        // Stats et Dashboard Gaming
-        Route::get('/stats', [GamingController::class, 'stats']);
-        Route::get('/dashboard', [GamingController::class, 'dashboard']);
-        Route::post('/check-achievements', [GamingController::class, 'checkAchievements']);
+        Route::get('stats', [GamingController::class, 'stats'])->name('stats');
+        Route::get('dashboard', [GamingController::class, 'dashboard'])->name('dashboard');
+        Route::get('player', [GamingController::class, 'getPlayerData'])->name('player');
+        Route::put('player', [GamingController::class, 'updatePlayer'])->name('player.update');
 
-        // Achievements (Succès)
+        // 🏆 ACHIEVEMENTS
         Route::prefix('achievements')->name('achievements.')->group(function () {
-            Route::get('/', [AchievementController::class, 'index']);
-            Route::get('/available', [AchievementController::class, 'available']);
-            Route::get('/unlocked', [AchievementController::class, 'unlocked']);
-            Route::get('/{achievement}', [AchievementController::class, 'show']);
-            Route::post('/check', [AchievementController::class, 'checkAndUnlock']);
+            Route::get('/', [AchievementController::class, 'index'])->name('index');
+            Route::get('recent', [AchievementController::class, 'recent'])->name('recent');
+            Route::get('user', [AchievementController::class, 'getUserAchievements'])->name('user');
+            Route::post('check', [AchievementController::class, 'checkAchievements'])->name('check');
+            Route::post('{achievement}/unlock', [AchievementController::class, 'unlock'])->name('unlock');
         });
 
-        // Niveaux et XP
+        Route::get('user-achievements', [AchievementController::class, 'getUserAchievements'])->name('user-achievements');
+
+        // 📊 LEVEL & XP
+        Route::get('level', [UserLevelController::class, 'show'])->name('level.current');
+        Route::post('add-xp', [UserLevelController::class, 'addXP'])->name('level.add-xp');
+        Route::get('xp-events', [UserLevelController::class, 'getXPEvents'])->name('level.xp-events');
+        Route::get('level-rewards', [UserLevelController::class, 'getLevelRewards'])->name('level.rewards');
+        Route::post('level-rewards/{level}/claim', [UserLevelController::class, 'claimRewards'])->name('level.rewards.claim');
+
         Route::prefix('level')->name('level.')->group(function () {
-            Route::get('/', [UserLevelController::class, 'show']);
-            Route::get('/progress', [UserLevelController::class, 'progress']);
-            Route::get('/leaderboard', [UserLevelController::class, 'leaderboard']);
+            Route::get('/', [UserLevelController::class, 'show'])->name('show');
+            Route::post('xp', [UserLevelController::class, 'addXP'])->name('xp.add');
+            Route::get('history', [UserLevelController::class, 'getXPEvents'])->name('history');
+            Route::get('rewards', [UserLevelController::class, 'getLevelRewards'])->name('rewards');
         });
 
-        // Actions utilisateur (pour déclencher XP/achievements)
-        Route::prefix('actions')->name('actions.')->group(function () {
-            Route::post('/transaction-created', [GamingActionController::class, 'transactionCreated']);
-            Route::post('/goal-achieved', [GamingActionController::class, 'goalAchieved']);
-            Route::post('/category-created', [GamingActionController::class, 'categoryCreated']);
-            Route::post('/add-xp', [GamingActionController::class, 'addXp']);
+        // 🎯 ACTIONS
+        Route::post('actions', [GamingActionController::class, 'store'])->name('actions.store');
+        Route::get('actions/recent', [GamingActionController::class, 'recent'])->name('actions.recent');
+
+        // 🔥 STREAKS
+        Route::prefix('streaks')->name('streaks.')->group(function () {
+            Route::get('/', [StreakController::class, 'index'])->name('index');
+            Route::get('all', [StreakController::class, 'index'])->name('all');
+            Route::post('update', [StreakController::class, 'updateStreak'])->name('update');
+            Route::post('{type}/update', [StreakController::class, 'updateStreakByType'])->name('update-by-type');
+            Route::get('{type}', [StreakController::class, 'show'])->name('show');
+            Route::post('{type}/trigger', [StreakController::class, 'trigger'])->name('trigger');
         });
+
+        // 🏅 LEADERBOARD
+        Route::get('leaderboard', [GamingController::class, 'getLeaderboard'])->name('leaderboard');
+        Route::get('ranking', [GamingController::class, 'getUserRanking'])->name('ranking');
     });
 
     // ==========================================
-    // STREAKS ROUTES AVEC PAGINATION
+    // 📈 ENGAGEMENT (PROTECTED)
     // ==========================================
-    Route::prefix('streaks')->name('streaks.')->group(function () {
-        Route::get('/', [StreakController::class, 'index']);
-        Route::get('/leaderboard', [StreakController::class, 'leaderboard']);
-        Route::get('/check-expired', [StreakController::class, 'checkExpired']);
-        Route::get('/{type}', [StreakController::class, 'show']);
-        Route::post('/{type}/trigger', [StreakController::class, 'trigger']);
-        Route::post('/{type}/claim-bonus', [StreakController::class, 'claimBonus']);
-        Route::post('/{type}/reactivate', [StreakController::class, 'reactivate']);
+
+    Route::prefix('engagement')->name('engagement.')->group(function () {
+        Route::post('track', [EngagementController::class, 'trackAction'])->name('track');
+        Route::get('stats', [EngagementController::class, 'getStats'])->name('stats');
+        Route::get('recent-actions', [EngagementController::class, 'getRecentActions'])->name('recent');
+        Route::get('leaderboard', [EngagementController::class, 'getLeaderboard'])->name('leaderboard');
+        Route::get('notifications', [EngagementController::class, 'getNotifications'])->name('notifications.index');
+        Route::put('notifications/{id}/read', [EngagementController::class, 'markNotificationAsRead'])->name('notifications.read');
+        Route::post('notifications/{id}/dismiss', [EngagementController::class, 'dismissNotification'])->name('notifications.dismiss');
     });
 
     // ==========================================
-    // ROUTES DE RECHERCHE AVANCÉE
+    // 📊 ANALYTICS & PROJECTIONS (PROTECTED)
     // ==========================================
-    Route::prefix('search')->group(function () {
-        Route::get('/transactions', function (Request $request) {
-            $query = Auth::user()->transactions()->with('category');
 
-            // Recherche globale
-            if ($request->filled('q')) {
-                $searchTerm = $request->q;
-                $query->where(function ($q) use ($searchTerm) {
-                    $q->where('description', 'like', "%{$searchTerm}%")
-                        ->orWhere('reference', 'like', "%{$searchTerm}%")
-                        ->orWhereHas('category', function ($categoryQuery) use ($searchTerm) {
-                            $categoryQuery->where('name', 'like', "%{$searchTerm}%");
-                        });
-                });
-            }
-
-            $results = $query->latest()->paginate(15);
-
-            return response()->json([
-                'success' => true,
-                'data' => $results->items(),
-                'pagination' => [
-                    'current_page' => $results->currentPage(),
-                    'per_page' => $results->perPage(),
-                    'total' => $results->total(),
-                    'last_page' => $results->lastPage(),
-                ],
-                'message' => 'Recherche de transactions effectuée'
-            ]);
-        });
-
-        Route::get('/categories', function (Request $request) {
-            $query = Auth::user()->categories();
-
-            if ($request->filled('q')) {
-                $query->where('name', 'like', "%{$request->q}%");
-            }
-
-            $results = $query->paginate(15);
-
-            return response()->json([
-                'success' => true,
-                'data' => $results->items(),
-                'pagination' => [
-                    'current_page' => $results->currentPage(),
-                    'per_page' => $results->perPage(),
-                    'total' => $results->total(),
-                    'last_page' => $results->lastPage(),
-                ],
-                'message' => 'Recherche de catégories effectuée'
-            ]);
-        });
+    Route::prefix('analytics')->name('analytics.')->group(function () {
+        Route::get('dashboard', [AnalyticsController::class, 'dashboard'])->name('dashboard');
+        Route::get('transactions-summary', [AnalyticsController::class, 'transactionsSummary'])->name('transactions');
+        Route::get('goals-progress', [AnalyticsController::class, 'goalsProgress'])->name('goals');
+        Route::get('spending-trends', [AnalyticsController::class, 'spendingTrends'])->name('spending');
+        Route::get('category-breakdown', [AnalyticsController::class, 'categoryBreakdown'])->name('categories');
     });
 
-    // ==========================================
-    // EXPORT DE DONNÉES
-    // ==========================================
-    Route::prefix('export')->group(function () {
-        Route::get('/transactions', function (Request $request) {
-            // Cette route nécessitera Laravel Excel
-            return response()->json([
-                'success' => false,
-                'message' => 'Export de transactions - À implémenter avec Laravel Excel'
-            ]);
-        });
-
-        Route::get('/goals', function (Request $request) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Export d\'objectifs - À implémenter avec Laravel Excel'
-            ]);
-        });
-    });
-
-    // ==========================================
-    // NOTIFICATIONS
-    // ==========================================
-    Route::prefix('notifications')->group(function () {
-        Route::get('/', function (Request $request) {
-            $notifications = $request->user()
-                ->notifications()
-                ->paginate(15);
-
-            return response()->json([
-                'success' => true,
-                'data' => $notifications->items(),
-                'pagination' => [
-                    'current_page' => $notifications->currentPage(),
-                    'per_page' => $notifications->perPage(),
-                    'total' => $notifications->total(),
-                    'last_page' => $notifications->lastPage(),
-                ],
-                'unread_count' => $request->user()->unreadNotifications()->count(),
-                'message' => 'Notifications récupérées avec succès'
-            ]);
-        });
-
-        Route::post('/{id}/read', function (Request $request, $id) {
-            $notification = $request->user()->notifications()->find($id);
-
-            if (!$notification) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Notification non trouvée'
-                ], 404);
-            }
-
-            $notification->markAsRead();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Notification marquée comme lue'
-            ]);
-        });
-
-        Route::post('/read-all', function (Request $request) {
-            $request->user()->unreadNotifications->markAsRead();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Toutes les notifications marquées comme lues'
-            ]);
-        });
-    });
+    Route::get('suggestions', [SuggestionController::class, 'index'])->name('suggestions.index');
+    Route::get('projections', [ProjectionController::class, 'index'])->name('projections.index');
 });
 
 // ==========================================
-// ROUTES ADMIN (optionnel pour plus tard)
+// 👑 ADMIN ROUTES (PROTECTED + ADMIN)
 // ==========================================
-Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->name('admin.')->group(function () {
-    // Gaming Admin
-    Route::prefix('gaming')->name('gaming.')->group(function () {
-        Route::get('/stats', function () {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'total_users' => \App\Models\User::count(),
-                    'total_achievements' => \App\Models\Achievement::count(),
-                    'total_xp_distributed' => \App\Models\UserLevel::sum('total_xp'),
-                    'avg_level' => round(\App\Models\UserLevel::avg('level'), 2),
-                    'achievement_unlock_stats' => \DB::table('user_achievements')
-                        ->select('achievement_id', \DB::raw('count(*) as unlock_count'))
-                        ->groupBy('achievement_id')
-                        ->get()
-                ],
-                'message' => 'Statistiques admin gaming récupérées'
-            ]);
-        });
 
-        Route::get('/users/{user}/gaming-stats', function (\App\Models\User $user) {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'user' => $user->only(['id', 'name', 'email']),
-                    'gaming_stats' => $user->getGamingStats(),
-                    'achievements' => $user->achievements()->get(),
-                    'level_details' => $user->level?->getDetailedStats()
-                ]
-            ]);
-        });
+Route::middleware(['auth:sanctum', 'admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('users-engagement', [AdminController::class, 'usersEngagement'])->name('users-engagement');
+        Route::get('system-stats', [AdminController::class, 'systemStats'])->name('system-stats');
+        Route::post('broadcast-notification', [AdminController::class, 'broadcastNotification'])->name('broadcast');
+        Route::get('users', [AdminController::class, 'listUsers'])->name('users');
+        Route::delete('users/{user}', [AdminController::class, 'deleteUser'])->name('users.delete');
     });
-});
-
-
-
 
 // ==========================================
-// ROUTE DE FALLBACK POUR 404 API
+// 🚨 FALLBACK 404
 // ==========================================
+
 Route::fallback(function () {
     return response()->json([
         'success' => false,
-        'message' => 'Endpoint non trouvé',
-        'available_endpoints' => '/api/docs'
+        'message' => 'Route API non trouvée',
+        'error' => 'Endpoint inexistant',
     ], 404);
 });

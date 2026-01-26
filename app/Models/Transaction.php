@@ -12,8 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Transaction extends Model
 {
     use HasFactory, SoftDeletes;
+
     protected $fillable = [
         'user_id',
+        'bank_connection_id',           // 🆕 Bridge
+        'external_transaction_id',      // 🆕 Bridge
+        'bridge_transaction_id',        // 🆕 Bridge
         'category_id',
         'type',
         'amount',
@@ -32,7 +36,10 @@ class Transaction extends Model
         'reconciled_at',
         'is_transfer',
         'transfer_transaction_id',
-        'source'
+        'source',
+        'is_from_bridge',               // 🆕 Bridge
+        'auto_imported',                // 🆕 Bridge
+        'auto_categorized',             // 🆕 Bridge
     ];
 
     protected $casts = [
@@ -43,15 +50,18 @@ class Transaction extends Model
         'is_recurring' => 'boolean',
         'is_reconciled' => 'boolean',
         'is_transfer' => 'boolean',
+        'is_from_bridge' => 'boolean',     // 🆕 Bridge
+        'auto_imported' => 'boolean',      // 🆕 Bridge
+        'auto_categorized' => 'boolean',   // 🆕 Bridge
         'recurrence_interval' => 'integer',
-        'metadata' => 'array'
+        'metadata' => 'array',
     ];
 
     protected $dates = [
         'transaction_date',
         'recurrence_end_date',
         'reconciled_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $attributes = [
@@ -60,46 +70,55 @@ class Transaction extends Model
         'recurrence_interval' => 1,
         'is_reconciled' => false,
         'is_transfer' => false,
-        'source' => 'manual'
+        'source' => 'manual',
+        'is_from_bridge' => false,      // 🆕 Bridge
+        'auto_imported' => false,       // 🆕 Bridge
+        'auto_categorized' => false,    // 🆕 Bridge
     ];
 
     /**
      * Les types de transactions
      */
     public const TYPE_INCOME = 'income';
+
     public const TYPE_EXPENSE = 'expense';
 
     public const TYPES = [
         self::TYPE_INCOME => 'Revenus',
-        self::TYPE_EXPENSE => 'Dépenses'
+        self::TYPE_EXPENSE => 'Dépenses',
     ];
 
     /**
      * Les statuts de transactions
      */
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
         self::STATUS_PENDING => 'En attente',
         self::STATUS_COMPLETED => 'Terminée',
-        self::STATUS_CANCELLED => 'Annulée'
+        self::STATUS_CANCELLED => 'Annulée',
     ];
 
     /**
      * Les types de récurrence
      */
     public const RECURRENCE_DAILY = 'daily';
+
     public const RECURRENCE_WEEKLY = 'weekly';
+
     public const RECURRENCE_MONTHLY = 'monthly';
+
     public const RECURRENCE_YEARLY = 'yearly';
 
     public const RECURRENCE_TYPES = [
         self::RECURRENCE_DAILY => 'Quotidienne',
         self::RECURRENCE_WEEKLY => 'Hebdomadaire',
         self::RECURRENCE_MONTHLY => 'Mensuelle',
-        self::RECURRENCE_YEARLY => 'Annuelle'
+        self::RECURRENCE_YEARLY => 'Annuelle',
     ];
 
     /**
@@ -111,16 +130,53 @@ class Transaction extends Model
         'check' => 'Chèque',
         'transfer' => 'Virement',
         'online' => 'Paiement en ligne',
-        'other' => 'Autre'
+        'other' => 'Autre',
     ];
 
+    /**
+     * 🆕 Sources de transactions
+     */
+    public const SOURCE_MANUAL = 'manual';
 
-    public function user() {
+    public const SOURCE_BRIDGE = 'bridge';
+
+    public const SOURCE_RECURRING = 'recurring';
+
+    public const SOURCE_IMPORT = 'import';
+
+    public const SOURCES = [
+        self::SOURCE_MANUAL => 'Manuelle',
+        self::SOURCE_BRIDGE => 'Import bancaire',
+        self::SOURCE_RECURRING => 'Récurrence',
+        self::SOURCE_IMPORT => 'Import fichier',
+    ];
+
+    // ==========================================
+    // RELATIONS
+    // ==========================================
+
+    /**
+     * Relation avec l'utilisateur
+     */
+    public function user(): BelongsTo
+    {
         return $this->belongsTo(User::class);
     }
 
-    public function category() {
+    /**
+     * Relation avec la catégorie
+     */
+    public function category(): BelongsTo
+    {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * 🆕 Relation avec la connexion bancaire
+     */
+    public function bankConnection(): BelongsTo
+    {
+        return $this->belongsTo(BankConnection::class);
     }
 
     /**
@@ -147,10 +203,17 @@ class Transaction extends Model
         return $this->belongsTo(Transaction::class, 'transfer_transaction_id');
     }
 
+    /**
+     * Relation avec les contributions aux objectifs
+     */
     public function goalContributions(): HasMany
     {
-        return $this->HasMany(GoalContribution::class);
+        return $this->hasMany(GoalContribution::class);
     }
+
+    // ==========================================
+    // SCOPES
+    // ==========================================
 
     /**
      * Scope pour filtrer par utilisateur
@@ -258,6 +321,42 @@ class Transaction extends Model
     }
 
     /**
+     * 🆕 Scope pour les transactions Bridge
+     */
+    public function scopeFromBridge($query)
+    {
+        return $query->where('is_from_bridge', true);
+    }
+
+    /**
+     * 🆕 Scope pour les transactions sans catégorie
+     */
+    public function scopeUncategorized($query)
+    {
+        return $query->whereNull('category_id');
+    }
+
+    /**
+     * 🆕 Scope pour les transactions auto-catégorisées
+     */
+    public function scopeAutoCategorized($query)
+    {
+        return $query->where('auto_categorized', true);
+    }
+
+    /**
+     * 🆕 Scope pour les transactions manuelles
+     */
+    public function scopeManual($query)
+    {
+        return $query->where('source', self::SOURCE_MANUAL);
+    }
+
+    // ==========================================
+    // ACCESSORS
+    // ==========================================
+
+    /**
      * Accessor pour le nom du type
      */
     public function getTypeNameAttribute(): string
@@ -289,7 +388,8 @@ class Transaction extends Model
     public function getFormattedAmountAttribute(): string
     {
         $sign = $this->type === self::TYPE_EXPENSE ? '-' : '+';
-        return $sign . number_format($this->amount, 2, ',', ' ') . ' €';
+
+        return $sign.number_format($this->amount, 2, ',', ' ').' €';
     }
 
     /**
@@ -298,9 +398,29 @@ class Transaction extends Model
     public function getIsEditableAttribute(): bool
     {
         return $this->status !== self::STATUS_CANCELLED &&
-            !$this->is_reconciled &&
-            $this->source === 'manual';
+            ! $this->is_reconciled &&
+            $this->source === self::SOURCE_MANUAL;
     }
+
+    /**
+     * 🆕 Accessor pour le nom de la source
+     */
+    public function getSourceNameAttribute(): string
+    {
+        return self::SOURCES[$this->source] ?? $this->source;
+    }
+
+    /**
+     * 🆕 Accessor pour vérifier si c'est une transaction Bridge
+     */
+    public function getIsBridgeTransactionAttribute(): bool
+    {
+        return $this->is_from_bridge || $this->source === self::SOURCE_BRIDGE;
+    }
+
+    // ==========================================
+    // MÉTHODES MÉTIER
+    // ==========================================
 
     /**
      * Vérifier si la transaction appartient à un utilisateur
@@ -317,7 +437,7 @@ class Transaction extends Model
     {
         return $this->update([
             'is_reconciled' => true,
-            'reconciled_at' => now()
+            'reconciled_at' => now(),
         ]);
     }
 
@@ -328,7 +448,28 @@ class Transaction extends Model
     {
         return $this->update([
             'is_reconciled' => false,
-            'reconciled_at' => null
+            'reconciled_at' => null,
+        ]);
+    }
+
+    /**
+     * 🆕 Vérifier si la transaction nécessite une catégorisation
+     */
+    public function needsCategorization(): bool
+    {
+        return is_null($this->category_id) &&
+            $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * 🆕 Marquer comme catégorisée automatiquement
+     */
+    public function markAsAutoCategorized($categoryId): bool
+    {
+        return $this->update([
+            'category_id' => $categoryId,
+            'auto_categorized' => true,
+            'status' => self::STATUS_COMPLETED,
         ]);
     }
 
@@ -337,13 +478,13 @@ class Transaction extends Model
      */
     public function generateNextRecurrence(): ?Transaction
     {
-        if (!$this->is_recurring || !$this->recurrence_type) {
+        if (! $this->is_recurring || ! $this->recurrence_type) {
             return null;
         }
 
         $nextDate = $this->calculateNextRecurrenceDate();
 
-        if (!$nextDate || ($this->recurrence_end_date && $nextDate->gt($this->recurrence_end_date))) {
+        if (! $nextDate || ($this->recurrence_end_date && $nextDate->gt($this->recurrence_end_date))) {
             return null;
         }
 
@@ -357,7 +498,7 @@ class Transaction extends Model
             'status' => self::STATUS_PENDING,
             'payment_method' => $this->payment_method,
             'parent_transaction_id' => $this->id,
-            'source' => 'recurring'
+            'source' => self::SOURCE_RECURRING,
         ]);
     }
 
@@ -370,7 +511,7 @@ class Transaction extends Model
             ->orderBy('transaction_date', 'desc')
             ->first()?->transaction_date ?? $this->transaction_date;
 
-        return match($this->recurrence_type) {
+        return match ($this->recurrence_type) {
             self::RECURRENCE_DAILY => $lastDate->addDays($this->recurrence_interval),
             self::RECURRENCE_WEEKLY => $lastDate->addWeeks($this->recurrence_interval),
             self::RECURRENCE_MONTHLY => $lastDate->addMonths($this->recurrence_interval),
@@ -378,6 +519,10 @@ class Transaction extends Model
             default => null
         };
     }
+
+    // ==========================================
+    // BOOT METHOD
+    // ==========================================
 
     /**
      * Boot method pour gérer les événements du modèle
@@ -389,11 +534,19 @@ class Transaction extends Model
         // Validation avant sauvegarde
         static::saving(function ($transaction) {
             // Valider la cohérence des données de récurrence
-            if ($transaction->is_recurring && !$transaction->recurrence_type) {
+            if ($transaction->is_recurring && ! $transaction->recurrence_type) {
                 throw new \Exception('Le type de récurrence est requis pour une transaction récurrente.');
+            }
+
+            // 🆕 Auto-définir source pour transactions Bridge
+            if ($transaction->is_from_bridge && $transaction->source === self::SOURCE_MANUAL) {
+                $transaction->source = self::SOURCE_BRIDGE;
+            }
+
+            // 🆕 Auto-définir is_from_bridge si source est bridge
+            if ($transaction->source === self::SOURCE_BRIDGE && ! $transaction->is_from_bridge) {
+                $transaction->is_from_bridge = true;
             }
         });
     }
-
-
 }

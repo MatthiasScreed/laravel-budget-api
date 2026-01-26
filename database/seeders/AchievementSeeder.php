@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Achievement;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class AchievementSeeder extends Seeder
@@ -23,7 +22,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'transaction',
                 'criteria' => ['min_transaction' => 1],
                 'points' => 10,
-                'rarity' => 'common'
+                'rarity' => 'common',
             ],
             [
                 'name' => 'Actif régulier',
@@ -34,7 +33,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'transaction',
                 'criteria' => ['min_transactions' => 10],
                 'points' => 25,
-                'rarity' => 'common'
+                'rarity' => 'common',
             ],
             [
                 'name' => 'Expert des finances',
@@ -45,7 +44,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'transaction',
                 'criteria' => ['min_transactions' => 100],
                 'points' => 100,
-                'rarity' => 'epic'
+                'rarity' => 'epic',
             ],
             // Succès d'objectifs
             [
@@ -57,7 +56,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'goal',
                 'criteria' => ['min_goals_created' => 1],
                 'points' => 15,
-                'rarity' => 'common'
+                'rarity' => 'common',
             ],
             [
                 'name' => 'Réalisateur',
@@ -68,7 +67,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'goal',
                 'criteria' => ['min_goals_completed' => 1],
                 'points' => 50,
-                'rarity' => 'rare'
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Maître des objectifs',
@@ -79,7 +78,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'goal',
                 'criteria' => ['min_goals_completed' => 5],
                 'points' => 200,
-                'rarity' => 'legendary'
+                'rarity' => 'legendary',
             ],
 
             // Succès de séries
@@ -92,7 +91,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'streak',
                 'criteria' => ['streak_type' => 'daily_transaction', 'min_count' => 3],
                 'points' => 20,
-                'rarity' => 'common'
+                'rarity' => 'common',
             ],
             [
                 'name' => 'Régularité',
@@ -103,7 +102,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'streak',
                 'criteria' => ['streak_type' => 'daily_transaction', 'min_count' => 7],
                 'points' => 50,
-                'rarity' => 'rare'
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Champion de la régularité',
@@ -114,7 +113,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'streak',
                 'criteria' => ['streak_type' => 'daily_transaction', 'min_count' => 30],
                 'points' => 200,
-                'rarity' => 'epic'
+                'rarity' => 'epic',
             ],
 
             // Succès d'étapes
@@ -127,7 +126,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'milestone',
                 'criteria' => ['min_savings_amount' => 1000],
                 'points' => 30,
-                'rarity' => 'common'
+                'rarity' => 'common',
             ],
             [
                 'name' => 'Épargnant sérieux',
@@ -138,7 +137,7 @@ class AchievementSeeder extends Seeder
                 'type' => 'milestone',
                 'criteria' => ['min_savings_amount' => 5000],
                 'points' => 75,
-                'rarity' => 'rare'
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Maître épargnant',
@@ -149,45 +148,63 @@ class AchievementSeeder extends Seeder
                 'type' => 'milestone',
                 'criteria' => ['min_savings_amount' => 20000],
                 'points' => 300,
-                'rarity' => 'legendary'
+                'rarity' => 'legendary',
             ],
             [
                 'name' => 'Banquier Connecté',
+                'slug' => 'bank-connected',
                 'description' => 'Connecte ton premier compte bancaire',
-                'icon' => '🏦',
-                'type' => 'one_time',
-                'xp_reward' => 100,
-                'criteria' => json_encode(['bank_connections_count' => 1])
+                'icon' => 'bank',
+                'color' => '#10B981',
+                'type' => 'milestone',
+                'criteria' => ['bank_connections_count' => 1],
+                'points' => 100,
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Synchroniseur Pro',
+                'slug' => 'sync-pro',
                 'description' => 'Synchronise tes comptes 10 fois',
-                'icon' => '🔄',
-                'type' => 'cumulative',
-                'xp_reward' => 75,
-                'criteria' => json_encode(['sync_count' => 10])
+                'icon' => 'refresh',
+                'color' => '#3B82F6',
+                'type' => 'milestone',
+                'criteria' => ['sync_count' => 10],
+                'points' => 75,
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Premier Pas Digital',
+                'slug' => 'first-digital-step',
                 'description' => 'Connecte ton premier compte bancaire',
-                'icon' => '🏦',
-                'xp_reward' => 100,
-                'criteria' => json_encode(['bank_connections' => 1])
+                'icon' => 'bank',
+                'color' => '#059669',
+                'type' => 'milestone',
+                'criteria' => ['bank_connections' => 1],
+                'points' => 100,
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Synchroniseur',
+                'slug' => 'synchronizer',
                 'description' => 'Effectue 10 synchronisations',
-                'icon' => '🔄',
-                'xp_reward' => 75,
-                'criteria' => json_encode(['sync_count' => 10])
+                'icon' => 'refresh-cw',
+                'color' => '#6366F1',
+                'type' => 'milestone',
+                'criteria' => ['sync_count' => 10],
+                'points' => 75,
+                'rarity' => 'rare',
             ],
             [
                 'name' => 'Organisateur Pro',
+                'slug' => 'organizer-pro',
                 'description' => 'Catégorise 50 transactions importées',
-                'icon' => '📊',
-                'xp_reward' => 150,
-                'criteria' => json_encode(['categorized_transactions' => 50])
-            ]
+                'icon' => 'folder',
+                'color' => '#8B5CF6',
+                'type' => 'transaction',
+                'criteria' => ['categorized_transactions' => 50],
+                'points' => 150,
+                'rarity' => 'epic',
+            ],
 
         ];
 

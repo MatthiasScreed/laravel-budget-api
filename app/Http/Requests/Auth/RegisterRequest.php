@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Auth;
 
-
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
@@ -30,35 +29,33 @@ class RegisterRequest extends FormRequest
                 'string',
                 'min:2',
                 'max:255',
-                'regex:/^[a-zA-ZÀ-ÿ\s\-\'\.]+$/' // Permet les accents, espaces, tirets, apostrophes
+                'regex:/^[a-zA-ZÀ-ÿ\s\-\'\.]+$/',
             ],
             'email' => [
                 'required',
                 'string',
-                'email:rfc', // ✅ Plus de validation DNS
+                'email:rfc',
                 'max:255',
-                'unique:users,email'
+                'unique:users,email',
             ],
             'password' => [
                 'required',
                 'string',
                 'confirmed',
                 config('app.env') === 'testing'
-                    ? 'min:8' // ✅ Simple en test
-                    : [
-                    Password::min(8)
+                    ? 'min:8'
+                    : Password::min(8)  // ✅ Plus de tableau imbriqué
                         ->letters()
                         ->mixedCase()
                         ->numbers()
                         ->symbols()
-                        ->uncompromised()
-                ]
+                        ->uncompromised(),
             ],
             'terms_accepted' => [
                 'required',
                 'boolean',
-                'accepted' // Doit être true
-            ]
+                'accepted',
+            ],
         ];
     }
 
@@ -81,7 +78,7 @@ class RegisterRequest extends FormRequest
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
 
             'terms_accepted.required' => 'Vous devez accepter les conditions d\'utilisation.',
-            'terms_accepted.accepted' => 'Vous devez accepter les conditions d\'utilisation.'
+            'terms_accepted.accepted' => 'Vous devez accepter les conditions d\'utilisation.',
         ];
     }
 
@@ -94,20 +91,18 @@ class RegisterRequest extends FormRequest
             'name' => 'nom',
             'email' => 'adresse email',
             'password' => 'mot de passe',
-            'terms_accepted' => 'conditions d\'utilisation'
+            'terms_accepted' => 'conditions d\'utilisation',
         ];
     }
 
     /**
-     * ✅ AJOUTER CETTE MÉTHODE - Normalisation avant validation
      * Prepare the data for validation.
      */
     protected function prepareForValidation(): void
     {
-        // Normaliser l'email en minuscules si présent
         if ($this->has('email')) {
             $this->merge([
-                'email' => strtolower($this->input('email'))
+                'email' => strtolower($this->input('email')),
             ]);
         }
     }
