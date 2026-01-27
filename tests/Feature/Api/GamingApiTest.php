@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
 use App\Models\Achievement;
+use App\Models\User;
 use App\Models\UserLevel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,12 +33,12 @@ class GamingApiTest extends TestCase
                     'stats',
                     'recent_achievements',
                     'next_achievements',
-                    'activity_summary'
+                    'activity_summary',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
     }
 
@@ -56,15 +56,15 @@ class GamingApiTest extends TestCase
                         'current_level',
                         'total_xp',
                         'progress_percentage',
-                        'xp_to_next_level'
+                        'xp_to_next_level',
                     ],
                     'next_levels',
-                    'level_history'
+                    'level_history',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
         // Vérifier les données de base
@@ -88,13 +88,13 @@ class GamingApiTest extends TestCase
                     'stats' => [
                         'total_achievements',
                         'unlocked_count',
-                        'completion_percentage'
-                    ]
+                        'completion_percentage',
+                    ],
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
         // Vérifier qu'on a des achievements (créés par TestCase)
@@ -122,7 +122,7 @@ class GamingApiTest extends TestCase
 
         // Débloquer l'achievement pour l'utilisateur
         $this->user->achievements()->attach($achievement->id, [
-            'unlocked_at' => now()
+            'unlocked_at' => now(),
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -152,12 +152,12 @@ class GamingApiTest extends TestCase
                 'data' => [
                     'unlocked_achievements',
                     'count',
-                    'xp_gained'
+                    'xp_gained',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
         // Pas d'achievements débloqués initialement
@@ -189,12 +189,12 @@ class GamingApiTest extends TestCase
                     'stats',
                     'recent_achievements',
                     'next_achievements',
-                    'activity_summary'
+                    'activity_summary',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
         // Vérifier les données de base
@@ -218,22 +218,22 @@ class GamingApiTest extends TestCase
                         'current_level',
                         'total_xp',
                         'progress_percentage',
-                        'title'
+                        'title',
                     ],
                     'achievements_count',
-                    'recent_achievements'
+                    'recent_achievements',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'level_info' => [
                         'current_level' => 1,
-                        'total_xp' => 0
+                        'total_xp' => 0,
                     ],
-                    'achievements_count' => 0
-                ]
+                    'achievements_count' => 0,
+                ],
             ]);
     }
 
@@ -243,7 +243,7 @@ class GamingApiTest extends TestCase
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/gaming/actions/add-xp', [
                 'xp' => 100,
-                'reason' => 'Test manual XP'
+                'reason' => 'Test manual XP',
             ]);
 
         $response->assertStatus(200)
@@ -252,15 +252,15 @@ class GamingApiTest extends TestCase
                 'data' => [
                     'xp_added',
                     'leveled_up',
-                    'new_stats'
+                    'new_stats',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'xp_added' => 100
-                ]
+                    'xp_added' => 100,
+                ],
             ]);
 
         // Vérifier que l'XP a bien été ajouté

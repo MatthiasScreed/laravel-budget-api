@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
-use App\Models\Transaction;
 use App\Models\FinancialGoal;
+use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -35,16 +35,16 @@ class DashboardApiTest extends TestCase
                 'success',
                 'data' => [
                     'financial' => [
-                        'balance', 'monthly_income', 'monthly_expenses'
+                        'balance', 'monthly_income', 'monthly_expenses',
                     ],
                     'goals' => [
-                        'total_goals', 'active_goals', 'total_saved'
+                        'total_goals', 'active_goals', 'total_saved',
                     ],
                     'gaming' => [
-                        'level', 'total_xp', 'achievements_count'
+                        'level', 'total_xp', 'achievements_count',
                     ],
-                    'recent_activity'
-                ]
+                    'recent_activity',
+                ],
             ]);
     }
 }

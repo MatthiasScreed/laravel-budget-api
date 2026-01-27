@@ -26,26 +26,26 @@ class LoginRequest extends FormRequest
                 'required',
                 'string',
                 'email',
-                'max:255'
+                'max:255',
             ],
             'password' => [
                 'required',
                 'string',
-                'min:1' // Au moins 1 caractère pour la connexion
+                'min:1', // Au moins 1 caractère pour la connexion
             ],
             'remember' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'device_name' => [
                 'sometimes',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'revoke_other_tokens' => [
                 'sometimes',
-                'boolean'
-            ]
+                'boolean',
+            ],
         ];
     }
 
@@ -58,7 +58,7 @@ class LoginRequest extends FormRequest
             'email.required' => 'L\'adresse email est obligatoire.',
             'email.email' => 'L\'adresse email doit être valide.',
             'password.required' => 'Le mot de passe est obligatoire.',
-            'device_name.max' => 'Le nom de l\'appareil ne peut pas dépasser 255 caractères.'
+            'device_name.max' => 'Le nom de l\'appareil ne peut pas dépasser 255 caractères.',
         ];
     }
 
@@ -70,8 +70,7 @@ class LoginRequest extends FormRequest
         $this->merge([
             'email' => strtolower($this->email), // Normaliser l'email
             'remember' => $this->boolean('remember', false),
-            'revoke_other_tokens' => $this->boolean('revoke_other_tokens', false)
+            'revoke_other_tokens' => $this->boolean('revoke_other_tokens', false),
         ]);
     }
-
 }

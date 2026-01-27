@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\DailyChallenge;
 use Carbon\Carbon;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DailyChallengesSeeder extends Seeder
@@ -49,7 +48,7 @@ class DailyChallengesSeeder extends Seeder
                 'difficulty' => 'easy',
                 'is_global' => true,
                 'is_active' => true,
-            ]
+            ],
         ];
 
         foreach ($challenges as $challenge) {

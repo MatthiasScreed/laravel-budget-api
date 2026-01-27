@@ -3,11 +3,13 @@
 namespace Tests;
 
 use App\Models\Achievement;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
     use CreatesApplication;
+    use RefreshDatabase;
 
     /**
      * Indicates whether the default seeder should run before each test.
@@ -115,7 +117,7 @@ abstract class TestCase extends BaseTestCase
             'type' => 'transaction',
             'rarity' => 'common', // ✅ Valeur correcte
             'criteria' => ['min_transactions' => 1],
-            'is_active' => true
+            'is_active' => true,
         ]);
 
         Achievement::create([
@@ -128,7 +130,7 @@ abstract class TestCase extends BaseTestCase
             'type' => 'milestone',
             'rarity' => 'rare', // 🔧 CHANGER uncommon en rare
             'criteria' => ['min_categories' => 3],
-            'is_active' => true
+            'is_active' => true,
         ]);
     }
 }

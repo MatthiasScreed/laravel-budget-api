@@ -10,7 +10,7 @@ class GamingReward extends Model
     protected $fillable = [
         'name', 'type', 'description', 'icon', 'color', 'rarity',
         'criteria', 'reward_data', 'is_active', 'is_repeatable',
-        'available_from', 'available_until'
+        'available_from', 'available_until',
     ];
 
     protected $casts = [

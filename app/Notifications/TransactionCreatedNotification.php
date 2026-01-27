@@ -5,7 +5,6 @@ namespace App\Notifications;
 use App\Models\Transaction;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class TransactionCreatedNotification extends Notification implements ShouldQueue
@@ -13,6 +12,7 @@ class TransactionCreatedNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Transaction $transaction;
+
     protected int $xpEarned;
 
     /**
@@ -47,7 +47,7 @@ class TransactionCreatedNotification extends Notification implements ShouldQueue
             'amount' => $this->transaction->amount,
             'type' => $this->transaction->type,
             'category' => $this->transaction->category->name,
-            'xp_earned' => $this->xpEarned
+            'xp_earned' => $this->xpEarned,
         ];
     }
 }

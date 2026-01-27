@@ -2,8 +2,8 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
@@ -33,7 +33,7 @@ describe('Registration', function () {
             'email' => 'test@example.com',
             'password' => 'VeryUniqueSecureTestPassword2025!@#$%^&*()',
             'password_confirmation' => 'VeryUniqueSecureTestPassword2025!@#$%^&*()',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -50,25 +50,25 @@ describe('Registration', function () {
                 'data' => [
                     'user' => ['id', 'name', 'email'],
                     'token',
-                    'token_type'
+                    'token_type',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'user' => [
                         'name' => 'Test User',
-                        'email' => 'test@example.com'
+                        'email' => 'test@example.com',
                     ],
-                    'token_type' => 'Bearer'
-                ]
+                    'token_type' => 'Bearer',
+                ],
             ]);
 
         // Vérifier en base
         $this->assertDatabaseHas('users', [
             'name' => 'Test User',
-            'email' => 'test@example.com'
+            'email' => 'test@example.com',
         ]);
 
         // Vérifier mot de passe hashé
@@ -89,7 +89,7 @@ describe('Registration', function () {
             'email' => 'invalid-email',
             'password' => 'SecurePassword123!',
             'password_confirmation' => 'SecurePassword123!',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -104,7 +104,7 @@ describe('Registration', function () {
             'email' => 'test@example.com',
             'password' => '123',
             'password_confirmation' => '123',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -119,7 +119,7 @@ describe('Registration', function () {
             'email' => 'test@example.com',
             'password' => 'AnotherUniqueSecureTestPassword2025!@#$%^&*()',
             'password_confirmation' => 'AnotherUniqueSecureTestPassword2025!@#$%^&*()',
-            'terms_accepted' => false
+            'terms_accepted' => false,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -136,7 +136,7 @@ describe('Registration', function () {
             'email' => 'test@example.com',
             'password' => 'YetAnotherUniqueSecureTestPassword2025!@#$%^&*()',
             'password_confirmation' => 'YetAnotherUniqueSecureTestPassword2025!@#$%^&*()',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -154,14 +154,14 @@ describe('Login', function () {
     beforeEach(function () {
         $this->user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => Hash::make('VeryUniqueSecureTestPassword2025!@#$%^&*()')
+            'password' => Hash::make('VeryUniqueSecureTestPassword2025!@#$%^&*()'),
         ]);
     });
 
     test('user can login with valid credentials', function () {
         $loginData = [
             'email' => 'test@example.com',
-            'password' => 'VeryUniqueSecureTestPassword2025!@#$%^&*()'
+            'password' => 'VeryUniqueSecureTestPassword2025!@#$%^&*()',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
@@ -177,15 +177,15 @@ describe('Login', function () {
                 'data' => [
                     'user' => ['id', 'name', 'email'],
                     'token',
-                    'token_type'
+                    'token_type',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'token_type' => 'Bearer'
-                ]
+                    'token_type' => 'Bearer',
+                ],
             ]);
 
         // Vérifier qu'un token a été créé
@@ -196,28 +196,28 @@ describe('Login', function () {
     test('login fails with invalid credentials', function () {
         $loginData = [
             'email' => 'test@example.com',
-            'password' => 'wrongpassword'
+            'password' => 'wrongpassword',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
 
         $response->assertStatus(401)
             ->assertJson([
-                'success' => false
+                'success' => false,
             ]);
     });
 
     test('login fails with non-existent email', function () {
         $loginData = [
             'email' => 'nonexistent@example.com',
-            'password' => 'password123'
+            'password' => 'password123',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
 
         $response->assertStatus(401)
             ->assertJson([
-                'success' => false
+                'success' => false,
             ]);
     });
 
@@ -225,7 +225,7 @@ describe('Login', function () {
         $loginData = [
             'email' => 'test@example.com',
             'password' => 'VeryUniqueSecureTestPassword2025!@#$%^&*()',
-            'remember' => true
+            'remember' => true,
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
@@ -261,7 +261,7 @@ describe('User Profile', function () {
     beforeEach(function () {
         $this->user = User::factory()->create([
             'name' => 'Test User',
-            'email' => 'test@example.com'
+            'email' => 'test@example.com',
         ]);
     });
 
@@ -278,15 +278,15 @@ describe('User Profile', function () {
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'id', 'name', 'email'
-                ]
+                    'id', 'name', 'email',
+                ],
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'name' => 'Test User',
-                    'email' => 'test@example.com'
-                ]
+                    'email' => 'test@example.com',
+                ],
             ]);
     });
 
@@ -315,7 +315,7 @@ describe('Logout', function () {
 
         $response->assertStatus(200)
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
     });
 
@@ -332,7 +332,7 @@ describe('Logout', function () {
 
         $response->assertStatus(200)
             ->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
         // Vérifier que tous les tokens ont été supprimés
@@ -354,13 +354,13 @@ describe('Password Management', function () {
     beforeEach(function () {
         $this->user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => Hash::make('oldpassword123')
+            'password' => Hash::make('oldpassword123'),
         ]);
     });
 
     test('user can request password reset', function () {
         $response = $this->postJson('/api/auth/forgot-password', [
-            'email' => 'test@example.com'
+            'email' => 'test@example.com',
         ]);
 
         // Accepter 200 ou 404 si la route n'existe pas encore
@@ -368,7 +368,7 @@ describe('Password Management', function () {
 
         if ($response->status() === 200) {
             $response->assertJson([
-                'success' => true
+                'success' => true,
             ]);
         }
     });
@@ -378,7 +378,7 @@ describe('Password Management', function () {
             ->putJson('/api/auth/change-password', [
                 'current_password' => 'oldpassword123',
                 'new_password' => 'newpassword123',
-                'new_password_confirmation' => 'newpassword123'
+                'new_password_confirmation' => 'newpassword123',
             ]);
 
         // Accepter 200, 404 si la route n'existe pas, ou 422 si validation échoue
@@ -386,7 +386,7 @@ describe('Password Management', function () {
 
         if ($response->status() === 200) {
             $response->assertJson([
-                'success' => true
+                'success' => true,
             ]);
 
             // Vérifier que le mot de passe a changé
@@ -407,7 +407,7 @@ describe('Security', function () {
     test('malformed email is rejected in login', function () {
         $response = $this->postJson('/api/auth/login', [
             'email' => "'; DROP TABLE users; --",
-            'password' => 'password'
+            'password' => 'password',
         ]);
 
         $response->assertStatus(422);
@@ -419,7 +419,7 @@ describe('Security', function () {
             'email' => 'test@example.com',
             'password' => 'XSSTestUniquePassword2025!@#$%^&*()',
             'password_confirmation' => 'XSSTestUniquePassword2025!@#$%^&*()',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ]);
 
         if ($response->status() === 201) {
@@ -452,7 +452,7 @@ describe('Integration Tests', function () {
             'email' => 'integration@example.com',
             'password' => 'SuperUniqueIntegrationPassword2025!@#$%^&*()',
             'password_confirmation' => 'SuperUniqueIntegrationPassword2025!@#$%^&*()',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ]);
 
         $registerResponse->assertStatus(201);
@@ -461,7 +461,7 @@ describe('Integration Tests', function () {
         // 2. Connexion avec autres identifiants
         $loginResponse = $this->postJson('/api/auth/login', [
             'email' => 'integration@example.com',
-            'password' => 'SuperUniqueIntegrationPassword2025!@#$%^&*()'
+            'password' => 'SuperUniqueIntegrationPassword2025!@#$%^&*()',
         ]);
 
         $loginResponse->assertStatus(200);
@@ -476,8 +476,8 @@ describe('Integration Tests', function () {
                 'success' => true,
                 'data' => [
                     'name' => 'Integration User',
-                    'email' => 'integration@example.com'
-                ]
+                    'email' => 'integration@example.com',
+                ],
             ]);
 
         // 4. Déconnexion avec gestion d'erreur gracieuse
@@ -496,6 +496,7 @@ describe('Integration Tests', function () {
             if ($logoutAllResponse->status() === 200) {
                 dump('✅ logout-all works as fallback');
                 expect(true)->toBeTrue('Integration test passed with logout-all fallback');
+
                 return; // Test réussi avec alternative
             }
         }
@@ -513,7 +514,7 @@ describe('Integration Tests', function () {
 
     test('logout all tokens works correctly', function () {
         $user = User::factory()->create([
-            'password' => Hash::make('password123')
+            'password' => Hash::make('password123'),
         ]);
 
         // Créer plusieurs tokens
@@ -558,7 +559,7 @@ describe('Performance', function () {
     test('login performs well with multiple tokens', function () {
         $user = User::factory()->create([
             'email' => 'perf@example.com',
-            'password' => Hash::make('password123')
+            'password' => Hash::make('password123'),
         ]);
 
         // Créer 50 tokens existants
@@ -570,7 +571,7 @@ describe('Performance', function () {
 
         $response = $this->postJson('/api/auth/login', [
             'email' => 'perf@example.com',
-            'password' => 'password123'
+            'password' => 'password123',
         ]);
 
         $endTime = microtime(true);

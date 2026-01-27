@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\GamingReward;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class GamingRewardsSeeder extends Seeder
@@ -47,7 +46,7 @@ class GamingRewardsSeeder extends Seeder
                 'reward_data' => ['multiplier' => 2, 'duration_hours' => 24],
                 'is_active' => true,
                 'is_repeatable' => true,
-            ]
+            ],
         ];
 
         foreach ($rewards as $reward) {

@@ -2,40 +2,35 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Streak;
-use Carbon\Carbon;
+use App\Models\User;
 
 class StreakService
 {
     /**
      * Déclencher une streak pour un utilisateur
-     *
-     * @param User $user
-     * @param string $type
-     * @return array
      */
     public function triggerStreak(User $user, string $type): array
     {
         $streak = $user->streaks()->where('type', $type)->first();
 
-        if (!$streak) {
+        if (! $streak) {
             $streak = $user->streaks()->create([
                 'type' => $type,
                 'current_count' => 0,
                 'best_count' => 0,
                 'last_activity_date' => null,
-                'is_active' => true
+                'is_active' => true,
             ]);
         }
 
         $success = $streak->incrementStreak();
 
-        if (!$success) {
+        if (! $success) {
             return [
                 'success' => false,
                 'message' => 'Action déjà comptabilisée aujourd\'hui',
-                'streak' => $this->formatStreakData($streak)
+                'streak' => $this->formatStreakData($streak),
             ];
         }
 
@@ -51,15 +46,12 @@ class StreakService
             'streak' => $this->formatStreakData($streak->fresh()),
             'bonus_xp' => $bonusXp,
             'is_milestone' => $streak->isAtMilestone(),
-            'next_milestone' => $streak->getNextMilestone()
+            'next_milestone' => $streak->getNextMilestone(),
         ];
     }
 
     /**
      * Calculer le bonus XP pour une streak
-     *
-     * @param Streak $streak
-     * @return int
      */
     protected function calculateStreakBonus(Streak $streak): int
     {
@@ -68,7 +60,7 @@ class StreakService
 
         // Bonus pour les milestones
         if ($streak->isAtMilestone()) {
-            $milestoneBonus = match($streak->current_count) {
+            $milestoneBonus = match ($streak->current_count) {
                 3 => 10,
                 7 => 25,
                 14 => 50,
@@ -82,7 +74,7 @@ class StreakService
         }
 
         // Bonus selon le type de streak
-        $typeMultiplier = match($streak->type) {
+        $typeMultiplier = match ($streak->type) {
             Streak::TYPE_DAILY_LOGIN => 1.0,
             Streak::TYPE_DAILY_TRANSACTION => 1.5,
             Streak::TYPE_WEEKLY_BUDGET => 2.0,
@@ -95,9 +87,6 @@ class StreakService
 
     /**
      * Formater les données de streak pour l'API
-     *
-     * @param Streak $streak
-     * @return array
      */
     protected function formatStreakData(Streak $streak): array
     {
@@ -113,50 +102,43 @@ class StreakService
             'next_milestone' => $streak->getNextMilestone(),
             'is_at_milestone' => $streak->isAtMilestone(),
             'can_claim_bonus' => $streak->canClaimBonus(),
-            'bonus_xp_available' => $streak->calculateBonusXp()
+            'bonus_xp_available' => $streak->calculateBonusXp(),
         ];
     }
 
     /**
      * Obtenir toutes les streaks d'un utilisateur
-     *
-     * @param User $user
-     * @return array
      */
     public function getUserStreaks(User $user): array
     {
         $streaks = $user->streaks()->get();
 
         return [
-            'streaks' => $streaks->map(fn($streak) => $this->formatStreakData($streak)),
+            'streaks' => $streaks->map(fn ($streak) => $this->formatStreakData($streak)),
             'total_active' => $streaks->where('is_active', true)->count(),
             'best_streak' => $streaks->max('best_count') ?? 0,
-            'total_bonus_available' => $streaks->sum(fn($s) => $s->calculateBonusXp())
+            'total_bonus_available' => $streaks->sum(fn ($s) => $s->calculateBonusXp()),
         ];
     }
 
     /**
      * Réclamer le bonus d'une streak
-     *
-     * @param User $user
-     * @param string $streakType
-     * @return array
      */
     public function claimStreakBonus(User $user, string $streakType): array
     {
         $streak = $user->streaks()->where('type', $streakType)->first();
 
-        if (!$streak) {
+        if (! $streak) {
             return [
                 'success' => false,
-                'message' => 'Streak non trouvée'
+                'message' => 'Streak non trouvée',
             ];
         }
 
-        if (!$streak->canClaimBonus()) {
+        if (! $streak->canClaimBonus()) {
             return [
                 'success' => false,
-                'message' => 'Aucun bonus disponible pour cette streak'
+                'message' => 'Aucun bonus disponible pour cette streak',
             ];
         }
 
@@ -170,15 +152,12 @@ class StreakService
             'new_total_xp' => $user->fresh()->getTotalXp(),
             'new_level' => $user->fresh()->getCurrentLevel(),
             'leveled_up' => $levelUpResult['leveled_up'] ?? false,
-            'streak' => $this->formatStreakData($streak->fresh())
+            'streak' => $this->formatStreakData($streak->fresh()),
         ];
     }
 
     /**
      * Vérifier et briser les streaks expirées
-     *
-     * @param User $user
-     * @return array
      */
     public function checkExpiredStreaks(User $user): array
     {
@@ -193,16 +172,12 @@ class StreakService
 
         return [
             'broken_streaks' => $brokenStreaks,
-            'count' => count($brokenStreaks)
+            'count' => count($brokenStreaks),
         ];
     }
 
     /**
      * Obtenir le leaderboard des streaks
-     *
-     * @param string $type
-     * @param int $limit
-     * @return array
      */
     public function getLeaderboard(string $type, int $limit = 10): array
     {
@@ -223,26 +198,22 @@ class StreakService
                     'current_count' => $streak->current_count,
                     'is_active' => $streak->is_active,
                     'type' => $streak->type,
-                    'type_name' => Streak::TYPES[$streak->type] ?? $streak->type
+                    'type_name' => Streak::TYPES[$streak->type] ?? $streak->type,
                 ];
             }),
             'streak_type' => $type,
-            'type_name' => Streak::TYPES[$type] ?? $type
+            'type_name' => Streak::TYPES[$type] ?? $type,
         ];
     }
 
     /**
      * Obtenir le rang d'un utilisateur pour un type de streak
-     *
-     * @param User $user
-     * @param string $type
-     * @return int|null
      */
     public function getUserRank(User $user, string $type): ?int
     {
         $userStreak = $user->streaks()->where('type', $type)->first();
 
-        if (!$userStreak) {
+        if (! $userStreak) {
             return null;
         }
 
@@ -264,8 +235,8 @@ class StreakService
      *
      * ✅ Déléguer au StreakService au lieu de gérer directement
      *
-     * @param User $user Utilisateur concerné
-     * @param string $streakType Type de série
+     * @param  User  $user  Utilisateur concerné
+     * @param  string  $streakType  Type de série
      * @return bool Série mise à jour avec succès
      */
     public function updateStreak(User $user, string $streakType): bool
@@ -278,7 +249,8 @@ class StreakService
             return $result['success'] ?? false;
 
         } catch (\Exception $e) {
-            \Log::error("Error updating streak {$streakType} for user {$user->id}: " . $e->getMessage());
+            \Log::error("Error updating streak {$streakType} for user {$user->id}: ".$e->getMessage());
+
             return false;
         }
     }

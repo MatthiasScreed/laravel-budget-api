@@ -13,7 +13,9 @@ class LevelUpNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected UserLevel $userLevel;
+
     protected int $previousLevel;
+
     protected int $newLevel;
 
     /**
@@ -42,7 +44,7 @@ class LevelUpNotification extends Notification implements ShouldQueue
         $levelBonus = $this->newLevel * 50;
 
         return (new MailMessage)
-            ->subject('🎉 Montée de niveau ! Niveau ' . $this->newLevel . ' atteint !')
+            ->subject('🎉 Montée de niveau ! Niveau '.$this->newLevel.' atteint !')
             ->greeting("Fantastique {$notifiable->name} ! 🎉")
             ->line("**Vous venez de passer au niveau {$this->newLevel} !**")
             ->line("Niveau précédent : {$this->previousLevel}")
@@ -69,7 +71,7 @@ class LevelUpNotification extends Notification implements ShouldQueue
             'new_level' => $this->newLevel,
             'total_xp' => $this->userLevel->total_xp,
             'level_title' => $this->userLevel->getTitle(),
-            'bonus_xp' => $this->newLevel * 50
+            'bonus_xp' => $this->newLevel * 50,
         ];
     }
 

@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,18 +11,18 @@ return new class extends Migration
     {
         Schema::table('transactions', function (Blueprint $table) {
             // ✅ Vérifier et ajouter bank_connection_id seulement si inexistante
-            if (!Schema::hasColumn('transactions', 'bank_connection_id')) {
+            if (! Schema::hasColumn('transactions', 'bank_connection_id')) {
                 $table->foreignId('bank_connection_id')->nullable()->constrained('bank_connections')->onDelete('set null');
             }
 
             // ✅ Vérifier et ajouter external_transaction_id seulement si inexistante
-            if (!Schema::hasColumn('transactions', 'external_transaction_id')) {
+            if (! Schema::hasColumn('transactions', 'external_transaction_id')) {
                 $table->string('external_transaction_id')->nullable();
             }
         });
 
         // ✅ Gestion séparée de la colonne source (éviter conflits dans Schema::table)
-        if (!Schema::hasColumn('transactions', 'source')) {
+        if (! Schema::hasColumn('transactions', 'source')) {
             DB::statement("ALTER TABLE transactions ADD COLUMN source ENUM('manual', 'bank_import', 'api', 'recurring') DEFAULT 'manual'");
         } else {
             // Modifier les valeurs ENUM existantes pour inclure les nouvelles options
@@ -30,7 +30,7 @@ return new class extends Migration
                 DB::statement("ALTER TABLE transactions MODIFY COLUMN source ENUM('manual', 'bank_import', 'api', 'recurring') DEFAULT 'manual'");
             } catch (\Exception $e) {
                 // Si ça échoue, on continue (peut-être que les valeurs existent déjà)
-                \Log::info('Source column modification skipped: ' . $e->getMessage());
+                \Log::info('Source column modification skipped: '.$e->getMessage());
             }
         }
 
@@ -75,7 +75,7 @@ return new class extends Migration
                 \Log::info("Index existe déjà: {$indexName}");
             }
         } catch (\Exception $e) {
-            \Log::warning("Impossible de créer l'index {$column}: " . $e->getMessage());
+            \Log::warning("Impossible de créer l'index {$column}: ".$e->getMessage());
         }
     }
 };

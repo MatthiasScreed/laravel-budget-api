@@ -94,17 +94,17 @@ class EngagementService
                 'total_xp' => $user->fresh()->level?->total_xp ?? 0,
                 'current_level' => $user->fresh()->level?->level ?? 1,
                 'achievements_unlocked' => $newAchievements,
-                'level_up' => $levelUpInfo
+                'level_up' => $levelUpInfo,
             ];
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Engagement tracking failed: ' . $e->getMessage());
+            \Log::error('Engagement tracking failed: '.$e->getMessage());
 
             return [
                 'action_tracked' => false,
                 'error' => 'Failed to track action',
-                'xp_gained' => 0
+                'xp_gained' => 0,
             ];
         }
     }
@@ -200,7 +200,7 @@ class EngagementService
                 ],
                 'streak_info' => $this->calculateCurrentStreak($user),
                 'active_events' => GamingEvent::active()->get(),
-                'rank_info' => $this->getUserRankInfo($user)
+                'rank_info' => $this->getUserRankInfo($user),
             ];
         });
     }
@@ -210,7 +210,7 @@ class EngagementService
      */
     protected function getActionDescription(string $actionType): string
     {
-        return match($actionType) {
+        return match ($actionType) {
             'page_view' => 'Page consultée',
             'button_click' => 'Interface utilisée',
             'transaction_add' => 'Transaction ajoutée !',
@@ -237,7 +237,7 @@ class EngagementService
             ->orderBy('created_at', 'desc')
             ->take(30)
             ->pluck('created_at')
-            ->map(fn($date) => $date->format('Y-m-d'))
+            ->map(fn ($date) => $date->format('Y-m-d'))
             ->unique()
             ->values();
 
@@ -266,7 +266,7 @@ class EngagementService
         return [
             'current' => $currentStreak,
             'max' => max($currentStreak, $user->max_streak ?? 0),
-            'last_login' => $recentLogins->first()
+            'last_login' => $recentLogins->first(),
         ];
     }
 
@@ -278,10 +278,10 @@ class EngagementService
         $userLevel = $user->level?->level ?? 1;
         $userXp = $user->level?->total_xp ?? 0;
 
-        $rank = Cache::remember("user_rank_{$user->id}", 600, function () use ($user, $userXp) {
+        $rank = Cache::remember("user_rank_{$user->id}", 600, function () use ($userXp) {
             return User::join('user_levels', 'users.id', '=', 'user_levels.user_id')
-                    ->where('user_levels.total_xp', '>', $userXp)
-                    ->count() + 1;
+                ->where('user_levels.total_xp', '>', $userXp)
+                ->count() + 1;
         });
 
         $totalUsers = Cache::remember('total_active_users', 600, function () {
@@ -292,7 +292,7 @@ class EngagementService
             'current_rank' => $rank,
             'total_users' => $totalUsers,
             'percentile' => $totalUsers > 0 ? round((($totalUsers - $rank) / $totalUsers) * 100, 1) : 0,
-            'league_tier' => $this->calculateLeagueTier($userLevel, $rank, $totalUsers)
+            'league_tier' => $this->calculateLeagueTier($userLevel, $rank, $totalUsers),
         ];
     }
 
@@ -301,10 +301,19 @@ class EngagementService
      */
     protected function calculateLeagueTier(int $level, int $rank, int $totalUsers): string
     {
-        if ($level >= 50 || $rank <= max(1, $totalUsers * 0.01)) return 'diamond';
-        if ($level >= 30 || $rank <= max(1, $totalUsers * 0.05)) return 'platinum';
-        if ($level >= 20 || $rank <= max(1, $totalUsers * 0.15)) return 'gold';
-        if ($level >= 10 || $rank <= max(1, $totalUsers * 0.35)) return 'silver';
+        if ($level >= 50 || $rank <= max(1, $totalUsers * 0.01)) {
+            return 'diamond';
+        }
+        if ($level >= 30 || $rank <= max(1, $totalUsers * 0.05)) {
+            return 'platinum';
+        }
+        if ($level >= 20 || $rank <= max(1, $totalUsers * 0.15)) {
+            return 'gold';
+        }
+        if ($level >= 10 || $rank <= max(1, $totalUsers * 0.35)) {
+            return 'silver';
+        }
+
         return 'bronze';
     }
 }

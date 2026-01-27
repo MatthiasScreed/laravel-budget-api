@@ -27,7 +27,7 @@ return new class extends Migration
                 'goal_adjustment',
                 'budget_alert',
                 'investment_opportunity',
-                'debt_optimization'
+                'debt_optimization',
             ])->comment('Type de suggestion');
 
             $table->enum('priority', ['low', 'medium', 'high', 'urgent'])

@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\GoalCreated;
-use App\Services\GamingService;
 use App\Notifications\GoalCreatedNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -44,11 +44,11 @@ class HandleGoalCreated implements ShouldQueue
             $user->notify(new GoalCreatedNotification($goal));
 
             // 5. Log pour debug
-            \Log::info("Objectif créé - XP ajoutés", [
+            \Log::info('Objectif créé - XP ajoutés', [
                 'user_id' => $user->id,
                 'goal_id' => $goal->id,
                 'goal_name' => $goal->name,
-                'xp_added' => 50
+                'xp_added' => 50,
             ]);
 
         } catch (\Exception $e) {
@@ -56,7 +56,7 @@ class HandleGoalCreated implements ShouldQueue
             \Log::error("Erreur lors du traitement de la création d'objectif", [
                 'user_id' => $user->id,
                 'goal_id' => $goal->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -66,10 +66,10 @@ class HandleGoalCreated implements ShouldQueue
      */
     public function failed(GoalCreated $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement GoalCreated", [
+        \Log::error('Échec du traitement GoalCreated', [
             'user_id' => $event->user->id,
             'goal_id' => $event->goal->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

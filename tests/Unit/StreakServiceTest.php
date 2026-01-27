@@ -1,27 +1,28 @@
 <?php
 
-use App\Models\User;
 use App\Models\Streak;
+use App\Models\User;
 use App\Services\StreakService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class StreakServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected StreakService $streakService;
+
     protected User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->streakService = new StreakService();
+        $this->streakService = new StreakService;
         $this->user = User::factory()->create([
             'name' => 'Test User',
-            'email' => 'test@example.com'
+            'email' => 'test@example.com',
         ]);
     }
 
@@ -90,7 +91,7 @@ class StreakServiceTest extends TestCase
             'current_count' => 2,
             'best_count' => 2,
             'last_activity_date' => now()->subDay(), // Hier
-            'is_active' => true
+            'is_active' => true,
         ]);
 
         // Déclencher aujourd'hui pour passer à 3
@@ -108,7 +109,7 @@ class StreakServiceTest extends TestCase
             'user_id' => $this->user->id,
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 7, // Milestone
-            'best_count' => 7
+            'best_count' => 7,
         ]);
 
         $this->assertTrue($streak->isAtMilestone());
@@ -123,7 +124,7 @@ class StreakServiceTest extends TestCase
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 7, // Divisible par 7
             'best_count' => 7,
-            'bonus_claimed_at' => null
+            'bonus_claimed_at' => null,
         ]);
 
         $this->assertTrue($streak->canClaimBonus());

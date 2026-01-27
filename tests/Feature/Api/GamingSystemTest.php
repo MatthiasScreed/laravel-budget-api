@@ -2,11 +2,10 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
 use App\Models\Achievement;
 use App\Models\Category;
 use App\Models\Transaction;
-use App\Models\FinancialGoal;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -39,22 +38,22 @@ class GamingSystemTest extends TestCase
                         'current_level',
                         'total_xp',
                         'progress_percentage',
-                        'title'
+                        'title',
                     ],
                     'achievements_count',
-                    'recent_achievements'
+                    'recent_achievements',
                 ],
-                'message'
+                'message',
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'level_info' => [
                         'current_level' => 1,
-                        'total_xp' => 0
+                        'total_xp' => 0,
                     ],
-                    'achievements_count' => 0
-                ]
+                    'achievements_count' => 0,
+                ],
             ]);
     }
 
@@ -71,8 +70,8 @@ class GamingSystemTest extends TestCase
                     'stats',
                     'recent_achievements',
                     'next_achievements',
-                    'activity_summary'
-                ]
+                    'activity_summary',
+                ],
             ]);
     }
 
@@ -86,7 +85,7 @@ class GamingSystemTest extends TestCase
             'type' => 'expense',
             'amount' => 50.00,
             'description' => 'Test transaction',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -115,7 +114,7 @@ class GamingSystemTest extends TestCase
         Transaction::factory()->create([
             'user_id' => $this->user->id,
             'category_id' => $category->id,
-            'status' => 'completed'
+            'status' => 'completed',
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -127,8 +126,8 @@ class GamingSystemTest extends TestCase
                 'data' => [
                     'unlocked_achievements',
                     'count',
-                    'xp_gained'
-                ]
+                    'xp_gained',
+                ],
             ]);
     }
 
@@ -146,9 +145,9 @@ class GamingSystemTest extends TestCase
                     'stats' => [
                         'total_achievements',
                         'unlocked_count',
-                        'completion_percentage'
-                    ]
-                ]
+                        'completion_percentage',
+                    ],
+                ],
             ]);
     }
 
@@ -166,9 +165,9 @@ class GamingSystemTest extends TestCase
                         'current_level',
                         'total_xp',
                         'progress_percentage',
-                        'title'
-                    ]
-                ]
+                        'title',
+                    ],
+                ],
             ]);
     }
 
@@ -178,7 +177,7 @@ class GamingSystemTest extends TestCase
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/gaming/actions/add-xp', [
                 'xp' => 100,
-                'reason' => 'Test manual XP'
+                'reason' => 'Test manual XP',
             ]);
 
         $response->assertStatus(200)
@@ -187,8 +186,8 @@ class GamingSystemTest extends TestCase
                 'data' => [
                     'xp_added',
                     'leveled_up',
-                    'new_stats'
-                ]
+                    'new_stats',
+                ],
             ]);
 
         $this->user->refresh();
@@ -205,8 +204,8 @@ class GamingSystemTest extends TestCase
                 'status',
                 'services' => [
                     'database',
-                    'gaming_system'
-                ]
+                    'gaming_system',
+                ],
             ]);
 
         $services = $response->json('services');

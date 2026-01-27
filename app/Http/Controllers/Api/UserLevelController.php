@@ -12,16 +12,13 @@ class UserLevelController extends Controller
 {
     /**
      * Informations du niveau de l'utilisateur connecté
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();
         $userLevel = $user->level;
 
-        if (!$userLevel) {
+        if (! $userLevel) {
             // Créer le niveau s'il n'existe pas
             $userLevel = $user->level()->create();
         }
@@ -34,7 +31,7 @@ class UserLevelController extends Controller
             'progress_percentage' => round($userLevel->getProgressPercentage(), 2),
             'title' => $userLevel->getTitle(),
             'level_color' => $userLevel->getLevelColor(),
-            'xp_to_next_level' => $userLevel->next_level_xp - $userLevel->current_level_xp
+            'xp_to_next_level' => $userLevel->next_level_xp - $userLevel->current_level_xp,
         ];
 
         // XP requis pour quelques niveaux suivants
@@ -44,7 +41,7 @@ class UserLevelController extends Controller
             $nextLevels[] = [
                 'level' => $targetLevel,
                 'xp_required' => UserLevel::getXpRequiredForLevel($targetLevel),
-                'xp_needed' => UserLevel::getXpRequiredForLevel($targetLevel) - $userLevel->total_xp
+                'xp_needed' => UserLevel::getXpRequiredForLevel($targetLevel) - $userLevel->total_xp,
             ];
         }
 
@@ -53,24 +50,21 @@ class UserLevelController extends Controller
             'data' => [
                 'level_info' => $levelData,
                 'next_levels' => $nextLevels,
-                'level_history' => $this->getLevelHistory($user)
+                'level_history' => $this->getLevelHistory($user),
             ],
-            'message' => 'Informations de niveau récupérées avec succès'
+            'message' => 'Informations de niveau récupérées avec succès',
         ]);
     }
 
     /**
      * Progression détaillée vers le niveau suivant
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function progress(Request $request): JsonResponse
     {
         $user = $request->user();
         $userLevel = $user->level;
 
-        if (!$userLevel) {
+        if (! $userLevel) {
             $userLevel = $user->level()->create();
         }
 
@@ -82,7 +76,7 @@ class UserLevelController extends Controller
             'xp_needed_for_next' => $userLevel->next_level_xp,
             'xp_remaining' => $userLevel->next_level_xp - $userLevel->current_level_xp,
             'progress_percentage' => round($userLevel->getProgressPercentage(), 2),
-            'total_xp' => $userLevel->total_xp
+            'total_xp' => $userLevel->total_xp,
         ];
 
         // Sources récentes d'XP (via les succès débloqués récemment)
@@ -92,9 +86,9 @@ class UserLevelController extends Controller
             ->get(['achievements.name', 'achievements.points'])
             ->map(function ($achievement) {
                 return [
-                    'source' => 'Succès: ' . $achievement->name,
+                    'source' => 'Succès: '.$achievement->name,
                     'xp' => $achievement->points,
-                    'date' => $achievement->pivot->unlocked_at
+                    'date' => $achievement->pivot->unlocked_at,
                 ];
             });
 
@@ -112,18 +106,15 @@ class UserLevelController extends Controller
                     'avg_xp_per_week' => $avgXpPerWeek,
                     'weeks_to_next_level' => $weeksToNextLevel,
                     'estimated_date' => $weeksToNextLevel ?
-                        now()->addWeeks($weeksToNextLevel)->format('Y-m-d') : null
-                ]
+                        now()->addWeeks($weeksToNextLevel)->format('Y-m-d') : null,
+                ],
             ],
-            'message' => 'Progression récupérée avec succès'
+            'message' => 'Progression récupérée avec succès',
         ]);
     }
 
     /**
      * Leaderboard des niveaux
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function leaderboard(Request $request): JsonResponse
     {
@@ -141,21 +132,21 @@ class UserLevelController extends Controller
                     'name' => $user->name,
                     'level' => $user->level,
                     'total_xp' => $user->total_xp,
-                    'title' => UserLevel::where('user_id', $user->id)->first()?->getTitle() ?? 'Débutant'
+                    'title' => UserLevel::where('user_id', $user->id)->first()?->getTitle() ?? 'Débutant',
                 ];
             });
 
         // Position de l'utilisateur actuel
         $currentUser = $request->user();
         $currentUserRank = User::join('user_levels', 'users.id', '=', 'user_levels.user_id')
-                ->where('user_levels.total_xp', '>', $currentUser->getTotalXp())
-                ->count() + 1;
+            ->where('user_levels.total_xp', '>', $currentUser->getTotalXp())
+            ->count() + 1;
 
         $currentUserInfo = [
             'rank' => $currentUserRank,
             'level' => $currentUser->getCurrentLevel(),
             'total_xp' => $currentUser->getTotalXp(),
-            'title' => $currentUser->getTitle()
+            'title' => $currentUser->getTitle(),
         ];
 
         // Statistiques globales
@@ -163,7 +154,7 @@ class UserLevelController extends Controller
             'total_users' => User::count(),
             'avg_level' => round(UserLevel::avg('level'), 1),
             'highest_level' => UserLevel::max('level'),
-            'total_xp_distributed' => UserLevel::sum('total_xp')
+            'total_xp_distributed' => UserLevel::sum('total_xp'),
         ];
 
         return response()->json([
@@ -171,17 +162,14 @@ class UserLevelController extends Controller
             'data' => [
                 'leaderboard' => $topUsers,
                 'current_user' => $currentUserInfo,
-                'global_stats' => $globalStats
+                'global_stats' => $globalStats,
             ],
-            'message' => 'Leaderboard récupéré avec succès'
+            'message' => 'Leaderboard récupéré avec succès',
         ]);
     }
 
     /**
      * Historique des niveaux de l'utilisateur
-     *
-     * @param User $user
-     * @return array
      */
     private function getLevelHistory(User $user): array
     {
@@ -194,7 +182,7 @@ class UserLevelController extends Controller
         $milestones[] = [
             'level' => 1,
             'reached_at' => $user->created_at,
-            'event' => 'Création du compte'
+            'event' => 'Création du compte',
         ];
 
         // Ajout des succès comme milestones
@@ -213,7 +201,7 @@ class UserLevelController extends Controller
                 $milestones[] = [
                     'level' => $newLevel,
                     'reached_at' => $achievement->pivot->unlocked_at,
-                    'event' => 'Succès: ' . $achievement->name
+                    'event' => 'Succès: '.$achievement->name,
                 ];
                 $currentLevel = $newLevel;
             }
@@ -224,9 +212,6 @@ class UserLevelController extends Controller
 
     /**
      * Calculer le niveau à partir de l'XP total
-     *
-     * @param int $totalXp
-     * @return int
      */
     private function calculateLevelFromXp(int $totalXp): int
     {
@@ -234,7 +219,7 @@ class UserLevelController extends Controller
         while (UserLevel::getXpRequiredForLevel($level + 1) <= $totalXp) {
             $level++;
         }
+
         return $level;
     }
-
 }

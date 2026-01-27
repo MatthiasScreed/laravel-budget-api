@@ -24,7 +24,6 @@ afterEach(function () {
     \App\Models\User::setEventDispatcher(app('events'));
 });
 
-
 // =============================================================================
 // TESTS D'INSCRIPTION
 // =============================================================================
@@ -39,7 +38,7 @@ describe('User Registration', function () {
             'password_confirmation' => 'SecureUniquePassword2025!@#$',
             'currency' => 'EUR',
             'language' => 'fr',
-            'terms_accepted' => true
+            'terms_accepted' => true,
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -69,7 +68,7 @@ describe('User Registration', function () {
             'name' => 'Test User',
             'email' => 'invalid-email',
             'password' => 'Password123!',
-            'password_confirmation' => 'Password123!'
+            'password_confirmation' => 'Password123!',
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -83,7 +82,7 @@ describe('User Registration', function () {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => '123',
-            'password_confirmation' => '123'
+            'password_confirmation' => '123',
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -97,7 +96,7 @@ describe('User Registration', function () {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'Password123!',
-            'password_confirmation' => 'DifferentPassword!'
+            'password_confirmation' => 'DifferentPassword!',
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -112,7 +111,7 @@ describe('User Registration', function () {
             'email' => 'test@example.com',
             'password' => 'UniqueSecurePassword2025!@#',
             'password_confirmation' => 'UniqueSecurePassword2025!@#',
-            'terms_accepted' => false // ✅ TESTÉ EXPLICITEMENT
+            'terms_accepted' => false, // ✅ TESTÉ EXPLICITEMENT
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -129,7 +128,7 @@ describe('User Registration', function () {
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'Password123!',
-            'password_confirmation' => 'Password123!'
+            'password_confirmation' => 'Password123!',
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -148,7 +147,7 @@ describe('User Login', function () {
     test('user can login successfully with valid credentials', function () {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => Hash::make('SecureLoginPassword2025!')
+            'password' => Hash::make('SecureLoginPassword2025!'),
         ]);
 
         // ✅ Créer manuellement le UserLevel
@@ -156,12 +155,12 @@ describe('User Login', function () {
             'level' => 1,
             'total_xp' => 0,
             'current_level_xp' => 0,
-            'next_level_xp' => 100
+            'next_level_xp' => 100,
         ]);
 
         $loginData = [
             'email' => 'test@example.com',
-            'password' => 'SecureLoginPassword2025!'
+            'password' => 'SecureLoginPassword2025!',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
@@ -171,7 +170,7 @@ describe('User Login', function () {
     test('login creates user level if missing', function () {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => Hash::make('SecureLoginPassword2025!')
+            'password' => Hash::make('SecureLoginPassword2025!'),
         ]);
 
         // ✅ Pas de UserLevel car observer désactivé
@@ -179,7 +178,7 @@ describe('User Login', function () {
 
         $response = $this->postJson('/api/auth/login', [
             'email' => 'test@example.com',
-            'password' => 'SecureLoginPassword2025!'
+            'password' => 'SecureLoginPassword2025!',
         ]);
 
         $response->assertStatus(200);
@@ -192,12 +191,12 @@ describe('User Login', function () {
     test('login fails with invalid credentials', function () {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => Hash::make('correctpassword')
+            'password' => Hash::make('correctpassword'),
         ]);
 
         $loginData = [
             'email' => 'test@example.com',
-            'password' => 'wrongpassword'
+            'password' => 'wrongpassword',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
@@ -205,14 +204,14 @@ describe('User Login', function () {
         $response->assertStatus(401)
             ->assertJson([
                 'success' => false,
-                'message' => 'Identifiants invalides'
+                'message' => 'Identifiants invalides',
             ]);
     });
 
     test('login fails with non-existent email', function () {
         $loginData = [
             'email' => 'nonexistent@example.com',
-            'password' => 'password123'
+            'password' => 'password123',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);
@@ -220,7 +219,7 @@ describe('User Login', function () {
         $response->assertStatus(401)
             ->assertJson([
                 'success' => false,
-                'message' => 'Identifiants invalides'
+                'message' => 'Identifiants invalides',
             ]);
     });
 
@@ -240,7 +239,7 @@ describe('User Profile', function () {
             'level' => 5,
             'total_xp' => 250,
             'current_level_xp' => 50,
-            'next_level_xp' => 100
+            'next_level_xp' => 100,
         ]);
 
         $response = $this->actingAs($user, 'sanctum')
@@ -255,26 +254,26 @@ describe('User Profile', function () {
                         'total_transactions',
                         'gaming_level',
                         'total_xp',
-                        'achievements_count'
+                        'achievements_count',
                     ],
                     'level_info' => [
                         'current_level',
                         'total_xp',
                         'progress_percentage',
-                        'title'
+                        'title',
                     ],
                     'recent_achievements',
-                    'preferences'
-                ]
+                    'preferences',
+                ],
             ])
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'level_info' => [
                         'current_level' => 5,
-                        'total_xp' => 250
-                    ]
-                ]
+                        'total_xp' => 250,
+                    ],
+                ],
             ]);
     });
 
@@ -317,7 +316,7 @@ describe('User Logout', function () {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Déconnexion réussie'
+                'message' => 'Déconnexion réussie',
             ]);
     });
 
@@ -336,7 +335,7 @@ describe('User Logout', function () {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Déconnexion de tous les appareils réussie'
+                'message' => 'Déconnexion de tous les appareils réussie',
             ]);
 
         // Vérifier que tous les tokens ont été supprimés
@@ -362,7 +361,7 @@ describe('Gaming Integration', function () {
             'email' => 'gaming@example.com',
             'password' => 'SuperUniqueGamingPassword2025!@#$%', // ✅ Mot de passe plus complexe
             'password_confirmation' => 'SuperUniqueGamingPassword2025!@#$%',
-            'terms_accepted' => true // ✅ AJOUTÉ
+            'terms_accepted' => true, // ✅ AJOUTÉ
         ];
 
         $response = $this->postJson('/api/auth/register', $userData);
@@ -389,11 +388,10 @@ describe('Gaming Integration', function () {
         expect($gamingResponse->status())->toBeIn([200, 404]);
     });
 
-
     test('login triggers daily login streak', function () {
         $user = User::factory()->create([
             'email' => 'streak@example.com',
-            'password' => Hash::make('StreakSuperSecurePassword2025!@#$')
+            'password' => Hash::make('StreakSuperSecurePassword2025!@#$'),
         ]);
 
         // ✅ Créer manuellement le UserLevel
@@ -401,12 +399,12 @@ describe('Gaming Integration', function () {
             'level' => 1,
             'total_xp' => 0,
             'current_level_xp' => 0,
-            'next_level_xp' => 100
+            'next_level_xp' => 100,
         ]);
 
         $loginData = [
             'email' => 'streak@example.com',
-            'password' => 'StreakSuperSecurePassword2025!@#$'
+            'password' => 'StreakSuperSecurePassword2025!@#$',
         ];
 
         $response = $this->postJson('/api/auth/login', $loginData);

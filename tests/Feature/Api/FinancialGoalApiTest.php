@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
 use App\Models\FinancialGoal;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,7 +29,7 @@ class FinancialGoalApiTest extends TestCase
             'target_date' => now()->addMonths(6)->toDateString(),
             'priority' => 2, // Changé de 'high' vers un nombre (1-5)
             'type' => 'savings',
-            'color' => '#3B82F6'
+            'color' => '#3B82F6',
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -40,15 +40,15 @@ class FinancialGoalApiTest extends TestCase
                 'success',
                 'data' => [
                     'id', 'name', 'target_amount', 'current_amount',
-                    'progress_percentage', 'days_remaining'
+                    'progress_percentage', 'days_remaining',
                 ],
-                'message'
+                'message',
             ]);
 
         $this->assertDatabaseHas('financial_goals', [
             'user_id' => $this->user->id,
             'name' => 'Vacances d\'été',
-            'target_amount' => 2000.00
+            'target_amount' => 2000.00,
         ]);
     }
 
@@ -60,12 +60,12 @@ class FinancialGoalApiTest extends TestCase
             'user_id' => $this->user->id,
             'name' => 'Test Goal', // ✅ Ajout du nom requis
             'target_amount' => 1000,
-            'current_amount' => 0
+            'current_amount' => 0,
         ]);
 
         $contributionData = [
             'amount' => 100.00,
-            'description' => 'Première contribution'
+            'description' => 'Première contribution',
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -76,9 +76,9 @@ class FinancialGoalApiTest extends TestCase
                 'success',
                 'data' => [
                     'contribution',
-                    'goal'
+                    'goal',
                 ],
-                'message'
+                'message',
             ]);
 
         // Vérifier que l'objectif a été mis à jour
@@ -91,11 +91,11 @@ class FinancialGoalApiTest extends TestCase
     {
         // ✅ Créer des objectifs avec différents statuts
         FinancialGoal::factory()->active()->count(2)->create([
-            'user_id' => $this->user->id
+            'user_id' => $this->user->id,
         ]);
 
         FinancialGoal::factory()->completed()->create([
-            'user_id' => $this->user->id
+            'user_id' => $this->user->id,
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -109,9 +109,9 @@ class FinancialGoalApiTest extends TestCase
                     'active_goals',
                     'completed_goals',
                     'total_target_amount',
-                    'completion_rate'
+                    'completion_rate',
                 ],
-                'message'
+                'message',
             ]);
 
         // Vérifier les valeurs
@@ -125,14 +125,14 @@ class FinancialGoalApiTest extends TestCase
     public function user_can_get_goal_contributions()
     {
         $goal = FinancialGoal::factory()->active()->create([
-            'user_id' => $this->user->id
+            'user_id' => $this->user->id,
         ]);
 
         // Ajouter une contribution
         $this->actingAs($this->user, 'sanctum')
             ->postJson("/api/financial-goals/{$goal->id}/contributions", [
                 'amount' => 50.00,
-                'description' => 'Test contribution'
+                'description' => 'Test contribution',
             ]);
 
         // Récupérer les contributions
@@ -146,9 +146,9 @@ class FinancialGoalApiTest extends TestCase
                     'goal',
                     'contributions',
                     'total_contributions',
-                    'contributions_count'
+                    'contributions_count',
                 ],
-                'message'
+                'message',
             ]);
     }
 
@@ -157,7 +157,7 @@ class FinancialGoalApiTest extends TestCase
     {
         $otherUser = User::factory()->create();
         $goal = FinancialGoal::factory()->create([
-            'user_id' => $otherUser->id
+            'user_id' => $otherUser->id,
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -172,14 +172,14 @@ class FinancialGoalApiTest extends TestCase
         $goal = FinancialGoal::factory()->active()->create([
             'user_id' => $this->user->id,
             'target_amount' => 100,
-            'current_amount' => 80
+            'current_amount' => 80,
         ]);
 
         // Ajouter une contribution qui atteint le target
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson("/api/financial-goals/{$goal->id}/contributions", [
                 'amount' => 20.00,
-                'description' => 'Final contribution'
+                'description' => 'Final contribution',
             ]);
 
         $response->assertStatus(201);

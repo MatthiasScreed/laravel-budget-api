@@ -5,12 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-
 class DailyChallenge extends Model
 {
     protected $fillable = [
         'challenge_date', 'type', 'title', 'description', 'criteria',
-        'reward_xp', 'bonus_rewards', 'difficulty', 'is_global', 'is_active'
+        'reward_xp', 'bonus_rewards', 'difficulty', 'is_global', 'is_active',
     ];
 
     protected $casts = [

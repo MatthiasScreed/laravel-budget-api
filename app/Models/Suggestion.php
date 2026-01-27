@@ -31,7 +31,7 @@ class Suggestion extends Model
         'feedback',
         'confidence_score',
         'source',
-        'calculation_basis'
+        'calculation_basis',
     ];
 
     protected $casts = [
@@ -43,7 +43,7 @@ class Suggestion extends Model
         'seen_at' => 'datetime',
         'acted_at' => 'datetime',
         'dismissed_at' => 'datetime',
-        'expires_at' => 'date'
+        'expires_at' => 'date',
     ];
 
     protected $dates = [
@@ -51,26 +51,33 @@ class Suggestion extends Model
         'acted_at',
         'dismissed_at',
         'expires_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $attributes = [
         'priority' => 'medium',
         'status' => 'pending',
         'confidence_score' => 0.50,
-        'source' => 'system'
+        'source' => 'system',
     ];
 
     /**
      * Types de suggestions
      */
     public const TYPE_REDUCE_EXPENSE = 'reduce_expense';
+
     public const TYPE_INCREASE_INCOME = 'increase_income';
+
     public const TYPE_OPTIMIZE_SAVINGS = 'optimize_savings';
+
     public const TYPE_CATEGORY_REBALANCE = 'category_rebalance';
+
     public const TYPE_GOAL_ADJUSTMENT = 'goal_adjustment';
+
     public const TYPE_BUDGET_ALERT = 'budget_alert';
+
     public const TYPE_INVESTMENT_OPPORTUNITY = 'investment_opportunity';
+
     public const TYPE_DEBT_OPTIMIZATION = 'debt_optimization';
 
     public const TYPES = [
@@ -81,44 +88,53 @@ class Suggestion extends Model
         self::TYPE_GOAL_ADJUSTMENT => 'Ajuster les objectifs',
         self::TYPE_BUDGET_ALERT => 'Alerte budget',
         self::TYPE_INVESTMENT_OPPORTUNITY => 'Opportunité d\'investissement',
-        self::TYPE_DEBT_OPTIMIZATION => 'Optimisation des dettes'
+        self::TYPE_DEBT_OPTIMIZATION => 'Optimisation des dettes',
     ];
 
     /**
      * Priorités
      */
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_MEDIUM = 'medium';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_URGENT = 'urgent';
 
     public const PRIORITIES = [
         self::PRIORITY_LOW => 'Basse',
         self::PRIORITY_MEDIUM => 'Moyenne',
         self::PRIORITY_HIGH => 'Haute',
-        self::PRIORITY_URGENT => 'Urgente'
+        self::PRIORITY_URGENT => 'Urgente',
     ];
 
     /**
      * Types d'impact
      */
     public const IMPACT_SAVINGS = 'savings';
+
     public const IMPACT_INCOME = 'income';
+
     public const IMPACT_GOAL_ACHIEVEMENT = 'goal_achievement';
 
     public const IMPACT_TYPES = [
         self::IMPACT_SAVINGS => 'Économies',
         self::IMPACT_INCOME => 'Revenus',
-        self::IMPACT_GOAL_ACHIEVEMENT => 'Atteinte d\'objectif'
+        self::IMPACT_GOAL_ACHIEVEMENT => 'Atteinte d\'objectif',
     ];
 
     /**
      * Statuts
      */
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_SEEN = 'seen';
+
     public const STATUS_ACTED = 'acted';
+
     public const STATUS_DISMISSED = 'dismissed';
+
     public const STATUS_EXPIRED = 'expired';
 
     public const STATUSES = [
@@ -126,7 +142,7 @@ class Suggestion extends Model
         self::STATUS_SEEN => 'Vue',
         self::STATUS_ACTED => 'Action prise',
         self::STATUS_DISMISSED => 'Rejetée',
-        self::STATUS_EXPIRED => 'Expirée'
+        self::STATUS_EXPIRED => 'Expirée',
     ];
 
     /**
@@ -245,7 +261,7 @@ class Suggestion extends Model
             self::PRIORITY_URGENT => 1,
             self::PRIORITY_HIGH => 2,
             self::PRIORITY_MEDIUM => 3,
-            self::PRIORITY_LOW => 4
+            self::PRIORITY_LOW => 4,
         ];
 
         return $query->orderByRaw(
@@ -306,7 +322,7 @@ class Suggestion extends Model
     public function getIsActionableAttribute(): bool
     {
         return in_array($this->status, [self::STATUS_PENDING, self::STATUS_SEEN]) &&
-            !$this->is_expired;
+            ! $this->is_expired;
     }
 
     /**
@@ -322,12 +338,13 @@ class Suggestion extends Model
      */
     public function getFormattedPotentialImpactAttribute(): ?string
     {
-        if (!$this->potential_impact) {
+        if (! $this->potential_impact) {
             return null;
         }
 
         $sign = in_array($this->impact_type, [self::IMPACT_SAVINGS, self::IMPACT_INCOME]) ? '+' : '';
-        return $sign . number_format($this->potential_impact, 2, ',', ' ') . ' €';
+
+        return $sign.number_format($this->potential_impact, 2, ',', ' ').' €';
     }
 
     /**
@@ -338,20 +355,21 @@ class Suggestion extends Model
         if ($this->status === self::STATUS_PENDING) {
             return $this->update([
                 'status' => self::STATUS_SEEN,
-                'seen_at' => now()
+                'seen_at' => now(),
             ]);
         }
+
         return false;
     }
 
     /**
      * Marquer comme actionnée
      */
-    public function markAsActed(array $feedback = null): bool
+    public function markAsActed(?array $feedback = null): bool
     {
         $updateData = [
             'status' => self::STATUS_ACTED,
-            'acted_at' => now()
+            'acted_at' => now(),
         ];
 
         if ($feedback) {
@@ -364,11 +382,11 @@ class Suggestion extends Model
     /**
      * Rejeter la suggestion
      */
-    public function dismiss(array $reason = null): bool
+    public function dismiss(?array $reason = null): bool
     {
         $updateData = [
             'status' => self::STATUS_DISMISSED,
-            'dismissed_at' => now()
+            'dismissed_at' => now(),
         ];
 
         if ($reason) {

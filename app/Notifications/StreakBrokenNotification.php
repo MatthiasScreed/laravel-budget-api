@@ -5,7 +5,6 @@ namespace App\Notifications;
 use App\Models\Streak;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class StreakBrokenNotification extends Notification implements ShouldQueue
@@ -13,6 +12,7 @@ class StreakBrokenNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Streak $streak;
+
     protected int $previousCount;
 
     /**
@@ -46,7 +46,7 @@ class StreakBrokenNotification extends Notification implements ShouldQueue
             'streak_id' => $this->streak->id,
             'streak_name' => $this->streak->name,
             'previous_count' => $this->previousCount,
-            'encouragement' => 'Pas de souci ! Recommencez dès aujourd\'hui pour battre votre record !'
+            'encouragement' => 'Pas de souci ! Recommencez dès aujourd\'hui pour battre votre record !',
         ];
     }
 }

@@ -2,9 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class TransactionFactory extends Factory
@@ -25,7 +25,7 @@ class TransactionFactory extends Factory
             'is_recurring' => $this->faker->boolean(10),
             'is_reconciled' => $this->faker->boolean(80),
             'is_transfer' => $this->faker->boolean(5),
-            'source' => 'manual'
+            'source' => 'manual',
         ];
     }
 
@@ -33,7 +33,7 @@ class TransactionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'type' => 'income',
-            'category_id' => Category::factory()->income()
+            'category_id' => Category::factory()->income(),
         ]);
     }
 
@@ -41,28 +41,28 @@ class TransactionFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'type' => 'expense',
-            'category_id' => Category::factory()->expense()
+            'category_id' => Category::factory()->expense(),
         ]);
     }
 
     public function completed(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'completed'
+            'status' => 'completed',
         ]);
     }
 
     public function pending(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
     }
 
     public function thisMonth(): static
     {
         return $this->state(fn (array $attributes) => [
-            'transaction_date' => $this->faker->dateTimeBetween('first day of this month', 'now')
+            'transaction_date' => $this->faker->dateTimeBetween('first day of this month', 'now'),
         ]);
     }
 
@@ -71,7 +71,7 @@ class TransactionFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_recurring' => true,
             'recurrence_type' => $this->faker->randomElement(['daily', 'weekly', 'monthly', 'yearly']),
-            'recurrence_interval' => $this->faker->numberBetween(1, 3)
+            'recurrence_interval' => $this->faker->numberBetween(1, 3),
         ]);
     }
 }

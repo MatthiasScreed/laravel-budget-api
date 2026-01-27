@@ -3,25 +3,20 @@
 namespace App\Traits;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 
 trait ApiResponseTrait
 {
     /**
      * Réponse de succès standard
      *
-     * @param mixed $data
-     * @param string $message
-     * @param int $statusCode
-     * @return JsonResponse
+     * @param  mixed  $data
      */
     protected function successResponse($data = null, string $message = 'Opération réussie', int $statusCode = 200): JsonResponse
     {
         $response = [
             'success' => true,
-            'message' => $message
+            'message' => $message,
         ];
 
         if ($data !== null) {
@@ -33,17 +28,12 @@ trait ApiResponseTrait
 
     /**
      * Réponse d'erreur standard
-     *
-     * @param string $message
-     * @param int $statusCode
-     * @param array|null $errors
-     * @return JsonResponse
      */
-    protected function errorResponse(string $message, int $statusCode = 400, array $errors = null): JsonResponse
+    protected function errorResponse(string $message, int $statusCode = 400, ?array $errors = null): JsonResponse
     {
         $response = [
             'success' => false,
-            'message' => $message
+            'message' => $message,
         ];
 
         if ($errors !== null) {
@@ -55,10 +45,6 @@ trait ApiResponseTrait
 
     /**
      * Réponse avec données paginées
-     *
-     * @param LengthAwarePaginator $paginator
-     * @param string $message
-     * @return JsonResponse
      */
     protected function paginatedResponse(LengthAwarePaginator $paginator, string $message = 'Données récupérées avec succès'): JsonResponse
     {
@@ -73,17 +59,15 @@ trait ApiResponseTrait
                 'last_page' => $paginator->lastPage(),
                 'from' => $paginator->firstItem(),
                 'to' => $paginator->lastItem(),
-                'has_more_pages' => $paginator->hasMorePages()
-            ]
+                'has_more_pages' => $paginator->hasMorePages(),
+            ],
         ]);
     }
 
     /**
      * Réponse pour création réussie
      *
-     * @param mixed $data
-     * @param string $message
-     * @return JsonResponse
+     * @param  mixed  $data
      */
     protected function createdResponse($data, string $message = 'Ressource créée avec succès'): JsonResponse
     {
@@ -93,9 +77,7 @@ trait ApiResponseTrait
     /**
      * Réponse pour mise à jour réussie
      *
-     * @param mixed $data
-     * @param string $message
-     * @return JsonResponse
+     * @param  mixed  $data
      */
     protected function updatedResponse($data, string $message = 'Ressource mise à jour avec succès'): JsonResponse
     {
@@ -104,9 +86,6 @@ trait ApiResponseTrait
 
     /**
      * Réponse pour suppression réussie
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function deletedResponse(string $message = 'Ressource supprimée avec succès'): JsonResponse
     {
@@ -115,9 +94,6 @@ trait ApiResponseTrait
 
     /**
      * Réponse pour ressource non trouvée
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function notFoundResponse(string $message = 'Ressource non trouvée'): JsonResponse
     {
@@ -126,9 +102,6 @@ trait ApiResponseTrait
 
     /**
      * Réponse pour accès non autorisé
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function unauthorizedResponse(string $message = 'Accès non autorisé'): JsonResponse
     {
@@ -137,10 +110,6 @@ trait ApiResponseTrait
 
     /**
      * Réponse pour erreur de validation
-     *
-     * @param array $errors
-     * @param string $message
-     * @return JsonResponse
      */
     protected function validationErrorResponse(array $errors, string $message = 'Données de validation incorrectes'): JsonResponse
     {
@@ -150,16 +119,15 @@ trait ApiResponseTrait
     /**
      * Appliquer la pagination avec filtres et recherche
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \Illuminate\Http\Request $request
-     * @param array $searchColumns Colonnes sur lesquelles effectuer la recherche
-     * @param array $filterableColumns Colonnes filtrables
-     * @return LengthAwarePaginator
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  \Illuminate\Http\Request  $request
+     * @param  array  $searchColumns  Colonnes sur lesquelles effectuer la recherche
+     * @param  array  $filterableColumns  Colonnes filtrables
      */
     protected function applyPaginationAndFilters($query, $request, array $searchColumns = [], array $filterableColumns = []): LengthAwarePaginator
     {
         // Recherche globale
-        if ($request->filled('search') && !empty($searchColumns)) {
+        if ($request->filled('search') && ! empty($searchColumns)) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchColumns, $searchTerm) {
                 foreach ($searchColumns as $column) {

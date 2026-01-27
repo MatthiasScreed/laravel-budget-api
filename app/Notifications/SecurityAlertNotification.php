@@ -3,7 +3,6 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\HtmlString;
@@ -13,6 +12,7 @@ class SecurityAlertNotification extends Notification
     use Queueable;
 
     public string $action;
+
     public array $details;
 
     /**
@@ -45,29 +45,29 @@ class SecurityAlertNotification extends Notification
             'password_changed' => [
                 'subject' => 'Mot de passe modifié',
                 'message' => 'Votre mot de passe a été modifié avec succès.',
-                'icon' => '🔒'
+                'icon' => '🔒',
             ],
             'password_reset' => [
                 'subject' => 'Mot de passe réinitialisé',
                 'message' => 'Votre mot de passe a été réinitialisé avec succès.',
-                'icon' => '🔑'
+                'icon' => '🔑',
             ],
             'login_from_new_device' => [
                 'subject' => 'Nouvelle connexion détectée',
                 'message' => 'Une connexion à votre compte a été détectée depuis un nouvel appareil.',
-                'icon' => '📱'
+                'icon' => '📱',
             ],
             'multiple_failed_logins' => [
                 'subject' => 'Tentatives de connexion suspectes',
                 'message' => 'Plusieurs tentatives de connexion échouées ont été détectées sur votre compte.',
-                'icon' => '⚠️'
-            ]
+                'icon' => '⚠️',
+            ],
         ];
 
         $actionData = $actionMessages[$this->action] ?? [
             'subject' => 'Activité de sécurité',
             'message' => 'Une activité de sécurité a été détectée sur votre compte.',
-            'icon' => '🔐'
+            'icon' => '🔐',
         ];
 
         $message = (new MailMessage)
@@ -76,7 +76,7 @@ class SecurityAlertNotification extends Notification
             ->line($actionData['message']);
 
         // Ajouter les détails spécifiques
-        if (!empty($this->details)) {
+        if (! empty($this->details)) {
             $message->line('Détails :');
 
             foreach ($this->details as $key => $value) {
@@ -91,7 +91,7 @@ class SecurityAlertNotification extends Notification
             ->line('3. Contacter notre support si nécessaire');
 
         if ($this->action !== 'password_changed' && $this->action !== 'password_reset') {
-            $resetUrl = config('app.frontend_url', config('app.url')) . '/forgot-password';
+            $resetUrl = config('app.frontend_url', config('app.url')).'/forgot-password';
             $message->action('Sécuriser mon compte', $resetUrl);
         }
 
@@ -109,7 +109,7 @@ class SecurityAlertNotification extends Notification
             'device' => 'Appareil',
             'location' => 'Localisation',
             'timestamp' => 'Date et heure',
-            'attempts_count' => 'Nombre de tentatives'
+            'attempts_count' => 'Nombre de tentatives',
         ];
 
         return $labels[$key] ?? ucfirst(str_replace('_', ' ', $key));

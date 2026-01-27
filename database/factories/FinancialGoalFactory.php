@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\FinancialGoal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -32,7 +31,7 @@ class FinancialGoalFactory extends Factory
                 'Formation',
                 'Voyage au Japon',
                 'Équipement informatique',
-                'Rénovation cuisine'
+                'Rénovation cuisine',
             ]),
             'description' => $this->faker->sentence(10),
             'target_amount' => $targetAmount,
@@ -41,14 +40,14 @@ class FinancialGoalFactory extends Factory
             'start_date' => $this->faker->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
             'status' => $this->faker->randomElement(['active', 'completed', 'paused']),
             'type' => $this->faker->randomElement([
-                'savings', 'debt_payoff', 'investment', 'purchase', 'emergency_fund', 'other'
+                'savings', 'debt_payoff', 'investment', 'purchase', 'emergency_fund', 'other',
             ]),
             'priority' => $this->faker->numberBetween(1, 5),
             'color' => $this->faker->randomElement([
-                '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'
+                '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4',
             ]),
             'icon' => $this->faker->randomElement([
-                'piggy-bank', 'car', 'home', 'plane', 'heart', 'graduation-cap', 'laptop'
+                'piggy-bank', 'car', 'home', 'plane', 'heart', 'graduation-cap', 'laptop',
             ]),
             'monthly_target' => $this->faker->optional(0.7)->randomFloat(2, 50, 1000),
             'is_automatic' => $this->faker->boolean(30),
@@ -57,7 +56,7 @@ class FinancialGoalFactory extends Factory
             'notes' => $this->faker->optional(0.6)->paragraph(),
             'is_shared' => $this->faker->boolean(10),
             'tags' => $this->faker->optional(0.5)->randomElements([
-                'urgent', 'long-terme', 'famille', 'personnel', 'vacances', 'investissement'
+                'urgent', 'long-terme', 'famille', 'personnel', 'vacances', 'investissement',
             ], $this->faker->numberBetween(1, 3)),
             'completed_at' => null, // Sera défini si status = 'completed'
         ];
@@ -108,7 +107,7 @@ class FinancialGoalFactory extends Factory
     public function travel(): static
     {
         return $this->state(fn (array $attributes) => [
-            'name' => 'Voyage ' . $this->faker->country(),
+            'name' => 'Voyage '.$this->faker->country(),
             'type' => 'savings',
             'icon' => 'plane',
             'color' => '#06B6D4',

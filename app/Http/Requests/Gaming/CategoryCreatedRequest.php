@@ -25,8 +25,8 @@ class CategoryCreatedRequest extends FormRequest
             'category_id' => [
                 'required',
                 'integer',
-                'exists:categories,id'
-            ]
+                'exists:categories,id',
+            ],
         ];
     }
 
@@ -38,7 +38,7 @@ class CategoryCreatedRequest extends FormRequest
         return [
             'category_id.required' => 'L\'ID de la catégorie est obligatoire.',
             'category_id.integer' => 'L\'ID de la catégorie doit être un nombre entier.',
-            'category_id.exists' => 'Cette catégorie n\'existe pas.'
+            'category_id.exists' => 'Cette catégorie n\'existe pas.',
         ];
     }
 
@@ -58,5 +58,4 @@ class CategoryCreatedRequest extends FormRequest
             }
         });
     }
-
 }

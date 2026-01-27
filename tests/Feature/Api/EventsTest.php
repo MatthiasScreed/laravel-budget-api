@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
-use App\Models\Category;
-use App\Models\Transaction;
-use App\Models\FinancialGoal;
-use App\Events\TransactionCreated;
 use App\Events\GoalCreated;
+use App\Events\TransactionCreated;
+use App\Models\Category;
+use App\Models\FinancialGoal;
+use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -37,7 +37,7 @@ class EventsTest extends TestCase
             'type' => 'expense',
             'amount' => 50.00,
             'description' => 'Test transaction',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -59,7 +59,7 @@ class EventsTest extends TestCase
             'name' => 'Test Goal',
             'target_amount' => 1000.00,
             'target_date' => now()->addMonths(3)->toDateString(),
-            'priority' => 3 // ✅ CORRECTION : utiliser un entier (1-5) au lieu de 'medium'
+            'priority' => 3, // ✅ CORRECTION : utiliser un entier (1-5) au lieu de 'medium'
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -86,7 +86,7 @@ class EventsTest extends TestCase
             'type' => 'income',
             'amount' => 150.00,
             'description' => 'Test income transaction',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -112,7 +112,7 @@ class EventsTest extends TestCase
             'target_amount' => 5000.00,
             'target_date' => now()->addYear()->toDateString(),
             'priority' => 5, // ✅ CORRECTION : utiliser un entier (1-5) au lieu de 'high'
-            'description' => 'Build emergency fund for unexpected expenses'
+            'description' => 'Build emergency fund for unexpected expenses',
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -173,7 +173,7 @@ class EventsTest extends TestCase
                 'type' => 'expense',
                 'amount' => 10 * $i,
                 'description' => "Test transaction {$i}",
-                'transaction_date' => now()->toDateString()
+                'transaction_date' => now()->toDateString(),
             ];
 
             $response = $this->actingAs($this->user, 'sanctum')

@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\GoalCompleted;
-use App\Services\GamingService;
 use App\Notifications\GoalCompletedNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -47,19 +47,19 @@ class HandleGoalCompleted implements ShouldQueue
             // 5. Mettre à jour la streak "goal_completion" si elle existe
             $this->gamingService->updateStreak($user, 'goal_completion');
 
-            \Log::info("Objectif complété - Récompenses distribuées", [
+            \Log::info('Objectif complété - Récompenses distribuées', [
                 'user_id' => $user->id,
                 'goal_id' => $goal->id,
                 'goal_name' => $goal->name,
                 'target_amount' => $goal->target_amount,
-                'xp_bonus' => $bonusXp
+                'xp_bonus' => $bonusXp,
             ]);
 
         } catch (\Exception $e) {
             \Log::error("Erreur lors du traitement de la complétion d'objectif", [
                 'user_id' => $user->id,
                 'goal_id' => $goal->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -73,7 +73,7 @@ class HandleGoalCompleted implements ShouldQueue
         $amountBonus = min(500, floor($goal->target_amount / 1000)); // 1 XP par 1000€
 
         // Bonus selon priorité
-        $priorityBonus = match($goal->priority) {
+        $priorityBonus = match ($goal->priority) {
             'high' => 100,
             'medium' => 50,
             'low' => 25,
@@ -103,10 +103,10 @@ class HandleGoalCompleted implements ShouldQueue
      */
     public function failed(GoalCompleted $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement GoalCompleted", [
+        \Log::error('Échec du traitement GoalCompleted', [
             'user_id' => $event->user->id,
             'goal_id' => $event->goal->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

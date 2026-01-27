@@ -2,18 +2,17 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Events\GoalCompleted;
 use App\Events\GoalCreated;
-use App\Models\Transaction;
-use App\Models\Category;
+use App\Events\TransactionCreated;
 use App\Models\FinancialGoal;
 use App\Models\GoalContribution;
-use App\Events\TransactionCreated;
-use App\Events\GoalCompleted;
+use App\Models\Transaction;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class BudgetService
 {
@@ -27,8 +26,8 @@ class BudgetService
     /**
      * Créer une nouvelle transaction
      *
-     * @param User $user Utilisateur propriétaire
-     * @param array $data Données de la transaction
+     * @param  User  $user  Utilisateur propriétaire
+     * @param  array  $data  Données de la transaction
      * @return Transaction Transaction créée
      */
     public function createTransaction(User $user, array $data): Transaction
@@ -44,7 +43,7 @@ class BudgetService
                 'description' => $data['description'] ?? null,
                 'payment_method' => $data['payment_method'] ?? null,
                 'reference' => $data['reference'] ?? null,
-                'status' => 'completed'
+                'status' => 'completed',
             ]);
 
             // 🎮 GAMING SÉCURISÉ
@@ -53,10 +52,11 @@ class BudgetService
                 $xpAmount = $this->calculateTransactionXp($transaction);
                 $this->gamingService->addExperience($user, $xpAmount, 'transaction');
             } catch (\Exception $gamingError) {
-                \Log::warning('Gaming error: ' . $gamingError->getMessage());
+                \Log::warning('Gaming error: '.$gamingError->getMessage());
             }
 
             DB::commit();
+
             return $transaction;
 
         } catch (\Exception $e) {
@@ -68,7 +68,7 @@ class BudgetService
     /**
      * Calculer l'XP pour une transaction
      *
-     * @param Transaction $transaction Transaction concernée
+     * @param  Transaction  $transaction  Transaction concernée
      * @return int Points d'expérience
      */
     public function calculateTransactionXp(Transaction $transaction): int
@@ -82,15 +82,15 @@ class BudgetService
     /**
      * Mettre à jour une transaction existante
      *
-     * @param Transaction $transaction Transaction à modifier
-     * @param array $data Nouvelles données
+     * @param  Transaction  $transaction  Transaction à modifier
+     * @param  array  $data  Nouvelles données
      * @return Transaction Transaction mise à jour
      */
     public function updateTransaction(Transaction $transaction, array $data): Transaction
     {
         $allowedFields = [
             'category_id', 'amount', 'transaction_date',
-            'description', 'payment_method', 'reference'
+            'description', 'payment_method', 'reference',
         ];
 
         $updateData = array_intersect_key($data, array_flip($allowedFields));
@@ -105,9 +105,9 @@ class BudgetService
     /**
      * Créer une contribution à un objectif financier
      *
-     * @param User $user Utilisateur concerné
-     * @param FinancialGoal $goal Objectif financier
-     * @param array $data Données de la contribution
+     * @param  User  $user  Utilisateur concerné
+     * @param  FinancialGoal  $goal  Objectif financier
+     * @param  array  $data  Données de la contribution
      * @return GoalContribution Contribution créée
      */
     public function createGoalContribution(User $user, FinancialGoal $goal, array $data): GoalContribution
@@ -120,7 +120,7 @@ class BudgetService
                 'date' => $data['date'] ?? now(),
                 'description' => $data['description'] ?? null,
                 'transaction_id' => $data['transaction_id'] ?? null,
-                'is_automatic' => $data['is_automatic'] ?? false
+                'is_automatic' => $data['is_automatic'] ?? false,
             ]);
 
             // Recalculer le montant actuel de l'objectif
@@ -140,6 +140,7 @@ class BudgetService
             $this->gamingService->addExperience($user, $xpAmount, 'contribution');
 
             DB::commit();
+
             return $contribution;
 
         } catch (\Exception $e) {
@@ -151,7 +152,7 @@ class BudgetService
     /**
      * Calculer l'XP pour une contribution
      *
-     * @param GoalContribution $contribution Contribution concernée
+     * @param  GoalContribution  $contribution  Contribution concernée
      * @return int Points d'expérience
      */
     protected function calculateContributionXp(GoalContribution $contribution): int
@@ -165,8 +166,8 @@ class BudgetService
     /**
      * Obtenir les statistiques budgétaires d'un utilisateur
      *
-     * @param User $user Utilisateur concerné
-     * @param Carbon|null $month Mois concerné
+     * @param  User  $user  Utilisateur concerné
+     * @param  Carbon|null  $month  Mois concerné
      * @return array Statistiques complètes
      */
     public function getBudgetStats(User $user, ?Carbon $month = null): array
@@ -180,7 +181,7 @@ class BudgetService
                 'categories' => $this->getCategoryStats($user, $month),
                 'goals' => $this->getGoalStats($user),
                 'trends' => $this->getTrends($user, $month),
-                'summary' => $this->getBudgetSummary($user, $month)
+                'summary' => $this->getBudgetSummary($user, $month),
             ];
         });
     }
@@ -188,8 +189,8 @@ class BudgetService
     /**
      * Obtenir les statistiques mensuelles
      *
-     * @param User $user Utilisateur concerné
-     * @param Carbon $month Mois concerné
+     * @param  User  $user  Utilisateur concerné
+     * @param  Carbon  $month  Mois concerné
      * @return array Statistiques mensuelles
      */
     protected function getMonthlyStats(User $user, Carbon $month): array
@@ -212,15 +213,15 @@ class BudgetService
             'income' => $income,
             'expenses' => $expenses,
             'balance' => $income - $expenses,
-            'savings_rate' => $income > 0 ? (($income - $expenses) / $income) * 100 : 0
+            'savings_rate' => $income > 0 ? (($income - $expenses) / $income) * 100 : 0,
         ];
     }
 
     /**
      * Obtenir les statistiques par catégorie
      *
-     * @param User $user Utilisateur concerné
-     * @param Carbon $month Mois concerné
+     * @param  User  $user  Utilisateur concerné
+     * @param  Carbon  $month  Mois concerné
      * @return Collection Statistiques par catégorie
      */
     protected function getCategoryStats(User $user, Carbon $month): Collection
@@ -234,6 +235,7 @@ class BudgetService
             ->get()
             ->map(function ($category) {
                 $transactions = $category->transactions;
+
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
@@ -241,7 +243,7 @@ class BudgetService
                     'color' => $category->color,
                     'total_amount' => $transactions->sum('amount'),
                     'transactions_count' => $transactions->count(),
-                    'average_amount' => $transactions->avg('amount') ?? 0
+                    'average_amount' => $transactions->avg('amount') ?? 0,
                 ];
             });
     }
@@ -249,7 +251,7 @@ class BudgetService
     /**
      * Obtenir les statistiques des objectifs
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Statistiques des objectifs
      */
     protected function getGoalStats(User $user): array
@@ -262,15 +264,15 @@ class BudgetService
             'completed_goals' => $goals->where('status', 'completed')->count(),
             'total_target_amount' => $goals->sum('target_amount'),
             'total_saved_amount' => $goals->sum('current_amount'),
-            'average_progress' => $goals->avg('progress_percentage') ?? 0
+            'average_progress' => $goals->avg('progress_percentage') ?? 0,
         ];
     }
 
     /**
      * Obtenir les tendances budgétaires
      *
-     * @param User $user Utilisateur concerné
-     * @param Carbon $month Mois de référence
+     * @param  User  $user  Utilisateur concerné
+     * @param  Carbon  $month  Mois de référence
      * @return array Tendances sur 6 mois
      */
     protected function getTrends(User $user, Carbon $month): array
@@ -286,7 +288,7 @@ class BudgetService
                 'month_name' => $targetMonth->format('M Y'),
                 'income' => $monthlyStats['income'],
                 'expenses' => $monthlyStats['expenses'],
-                'balance' => $monthlyStats['balance']
+                'balance' => $monthlyStats['balance'],
             ];
         }
 
@@ -296,8 +298,8 @@ class BudgetService
     /**
      * Obtenir le résumé budgétaire
      *
-     * @param User $user Utilisateur concerné
-     * @param Carbon $month Mois concerné
+     * @param  User  $user  Utilisateur concerné
+     * @param  Carbon  $month  Mois concerné
      * @return array Résumé budgétaire
      */
     protected function getBudgetSummary(User $user, Carbon $month): array
@@ -319,15 +321,15 @@ class BudgetService
             'balance_change' => $this->calculatePercentageChange(
                 $previousMonth['balance'],
                 $monthlyStats['balance']
-            )
+            ),
         ];
     }
 
     /**
      * Calculer le pourcentage de changement
      *
-     * @param float $oldValue Ancienne valeur
-     * @param float $newValue Nouvelle valeur
+     * @param  float  $oldValue  Ancienne valeur
+     * @param  float  $newValue  Nouvelle valeur
      * @return float Pourcentage de changement
      */
     protected function calculatePercentageChange(float $oldValue, float $newValue): float
@@ -342,14 +344,14 @@ class BudgetService
     /**
      * Vider le cache des statistiques utilisateur
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      */
     protected function clearUserStatsCache(User $user): void
     {
         $patterns = [
             "budget_stats_{$user->id}_*",
             "gaming_dashboard_{$user->id}",
-            "user_achievements_check_{$user->id}"
+            "user_achievements_check_{$user->id}",
         ];
 
         foreach ($patterns as $pattern) {
@@ -360,8 +362,8 @@ class BudgetService
     /**
      * Analyser les habitudes de dépenses
      *
-     * @param User $user Utilisateur concerné
-     * @param int $months Nombre de mois à analyser
+     * @param  User  $user  Utilisateur concerné
+     * @param  int  $months  Nombre de mois à analyser
      * @return array Analyse des habitudes
      */
     public function analyzeSpendingHabits(User $user, int $months = 6): array
@@ -378,14 +380,14 @@ class BudgetService
             'most_used_categories' => $this->getMostUsedCategories($transactions),
             'spending_patterns' => $this->getSpendingPatterns($transactions),
             'payment_methods' => $this->getPaymentMethodStats($transactions),
-            'weekly_patterns' => $this->getWeeklyPatterns($transactions)
+            'weekly_patterns' => $this->getWeeklyPatterns($transactions),
         ];
     }
 
     /**
      * Obtenir les catégories les plus utilisées
      *
-     * @param Collection $transactions Collection de transactions
+     * @param  Collection  $transactions  Collection de transactions
      * @return Collection Catégories triées par usage
      */
     protected function getMostUsedCategories(Collection $transactions): Collection
@@ -393,11 +395,12 @@ class BudgetService
         return $transactions->groupBy('category_id')
             ->map(function ($group) {
                 $category = $group->first()->category;
+
                 return [
                     'category' => $category,
                     'count' => $group->count(),
                     'total_amount' => $group->sum('amount'),
-                    'average_amount' => $group->avg('amount')
+                    'average_amount' => $group->avg('amount'),
                 ];
             })
             ->sortByDesc('total_amount')
@@ -408,7 +411,7 @@ class BudgetService
     /**
      * Obtenir les patterns de dépenses
      *
-     * @param Collection $transactions Collection de transactions
+     * @param  Collection  $transactions  Collection de transactions
      * @return array Patterns de dépenses
      */
     protected function getSpendingPatterns(Collection $transactions): array
@@ -423,14 +426,14 @@ class BudgetService
             })->keys()->first(),
             'highest_spending_day' => $byDay->sortByDesc(function ($group) {
                 return $group->sum('amount');
-            })->keys()->first()
+            })->keys()->first(),
         ];
     }
 
     /**
      * Obtenir les statistiques des méthodes de paiement
      *
-     * @param Collection $transactions Collection de transactions
+     * @param  Collection  $transactions  Collection de transactions
      * @return Collection Statistiques par méthode
      */
     protected function getPaymentMethodStats(Collection $transactions): Collection
@@ -441,7 +444,7 @@ class BudgetService
                     'method' => $method ?: 'Non spécifié',
                     'count' => $group->count(),
                     'total_amount' => $group->sum('amount'),
-                    'percentage' => 0 // Calculé après
+                    'percentage' => 0, // Calculé après
                 ];
             })
             ->values();
@@ -450,7 +453,7 @@ class BudgetService
     /**
      * Obtenir les patterns hebdomadaires
      *
-     * @param Collection $transactions Collection de transactions
+     * @param  Collection  $transactions  Collection de transactions
      * @return array Patterns par jour de la semaine
      */
     protected function getWeeklyPatterns(Collection $transactions): array
@@ -467,7 +470,7 @@ class BudgetService
             $patterns[] = [
                 'day' => $days[$i],
                 'count' => $dayTransactions->count(),
-                'average_amount' => $dayTransactions->avg('amount') ?? 0
+                'average_amount' => $dayTransactions->avg('amount') ?? 0,
             ];
         }
 
@@ -486,8 +489,8 @@ class BudgetService
     /**
      * Créer un nouvel objectif financier avec événements gaming
      *
-     * @param User $user Utilisateur concerné
-     * @param array $data Données de l'objectif
+     * @param  User  $user  Utilisateur concerné
+     * @param  array  $data  Données de l'objectif
      * @return FinancialGoal Objectif créé
      */
     public function createGoal(User $user, array $data): FinancialGoal
@@ -498,7 +501,7 @@ class BudgetService
             $data['user_id'] = $user->id;
 
             // Calculer la date de début si pas fournie
-            if (!isset($data['start_date'])) {
+            if (! isset($data['start_date'])) {
                 $data['start_date'] = now()->toDateString();
             }
 
@@ -525,6 +528,7 @@ class BudgetService
             $this->gamingService->checkAchievements($user);
 
             DB::commit();
+
             return $goal;
 
         } catch (\Exception $e) {
@@ -536,12 +540,12 @@ class BudgetService
     /**
      * Calculer la prochaine date de contribution automatique
      *
-     * @param string $frequency Fréquence des contributions
+     * @param  string  $frequency  Fréquence des contributions
      * @return string Date au format Y-m-d
      */
     protected function calculateNextAutomaticDate(string $frequency): string
     {
-        return match($frequency) {
+        return match ($frequency) {
             'weekly' => now()->addWeek()->toDateString(),
             'monthly' => now()->addMonth()->toDateString(),
             'quarterly' => now()->addQuarter()->toDateString(),

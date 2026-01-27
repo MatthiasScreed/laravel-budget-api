@@ -59,7 +59,7 @@ class WelcomeNotification extends Notification implements ShouldQueue
             ->line('3. Définissez votre premier objectif d\'épargne')
             ->line('4. Revenez chaque jour pour maintenir votre série !')
             ->line('')
-            ->line(new HtmlString('Si vous avez des questions, consultez notre <a href="' . $appUrl . '/help">aide en ligne</a>.'))
+            ->line(new HtmlString('Si vous avez des questions, consultez notre <a href="'.$appUrl.'/help">aide en ligne</a>.'))
             ->salutation(new HtmlString("Bonne gestion budgétaire ! 🚀<br>L'équipe {$appName}"));
     }
 
@@ -75,7 +75,7 @@ class WelcomeNotification extends Notification implements ShouldQueue
             'icon' => '🎉',
             'action_url' => '/dashboard',
             'xp_earned' => 100,
-            'achievement_unlocked' => 'Bienvenue à bord'
+            'achievement_unlocked' => 'Bienvenue à bord',
         ];
     }
 }

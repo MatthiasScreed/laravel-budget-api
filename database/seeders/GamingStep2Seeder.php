@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Achievement;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class GamingStep2Seeder extends Seeder
@@ -23,7 +22,7 @@ class GamingStep2Seeder extends Seeder
     public static function test(): void
     {
         echo "🏆 TEST DU SYSTÈME GAMING - ÉTAPE 2 : SUCCÈS\n";
-        echo "=" . str_repeat("=", 50) . "\n";
+        echo '='.str_repeat('=', 50)."\n";
 
         // Créer les succès par défaut
         self::createDefaultAchievements();
@@ -62,13 +61,13 @@ class GamingStep2Seeder extends Seeder
     protected static function createTestUser(): User
     {
         // Email unique avec timestamp - évite tous les problèmes de doublons
-        $testEmail = 'test-gaming-' . time() . '-' . rand(1000, 9999) . '@example.com';
+        $testEmail = 'test-gaming-'.time().'-'.rand(1000, 9999).'@example.com';
 
         $user = User::create([
             'name' => 'Test Gaming Step 2',
             'email' => $testEmail,
             'password' => bcrypt('password'),
-            'email_verified_at' => now()
+            'email_verified_at' => now(),
         ]);
 
         echo "\n👤 Utilisateur créé : {$user->name}\n";
@@ -92,7 +91,7 @@ class GamingStep2Seeder extends Seeder
         // Vérifier les succès
         $unlockedAchievements = $user->checkAndUnlockAchievements();
 
-        echo "🎯 Succès débloqués : " . count($unlockedAchievements) . "\n";
+        echo '🎯 Succès débloqués : '.count($unlockedAchievements)."\n";
 
         foreach ($unlockedAchievements as $achievement) {
             echo "   🏆 {$achievement->name} (+{$achievement->points} XP)\n";
@@ -122,7 +121,7 @@ class GamingStep2Seeder extends Seeder
             'name' => 'Test Category',
             'type' => 'expense',
             'color' => '#3B82F6',
-            'is_active' => true
+            'is_active' => true,
         ]);
 
         // Créer plusieurs transactions pour débloquer les succès
@@ -134,12 +133,12 @@ class GamingStep2Seeder extends Seeder
                 'amount' => 10 * $i,
                 'transaction_date' => now()->subDays($i),
                 'description' => "Transaction test {$i}",
-                'status' => 'completed'
+                'status' => 'completed',
             ]);
         }
 
         echo "📝 15 transactions de test créées\n";
-        echo "📊 Total transactions user : " . $user->transactions()->count() . "\n";
+        echo '📊 Total transactions user : '.$user->transactions()->count()."\n";
     }
 
     /**
@@ -154,7 +153,7 @@ class GamingStep2Seeder extends Seeder
         echo "📊 Niveau : {$stats['level_info']['current_level']}\n";
         echo "⭐ XP Total : {$stats['level_info']['total_xp']}\n";
         echo "🏆 Succès débloqués : {$stats['achievements_count']}\n";
-        echo "🎯 Succès récents : " . count($stats['recent_achievements']) . "\n";
+        echo '🎯 Succès récents : '.count($stats['recent_achievements'])."\n";
 
         if ($stats['achievements_count'] === 0) {
             echo "⚠️  ATTENTION: Aucun succès débloqué\n";
@@ -163,7 +162,7 @@ class GamingStep2Seeder extends Seeder
             $availableAchievements = Achievement::active()->get();
             foreach ($availableAchievements as $achievement) {
                 $canUnlock = $achievement->checkCriteria($user);
-                echo "   🏆 {$achievement->name} - " . ($canUnlock ? "✅ PEUT DÉBLOQUER" : "❌ Critères non remplis") . "\n";
+                echo "   🏆 {$achievement->name} - ".($canUnlock ? '✅ PEUT DÉBLOQUER' : '❌ Critères non remplis')."\n";
             }
 
             throw new \Exception('❌ Aucun succès dans les statistiques');
@@ -210,5 +209,4 @@ class GamingStep2Seeder extends Seeder
 
         echo "🧹 Nettoyage terminé avec succès\n";
     }
-
 }

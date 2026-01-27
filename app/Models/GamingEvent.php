@@ -8,7 +8,7 @@ class GamingEvent extends Model
 {
     protected $fillable = [
         'name', 'type', 'description', 'multiplier',
-        'conditions', 'rewards', 'start_at', 'end_at', 'is_active'
+        'conditions', 'rewards', 'start_at', 'end_at', 'is_active',
     ];
 
     protected $casts = [
@@ -17,7 +17,7 @@ class GamingEvent extends Model
         'start_at' => 'datetime',
         'end_at' => 'datetime',
         'is_active' => 'boolean',
-        'multiplier' => 'decimal:2'
+        'multiplier' => 'decimal:2',
     ];
 
     // Scopes
@@ -49,13 +49,18 @@ class GamingEvent extends Model
 
     public function getTimeRemaining(): ?int
     {
-        if (!$this->isActive()) return null;
+        if (! $this->isActive()) {
+            return null;
+        }
+
         return $this->end_at->diffInSeconds(now());
     }
 
     public function applyMultiplier(int $baseXp): int
     {
-        if (!$this->isActive()) return $baseXp;
+        if (! $this->isActive()) {
+            return $baseXp;
+        }
 
         return (int) round($baseXp * $this->multiplier);
     }
@@ -70,7 +75,7 @@ class GamingEvent extends Model
             'multiplier' => 2.00,
             'start_at' => now(),
             'end_at' => now()->addHours($durationHours),
-            'is_active' => true
+            'is_active' => true,
         ]);
     }
 
@@ -85,7 +90,7 @@ class GamingEvent extends Model
             'multiplier' => 1.50,
             'start_at' => $nextSaturday,
             'end_at' => $nextSaturday->copy()->addDays(2),
-            'is_active' => true
+            'is_active' => true,
         ]);
     }
 }

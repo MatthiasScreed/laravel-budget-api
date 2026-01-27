@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\UserRegistered;
-use App\Services\GamingService;
 use App\Notifications\WelcomeNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -38,7 +38,7 @@ class HandleUserRegistered implements ShouldQueue
             if ($welcomeAchievement) {
                 $user->achievements()->attach($welcomeAchievement->id, [
                     'unlocked_at' => now(),
-                    'progress' => 100
+                    'progress' => 100,
                 ]);
             }
 
@@ -46,7 +46,7 @@ class HandleUserRegistered implements ShouldQueue
             $this->initializeUserStreaks($user);
 
             // 4. Envoyer la notification de bienvenue
-            $user->notify(new WelcomeNotification());
+            $user->notify(new WelcomeNotification);
 
             // 5. Envoyer un email de bienvenue (si configuré)
             if (config('app.send_welcome_emails', true)) {
@@ -54,19 +54,19 @@ class HandleUserRegistered implements ShouldQueue
             }
 
             // 6. Log pour analytics
-            \Log::info("Nouvel utilisateur enregistré", [
+            \Log::info('Nouvel utilisateur enregistré', [
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'currency' => $user->currency,
                 'language' => $user->language,
-                'registration_date' => now()
+                'registration_date' => now(),
             ]);
 
         } catch (\Exception $e) {
             // Log l'erreur mais ne pas faire échouer l'inscription
             \Log::error("Erreur lors du traitement de l'inscription", [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -94,7 +94,7 @@ class HandleUserRegistered implements ShouldQueue
                 'best_count' => 0,
                 'is_active' => true,
                 'last_activity_date' => null,
-            ]
+            ],
         ];
 
         foreach ($basicStreaks as $streakData) {
@@ -108,9 +108,9 @@ class HandleUserRegistered implements ShouldQueue
      */
     public function failed(UserRegistered $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement UserRegistered", [
+        \Log::error('Échec du traitement UserRegistered', [
             'user_id' => $event->user->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

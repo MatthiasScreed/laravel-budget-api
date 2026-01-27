@@ -3,11 +3,8 @@
 namespace App\Events;
 
 use App\Models\User;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -16,6 +13,7 @@ class LevelUp
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public User $user;
+
     public array $levelData;
 
     /**
@@ -35,7 +33,7 @@ class LevelUp
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('user.' . $this->user->id),
+            new PrivateChannel('user.'.$this->user->id),
         ];
     }
 
@@ -57,7 +55,7 @@ class LevelUp
             'levels_gained' => $this->levelData['levels_gained'],
             'total_xp' => $this->levelData['total_xp'],
             'user_title' => $this->user->getTitle(),
-            'celebration_message' => $this->getCelebrationMessage()
+            'celebration_message' => $this->getCelebrationMessage(),
         ];
     }
 
@@ -68,13 +66,13 @@ class LevelUp
     {
         $level = $this->levelData['new_level'];
 
-        return match(true) {
+        return match (true) {
             $level >= 100 => '🏆 Incroyable ! Vous êtes maintenant Maître de l\'Épargne !',
             $level >= 75 => '🎯 Fantastique ! Vous êtes Expert Financier !',
-            $level >= 50 => '⭐ Excellent travail ! Niveau ' . $level . ' atteint !',
+            $level >= 50 => '⭐ Excellent travail ! Niveau '.$level.' atteint !',
             $level >= 25 => '🎉 Bravo ! Vous progressez vers l\'expertise !',
             $level >= 10 => '👏 Super ! Vous maîtrisez les bases !',
-            default => '🚀 Félicitations ! Niveau ' . $level . ' !'
+            default => '🚀 Félicitations ! Niveau '.$level.' !'
         };
     }
 }

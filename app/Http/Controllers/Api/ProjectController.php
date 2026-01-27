@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Cache;
 class ProjectController extends Controller
 {
     protected BudgetService $budgetService;
+
     protected ProjectService $projectService;
+
     protected GamingService $gamingService;
 
     public function __construct(
@@ -45,8 +47,8 @@ class ProjectController extends Controller
                 'data' => [
                     'templates' => $templates,
                     'popular' => $popularProjects,
-                    'categories' => $this->getTemplateCategories()
-                ]
+                    'categories' => $this->getTemplateCategories(),
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -57,7 +59,7 @@ class ProjectController extends Controller
     /**
      * Créer un nouveau projet basé sur un template
      *
-     * @param CreateProjectRequest $request Données validées
+     * @param  CreateProjectRequest  $request  Données validées
      * @return JsonResponse Projet créé
      */
     public function createFromTemplate(CreateProjectRequest $request): JsonResponse
@@ -81,8 +83,8 @@ class ProjectController extends Controller
                 'gaming' => [
                     'xp_gained' => 50,
                     'new_level' => $user->getCurrentLevel(),
-                    'achievements_unlocked' => $this->gamingService->checkAchievements($user)
-                ]
+                    'achievements_unlocked' => $this->gamingService->checkAchievements($user),
+                ],
             ], 201);
 
         } catch (\Exception $e) {
@@ -93,7 +95,7 @@ class ProjectController extends Controller
     /**
      * Ajouter une transaction à un projet
      *
-     * @param CreateTransactionRequest $request Données validées
+     * @param  CreateTransactionRequest  $request  Données validées
      * @return JsonResponse Transaction créée
      */
     public function addTransaction(CreateTransactionRequest $request): JsonResponse
@@ -117,7 +119,7 @@ class ProjectController extends Controller
                         'amount' => $request->amount,
                         'date' => $request->transaction_date,
                         'transaction_id' => $transaction->id,
-                        'description' => $request->description
+                        'description' => $request->description,
                     ]
                 );
             }
@@ -129,13 +131,13 @@ class ProjectController extends Controller
                 'message' => 'Transaction ajoutée avec succès !',
                 'data' => [
                     'transaction' => $transaction->load('category'),
-                    'contribution' => $contribution ?? null
+                    'contribution' => $contribution ?? null,
                 ],
                 'gaming' => [
                     'xp_gained' => $this->calculateTransactionXp($transaction),
                     'streak_updated' => true,
-                    'achievements_unlocked' => $this->gamingService->checkAchievements($user)
-                ]
+                    'achievements_unlocked' => $this->gamingService->checkAchievements($user),
+                ],
             ], 201);
 
         } catch (\Exception $e) {
@@ -146,7 +148,7 @@ class ProjectController extends Controller
     /**
      * Obtenir le tableau de bord complet
      *
-     * @param Request $request Paramètres de requête
+     * @param  Request  $request  Paramètres de requête
      * @return JsonResponse Dashboard complet
      */
     public function getDashboard(Request $request): JsonResponse
@@ -166,14 +168,14 @@ class ProjectController extends Controller
                         'gaming' => $this->gamingService->getDashboard($user),
                         'projects' => $this->getUserProjects($user),
                         'suggestions' => $this->getPersonalizedSuggestions($user),
-                        'quick_actions' => $this->getQuickActions($user)
+                        'quick_actions' => $this->getQuickActions($user),
                     ];
                 }
             );
 
             return response()->json([
                 'success' => true,
-                'data' => new DashboardResource($dashboard)
+                'data' => new DashboardResource($dashboard),
             ]);
 
         } catch (\Exception $e) {
@@ -184,7 +186,7 @@ class ProjectController extends Controller
     /**
      * Analyser les habitudes de l'utilisateur
      *
-     * @param Request $request Paramètres d'analyse
+     * @param  Request  $request  Paramètres d'analyse
      * @return JsonResponse Analyse des habitudes
      */
     public function analyzeHabits(Request $request): JsonResponse
@@ -199,7 +201,7 @@ class ProjectController extends Controller
             $analysis['gaming_insights'] = [
                 'level_progression' => $this->analyzeGamingProgression($user),
                 'achievement_progress' => $this->analyzeAchievementProgress($user),
-                'recommendations' => $this->generateGamingRecommendations($user)
+                'recommendations' => $this->generateGamingRecommendations($user),
             ];
 
             return response()->json([
@@ -208,8 +210,8 @@ class ProjectController extends Controller
                 'period' => [
                     'months_analyzed' => $months,
                     'from' => now()->subMonths($months)->format('Y-m-d'),
-                    'to' => now()->format('Y-m-d')
-                ]
+                    'to' => now()->format('Y-m-d'),
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -220,7 +222,7 @@ class ProjectController extends Controller
     /**
      * Obtenir les projets de l'utilisateur
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Projets de l'utilisateur
      */
     protected function getUserProjects($user): array
@@ -242,14 +244,14 @@ class ProjectController extends Controller
                 return $goal->target_date &&
                     $goal->target_date->diffInDays(now()) <= 30;
             })->values(),
-            'recent_contributions' => $goals->flatMap->contributions->take(10)
+            'recent_contributions' => $goals->flatMap->contributions->take(10),
         ];
     }
 
     /**
      * Obtenir les suggestions personnalisées
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Suggestions personnalisées
      */
     protected function getPersonalizedSuggestions($user): array
@@ -257,14 +259,14 @@ class ProjectController extends Controller
         return [
             'budget_optimization' => $this->generateBudgetSuggestions($user),
             'goal_recommendations' => $this->generateGoalSuggestions($user),
-            'gaming_challenges' => $this->generateGamingChallenges($user)
+            'gaming_challenges' => $this->generateGamingChallenges($user),
         ];
     }
 
     /**
      * Obtenir les actions rapides
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Actions rapides disponibles
      */
     protected function getQuickActions($user): array
@@ -272,7 +274,7 @@ class ProjectController extends Controller
         return [
             'add_transaction' => [
                 'enabled' => true,
-                'most_used_categories' => $user->getTopCategories(3)
+                'most_used_categories' => $user->getTopCategories(3),
             ],
             'contribute_to_goal' => [
                 'enabled' => $user->financialGoals()->active()->exists(),
@@ -280,21 +282,21 @@ class ProjectController extends Controller
                     ->active()
                     ->orderBy('priority')
                     ->limit(3)
-                    ->get()
+                    ->get(),
             ],
             'create_project' => [
                 'enabled' => true,
                 'suggested_templates' => collect($this->projectService->getPopularProjects())
                     ->take(3)
-                    ->pluck('key')
-            ]
+                    ->pluck('key'),
+            ],
         ];
     }
 
     /**
      * Générer des suggestions budgétaires
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Suggestions budgétaires
      */
     protected function generateBudgetSuggestions($user): array
@@ -308,7 +310,7 @@ class ProjectController extends Controller
                 'type' => 'save_more',
                 'title' => 'Optimisez votre épargne',
                 'message' => "Vous avez un surplus de {$monthlyStats['monthly']['balance']}€ ce mois-ci",
-                'action' => 'create_savings_goal'
+                'action' => 'create_savings_goal',
             ];
         }
 
@@ -318,7 +320,7 @@ class ProjectController extends Controller
     /**
      * Générer des suggestions d'objectifs
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Suggestions d'objectifs
      */
     protected function generateGoalSuggestions($user): array
@@ -326,12 +328,12 @@ class ProjectController extends Controller
         $suggestions = [];
 
         // Si aucun fonds d'urgence
-        if (!$user->financialGoals()->where('type', 'emergency_fund')->exists()) {
+        if (! $user->financialGoals()->where('type', 'emergency_fund')->exists()) {
             $suggestions[] = [
                 'type' => 'emergency_fund',
                 'template' => 'emergency_fund',
                 'title' => 'Créez votre fonds d\'urgence',
-                'priority' => 'high'
+                'priority' => 'high',
             ];
         }
 
@@ -341,7 +343,7 @@ class ProjectController extends Controller
     /**
      * Générer des défis gaming
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Défis gaming
      */
     protected function generateGamingChallenges($user): array
@@ -351,17 +353,17 @@ class ProjectController extends Controller
                 'title' => 'Série quotidienne',
                 'description' => 'Enregistrez une transaction chaque jour',
                 'current_streak' => $user->streaks()
-                        ->where('type', 'daily_transaction')
-                        ->first()?->current_count ?? 0,
-                'target' => 7
-            ]
+                    ->where('type', 'daily_transaction')
+                    ->first()?->current_count ?? 0,
+                'target' => 7,
+            ],
         ];
     }
 
     /**
      * Analyser la progression gaming
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Analyse gaming
      */
     protected function analyzeGamingProgression($user): array
@@ -372,14 +374,14 @@ class ProjectController extends Controller
             'current_level' => $level?->level ?? 1,
             'xp_this_month' => $this->getMonthlyXp($user),
             'projected_next_level' => $this->projectNextLevel($user),
-            'level_up_prediction' => $this->predictLevelUp($user)
+            'level_up_prediction' => $this->predictLevelUp($user),
         ];
     }
 
     /**
      * Analyser le progrès des succès
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Analyse des succès
      */
     protected function analyzeAchievementProgress($user): array
@@ -392,14 +394,14 @@ class ProjectController extends Controller
                 ($unlockedAchievements / $totalAchievements) * 100 : 0,
             'unlocked_count' => $unlockedAchievements,
             'total_count' => $totalAchievements,
-            'recent_achievements' => $user->getRecentAchievements(3)
+            'recent_achievements' => $user->getRecentAchievements(3),
         ];
     }
 
     /**
      * Générer des recommandations gaming
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Recommandations
      */
     protected function generateGamingRecommendations($user): array
@@ -410,14 +412,14 @@ class ProjectController extends Controller
                 ->whereNotIn('id', $user->achievements()->pluck('achievement_id'))
                 ->limit(3)
                 ->get(),
-            'streak_opportunities' => ['daily_transaction', 'weekly_goal']
+            'streak_opportunities' => ['daily_transaction', 'weekly_goal'],
         ];
     }
 
     /**
      * Obtenir l'XP gagné ce mois
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return int XP du mois
      */
     protected function getMonthlyXp($user): int
@@ -429,7 +431,7 @@ class ProjectController extends Controller
     /**
      * Prédire le prochain niveau
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return array Prédiction
      */
     protected function projectNextLevel($user): array
@@ -441,7 +443,7 @@ class ProjectController extends Controller
     /**
      * Prédire la montée de niveau
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      * @return string Prédiction
      */
     protected function predictLevelUp($user): string
@@ -452,7 +454,7 @@ class ProjectController extends Controller
     /**
      * Calculer l'XP d'une transaction
      *
-     * @param Transaction $transaction Transaction concernée
+     * @param  Transaction  $transaction  Transaction concernée
      * @return int XP calculé
      */
     protected function calculateTransactionXp(Transaction $transaction): int
@@ -471,27 +473,27 @@ class ProjectController extends Controller
             'popular' => ['travel', 'emergency_fund', 'car'],
             'long_term' => ['real_estate', 'investment', 'education'],
             'lifestyle' => ['event', 'home_improvement'],
-            'business' => ['business', 'debt_payoff']
+            'business' => ['business', 'debt_payoff'],
         ];
     }
 
     /**
      * Vider le cache utilisateur
      *
-     * @param User $user Utilisateur concerné
+     * @param  User  $user  Utilisateur concerné
      */
     protected function clearUserCache($user): void
     {
-        Cache::forget("dashboard_{$user->id}_" . now()->format('Y-m'));
+        Cache::forget("dashboard_{$user->id}_".now()->format('Y-m'));
         Cache::forget("gaming_dashboard_{$user->id}");
-        Cache::forget("budget_stats_{$user->id}_" . now()->format('Y-m'));
+        Cache::forget("budget_stats_{$user->id}_".now()->format('Y-m'));
     }
 
     /**
      * Gérer les erreurs de manière centralisée
      *
-     * @param \Exception $exception Exception à traiter
-     * @param string $message Message d'erreur par défaut
+     * @param  \Exception  $exception  Exception à traiter
+     * @param  string  $message  Message d'erreur par défaut
      * @return JsonResponse Réponse d'erreur
      */
     protected function handleError(\Exception $exception, string $message): JsonResponse
@@ -499,7 +501,7 @@ class ProjectController extends Controller
         \Log::error($message, [
             'exception' => $exception->getMessage(),
             'user_id' => auth()->id(),
-            'trace' => $exception->getTraceAsString()
+            'trace' => $exception->getTraceAsString(),
         ]);
 
         $statusCode = method_exists($exception, 'getStatusCode') ?
@@ -508,8 +510,7 @@ class ProjectController extends Controller
         return response()->json([
             'success' => false,
             'message' => $message,
-            'error' => config('app.debug') ? $exception->getMessage() : null
+            'error' => config('app.debug') ? $exception->getMessage() : null,
         ], $statusCode);
     }
-
 }

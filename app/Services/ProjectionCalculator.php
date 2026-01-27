@@ -8,6 +8,7 @@ use Carbon\Carbon;
 class ProjectionCalculator
 {
     private FinancialGoal $goal;
+
     private array $historicalData;
 
     public function __construct(FinancialGoal $goal)
@@ -23,7 +24,7 @@ class ProjectionCalculator
     {
         $baseCalculation = $this->calculateBase();
 
-        return match($type) {
+        return match ($type) {
             'optimistic' => $this->calculateOptimistic($baseCalculation),
             'pessimistic' => $this->calculatePessimistic($baseCalculation),
             default => $this->calculateRealistic($baseCalculation)
@@ -50,7 +51,7 @@ class ProjectionCalculator
             'monthly_average' => $monthlyAverage,
             'months_needed' => $monthsNeeded,
             'projected_date' => $projectedDate,
-            'projected_amount' => $this->goal->current_amount + ($monthlyAverage * $monthsNeeded)
+            'projected_amount' => $this->goal->current_amount + ($monthlyAverage * $monthsNeeded),
         ];
     }
 
@@ -77,7 +78,7 @@ class ProjectionCalculator
                 'historical_average' => $base['monthly_average'],
                 'variability_adjustment' => $variabilityFactor,
                 'seasonality_factor' => $seasonalityFactor,
-                'data_points' => count($this->historicalData)
+                'data_points' => count($this->historicalData),
             ],
             'milestones' => $this->calculateMilestones($projectedDate, $adjustedMonthly),
             'recommendation' => $this->generateRecommendation($adjustedMonthly, $confidence),
@@ -85,9 +86,9 @@ class ProjectionCalculator
                 'type' => 'realistic',
                 'adjustment_factors' => [
                     'variability' => $variabilityFactor,
-                    'seasonality' => $seasonalityFactor
-                ]
-            ])
+                    'seasonality' => $seasonalityFactor,
+                ],
+            ]),
         ];
     }
 
@@ -111,14 +112,14 @@ class ProjectionCalculator
             'assumptions' => [
                 'historical_average' => $base['monthly_average'],
                 'improvement_factor' => $improvementFactor,
-                'scenario' => 'Amélioration des habitudes d\'épargne'
+                'scenario' => 'Amélioration des habitudes d\'épargne',
             ],
             'milestones' => $this->calculateMilestones($projectedDate, $optimisticMonthly),
             'recommendation' => 'Scénario optimiste basé sur une amélioration de vos habitudes d\'épargne.',
             'calculation_data' => array_merge($base, [
                 'type' => 'optimistic',
-                'improvement_factor' => $improvementFactor
-            ])
+                'improvement_factor' => $improvementFactor,
+            ]),
         ];
     }
 
@@ -142,14 +143,14 @@ class ProjectionCalculator
             'assumptions' => [
                 'historical_average' => $base['monthly_average'],
                 'reduction_factor' => $reductionFactor,
-                'scenario' => 'Prise en compte d\'imprévus financiers'
+                'scenario' => 'Prise en compte d\'imprévus financiers',
             ],
             'milestones' => $this->calculateMilestones($projectedDate, $pessimisticMonthly),
             'recommendation' => 'Scénario prudent tenant compte d\'éventuels imprévus financiers.',
             'calculation_data' => array_merge($base, [
                 'type' => 'pessimistic',
-                'reduction_factor' => $reductionFactor
-            ])
+                'reduction_factor' => $reductionFactor,
+            ]),
         ];
     }
 
@@ -225,7 +226,7 @@ class ProjectionCalculator
             9 => 1.05, // Septembre - rentrée
             10 => 1.0, // Octobre
             11 => 0.9, // Novembre - préparation fêtes
-            12 => 0.8  // Décembre - fêtes
+            12 => 0.8,  // Décembre - fêtes
         ];
 
         return $seasonalFactors[$currentMonth] ?? 1.0;
@@ -242,7 +243,7 @@ class ProjectionCalculator
 
         $baseConfidence = ($dataQuality + $consistency + $goalRealism) / 3;
 
-        return match($type) {
+        return match ($type) {
             'optimistic' => $baseConfidence * 0.7, // Moins confiant pour optimiste
             'pessimistic' => $baseConfidence * 0.9, // Plus confiant pour pessimiste
             default => $baseConfidence
@@ -254,7 +255,7 @@ class ProjectionCalculator
      */
     private function assessGoalRealism(): float
     {
-        if (!$this->goal->target_date) {
+        if (! $this->goal->target_date) {
             return 0.5; // Moyennement réaliste sans date cible
         }
 
@@ -268,7 +269,7 @@ class ProjectionCalculator
 
         $ratio = $monthlyRequired / $monthlyAverage;
 
-        return match(true) {
+        return match (true) {
             $ratio <= 1.0 => 1.0,    // Très réaliste
             $ratio <= 1.5 => 0.8,   // Réaliste
             $ratio <= 2.0 => 0.6,   // Moyennement réaliste
@@ -300,7 +301,7 @@ class ProjectionCalculator
                 'percentage' => $percentage,
                 'target_amount' => $targetAmount,
                 'date' => $milestoneDate->format('Y-m-d'),
-                'description' => $percentage === 100 ? 'Objectif atteint' : "{$percentage}% de l'objectif"
+                'description' => $percentage === 100 ? 'Objectif atteint' : "{$percentage}% de l'objectif",
             ];
         }
 
@@ -315,18 +316,18 @@ class ProjectionCalculator
         $currentAverage = $this->getMonthlyAverage();
 
         if ($confidence >= 0.8) {
-            return "Excellente trajectoire ! Continuez à épargner {" . number_format($monthlyRequired, 0) . "} € par mois.";
+            return 'Excellente trajectoire ! Continuez à épargner {'.number_format($monthlyRequired, 0).'} € par mois.';
         }
 
         if ($confidence >= 0.6) {
-            return "Bonne progression. Essayez d'épargner régulièrement {" . number_format($monthlyRequired, 0) . "} € par mois.";
+            return "Bonne progression. Essayez d'épargner régulièrement {".number_format($monthlyRequired, 0).'} € par mois.';
         }
 
         if ($monthlyRequired > $currentAverage * 1.5) {
-            return "Objectif ambitieux. Considérez réviser la date cible ou augmenter vos contributions à {" . number_format($monthlyRequired, 0) . "} € par mois.";
+            return 'Objectif ambitieux. Considérez réviser la date cible ou augmenter vos contributions à {'.number_format($monthlyRequired, 0).'} € par mois.';
         }
 
-        return "Améliorez la régularité de vos contributions pour atteindre {" . number_format($monthlyRequired, 0) . "} € par mois.";
+        return 'Améliorez la régularité de vos contributions pour atteindre {'.number_format($monthlyRequired, 0).'} € par mois.';
     }
 
     /**
@@ -342,7 +343,7 @@ class ProjectionCalculator
             'monthly_average' => $defaultMonthly,
             'months_needed' => $monthsNeeded,
             'projected_date' => now()->addMonths($monthsNeeded),
-            'projected_amount' => $this->goal->target_amount
+            'projected_amount' => $this->goal->target_amount,
         ];
     }
 }

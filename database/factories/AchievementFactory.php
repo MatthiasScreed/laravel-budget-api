@@ -16,7 +16,7 @@ class AchievementFactory extends Factory
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name) . '-' . $this->faker->unique()->numberBetween(1000, 9999),
+            'slug' => Str::slug($name).'-'.$this->faker->unique()->numberBetween(1000, 9999),
             'description' => $this->faker->sentence(),
             'icon' => $this->faker->randomElement(['🎯', '🏆', '⭐', '🎉', '💪', '🔥', '⚡', '🌟']),
             'color' => $this->faker->randomElement(['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']),
@@ -38,7 +38,7 @@ class AchievementFactory extends Factory
             'criteria' => ['min_transactions' => 1],
             'points' => 10,
             'rarity' => 'common',
-            'color' => '#3B82F6'
+            'color' => '#3B82F6',
         ]);
     }
 
@@ -52,7 +52,7 @@ class AchievementFactory extends Factory
             'criteria' => ['min_transactions' => 100],
             'points' => 500,
             'rarity' => 'rare',
-            'color' => '#8B5CF6'
+            'color' => '#8B5CF6',
         ]);
     }
 
@@ -65,7 +65,7 @@ class AchievementFactory extends Factory
             'type' => 'transaction',
             'criteria' => ['min_transactions' => $this->faker->numberBetween(1, 5)],
             'points' => $this->faker->numberBetween(10, 50),
-            'rarity' => 'common'
+            'rarity' => 'common',
         ]);
     }
 }

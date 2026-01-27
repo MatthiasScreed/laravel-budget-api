@@ -27,12 +27,12 @@ class ResetPasswordRequest extends FormRequest
                 'required',
                 'string',
                 'email',
-                'max:255'
+                'max:255',
             ],
             'token' => [
                 'required',
                 'string',
-                'min:10' // Token minimum
+                'min:10', // Token minimum
             ],
             'password' => [
                 'required',
@@ -41,14 +41,14 @@ class ResetPasswordRequest extends FormRequest
                 config('app.env') === 'testing'
                     ? 'min:8' // ✅ Simple en test
                     : [
-                    Password::min(8)
-                        ->letters()
-                        ->mixedCase()
-                        ->numbers()
-                        ->symbols()
-                        ->uncompromised()
-                ]
-            ]
+                        Password::min(8)
+                            ->letters()
+                            ->mixedCase()
+                            ->numbers()
+                            ->symbols()
+                            ->uncompromised(),
+                    ],
+            ],
         ];
     }
 
@@ -63,7 +63,7 @@ class ResetPasswordRequest extends FormRequest
             'token.required' => 'Le token de réinitialisation est obligatoire.',
             'token.min' => 'Le token de réinitialisation est invalide.',
             'password.required' => 'Le nouveau mot de passe est obligatoire.',
-            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.'
+            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
         ];
     }
 
@@ -73,7 +73,7 @@ class ResetPasswordRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'email' => strtolower($this->email)
+            'email' => strtolower($this->email),
         ]);
     }
 }

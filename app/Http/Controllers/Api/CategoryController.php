@@ -16,9 +16,6 @@ class CategoryController extends Controller
 
     /**
      * Display a listing of categories with pagination and filters
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -35,9 +32,6 @@ class CategoryController extends Controller
 
     /**
      * Store a newly created category
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function store(Request $request): JsonResponse
     {
@@ -48,13 +42,13 @@ class CategoryController extends Controller
                 'max:255',
                 Rule::unique('categories')->where(function ($query) {
                     return $query->where('user_id', Auth::id());
-                })
+                }),
             ],
             'type' => 'required|in:income,expense',
             'icon' => 'nullable|string|max:100',
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
             'description' => 'nullable|string|max:500',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
         ]);
 
         $data['user_id'] = Auth::id();
@@ -70,13 +64,10 @@ class CategoryController extends Controller
 
     /**
      * Display the specified category
-     *
-     * @param Category $category
-     * @return JsonResponse
      */
     public function show(Category $category): JsonResponse
     {
-        if (!$this->userOwnsCategory($category)) {
+        if (! $this->userOwnsCategory($category)) {
             return $this->unauthorizedResponse('Vous n\'avez pas accès à cette catégorie');
         }
 
@@ -91,7 +82,7 @@ class CategoryController extends Controller
             'transactions_count' => $category->transactions()->count(),
             'total_amount' => $category->transactions()->sum('amount'),
             'avg_amount' => round($category->transactions()->avg('amount'), 2),
-            'last_transaction_date' => $category->transactions()->latest('transaction_date')->value('transaction_date')
+            'last_transaction_date' => $category->transactions()->latest('transaction_date')->value('transaction_date'),
         ];
 
         return $this->successResponse($categoryWithStats, 'Catégorie récupérée avec succès');
@@ -99,14 +90,10 @@ class CategoryController extends Controller
 
     /**
      * Update the specified category
-     *
-     * @param Request $request
-     * @param Category $category
-     * @return JsonResponse
      */
     public function update(Request $request, Category $category): JsonResponse
     {
-        if (!$this->userOwnsCategory($category)) {
+        if (! $this->userOwnsCategory($category)) {
             return $this->unauthorizedResponse('Vous n\'avez pas accès à cette catégorie');
         }
 
@@ -117,13 +104,13 @@ class CategoryController extends Controller
                 Rule::unique('categories')->where(function ($query) use ($category) {
                     return $query->where('user_id', Auth::id())
                         ->where('id', '!=', $category->id);
-                })
+                }),
             ],
             'type' => 'in:income,expense',
             'icon' => 'nullable|string|max:100',
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
             'description' => 'nullable|string|max:500',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
         ]);
 
         $category->update($data);
@@ -133,13 +120,10 @@ class CategoryController extends Controller
 
     /**
      * Remove the specified category
-     *
-     * @param Category $category
-     * @return JsonResponse
      */
     public function destroy(Category $category): JsonResponse
     {
-        if (!$this->userOwnsCategory($category)) {
+        if (! $this->userOwnsCategory($category)) {
             return $this->unauthorizedResponse('Vous n\'avez pas accès à cette catégorie');
         }
 
@@ -160,9 +144,6 @@ class CategoryController extends Controller
 
     /**
      * Get categories statistics
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function statistics(Request $request): JsonResponse
     {
@@ -189,12 +170,12 @@ class CategoryController extends Controller
                         'id' => $category->id,
                         'name' => $category->name,
                         'type' => $category->type,
-                        'total_amount' => $category->transactions->sum('amount')
+                        'total_amount' => $category->transactions->sum('amount'),
                     ];
                 })
                 ->sortByDesc('total_amount')
                 ->take(5)
-                ->values()
+                ->values(),
         ];
 
         return $this->successResponse($stats, 'Statistiques des catégories récupérées avec succès');
@@ -202,17 +183,14 @@ class CategoryController extends Controller
 
     /**
      * Archive/Unarchive a category
-     *
-     * @param Category $category
-     * @return JsonResponse
      */
     public function toggleActive(Category $category): JsonResponse
     {
-        if (!$this->userOwnsCategory($category)) {
+        if (! $this->userOwnsCategory($category)) {
             return $this->unauthorizedResponse('Vous n\'avez pas accès à cette catégorie');
         }
 
-        $category->update(['is_active' => !$category->is_active]);
+        $category->update(['is_active' => ! $category->is_active]);
 
         $status = $category->is_active ? 'activée' : 'archivée';
 
@@ -221,9 +199,6 @@ class CategoryController extends Controller
 
     /**
      * Check if the authenticated user owns the category
-     *
-     * @param Category $category
-     * @return bool
      */
     private function userOwnsCategory(Category $category): bool
     {

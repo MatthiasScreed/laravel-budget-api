@@ -4,19 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 class UserAction extends Model
 {
     public $timestamps = false; // On utilise seulement created_at
 
     protected $fillable = [
-        'user_id', 'action_type', 'context', 'metadata', 'xp_gained'
+        'user_id', 'action_type', 'context', 'metadata', 'xp_gained',
     ];
 
     protected $casts = [
         'metadata' => 'array',
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
     ];
 
     // Relations
@@ -35,7 +34,7 @@ class UserAction extends Model
     {
         return $query->whereBetween('created_at', [
             now()->startOfWeek(),
-            now()->endOfWeek()
+            now()->endOfWeek(),
         ]);
     }
 
@@ -47,7 +46,7 @@ class UserAction extends Model
     // Méthodes utilitaires
     public static function getXpForAction(string $actionType): int
     {
-        return match($actionType) {
+        return match ($actionType) {
             'page_view' => 1,
             'button_click' => 2,
             'transaction_add' => 15,
@@ -69,7 +68,7 @@ class UserAction extends Model
             'action_type' => $actionType,
             'context' => $context,
             'metadata' => $metadata,
-            'xp_gained' => $xp
+            'xp_gained' => $xp,
         ]);
     }
 }

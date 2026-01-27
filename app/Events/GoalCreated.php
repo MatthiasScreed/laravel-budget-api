@@ -2,13 +2,10 @@
 
 namespace App\Events;
 
-use App\Models\User;
 use App\Models\FinancialGoal;
-use Illuminate\Broadcasting\Channel;
+use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -17,13 +14,14 @@ class GoalCreated
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public User $user;
+
     public FinancialGoal $goal;
 
     /**
      * Create a new event instance.
      *
-     * @param User $user L'utilisateur qui a créé l'objectif
-     * @param FinancialGoal $goal L'objectif financier créé
+     * @param  User  $user  L'utilisateur qui a créé l'objectif
+     * @param  FinancialGoal  $goal  L'objectif financier créé
      */
     public function __construct(User $user, FinancialGoal $goal)
     {
@@ -39,7 +37,7 @@ class GoalCreated
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('user.' . $this->user->id),
+            new PrivateChannel('user.'.$this->user->id),
         ];
     }
 

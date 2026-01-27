@@ -7,7 +7,6 @@ use App\Models\FinancialGoal;
 use App\Models\GoalContribution;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -100,7 +99,7 @@ class DemoUserSeeder extends Seeder
                 'color' => '#10B981',
                 'icon' => 'airplane',
                 'priority' => 1,
-                'monthly_target' => 350
+                'monthly_target' => 350,
             ],
             [
                 'name' => 'Fonds d\'urgence',
@@ -113,7 +112,7 @@ class DemoUserSeeder extends Seeder
                 'color' => '#8B5CF6',
                 'icon' => 'shield',
                 'priority' => 2,
-                'monthly_target' => 600
+                'monthly_target' => 600,
             ],
             [
                 'name' => 'Nouvelle voiture',
@@ -126,8 +125,8 @@ class DemoUserSeeder extends Seeder
                 'color' => '#EF4444',
                 'icon' => 'car',
                 'priority' => 3,
-                'monthly_target' => 900
-            ]
+                'monthly_target' => 900,
+            ],
         ];
 
         foreach ($goals as $goalData) {
@@ -163,7 +162,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->startOfMonth(),
                 'description' => 'Salaire mensuel',
                 'payment_method' => 'transfer',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $freelanceCategory->id,
@@ -172,7 +171,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->subDays(10),
                 'description' => 'Mission freelance site web',
                 'payment_method' => 'transfer',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
 
             // Dépenses
@@ -183,7 +182,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->subDays(2),
                 'description' => 'Courses Carrefour',
                 'payment_method' => 'card',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $transportCategory->id,
@@ -192,7 +191,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->subDays(1),
                 'description' => 'Plein d\'essence',
                 'payment_method' => 'card',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $foodCategory->id,
@@ -201,7 +200,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now(),
                 'description' => 'Déjeuner restaurant',
                 'payment_method' => 'cash',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $leisureCategory->id,
@@ -210,7 +209,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->subDays(3),
                 'description' => 'Cinéma',
                 'payment_method' => 'card',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $shoppingCategory->id,
@@ -219,8 +218,8 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => now()->subDays(5),
                 'description' => 'Vêtements H&M',
                 'payment_method' => 'card',
-                'status' => 'completed'
-            ]
+                'status' => 'completed',
+            ],
         ];
 
         // Ajouter des transactions pour le mois précédent
@@ -233,7 +232,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => $lastMonth->startOfMonth(),
                 'description' => 'Salaire mensuel',
                 'payment_method' => 'transfer',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $foodCategory->id,
@@ -242,7 +241,7 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => $lastMonth->addDays(15),
                 'description' => 'Courses du mois',
                 'payment_method' => 'card',
-                'status' => 'completed'
+                'status' => 'completed',
             ],
             [
                 'category_id' => $transportCategory->id,
@@ -251,8 +250,8 @@ class DemoUserSeeder extends Seeder
                 'transaction_date' => $lastMonth->addDays(10),
                 'description' => 'Abonnement transport',
                 'payment_method' => 'transfer',
-                'status' => 'completed'
-            ]
+                'status' => 'completed',
+            ],
         ];
 
         $allTransactions = array_merge($transactions, $lastMonthTransactions);
@@ -283,21 +282,21 @@ class DemoUserSeeder extends Seeder
                 'amount' => 200,
                 'date' => now()->subMonths(2),
                 'description' => 'Contribution initiale voyage',
-                'is_automatic' => false
+                'is_automatic' => false,
             ],
             [
                 'financial_goal_id' => $travelGoal->id,
                 'amount' => 150,
                 'date' => now()->subMonth(),
                 'description' => 'Contribution mensuelle voyage',
-                'is_automatic' => true
+                'is_automatic' => true,
             ],
             [
                 'financial_goal_id' => $travelGoal->id,
                 'amount' => 100,
                 'date' => now()->subDays(5),
                 'description' => 'Contribution voyage',
-                'is_automatic' => false
+                'is_automatic' => false,
             ],
 
             // Contributions fonds d'urgence
@@ -306,28 +305,28 @@ class DemoUserSeeder extends Seeder
                 'amount' => 1000,
                 'date' => now()->subMonths(4),
                 'description' => 'Contribution initiale fonds urgence',
-                'is_automatic' => false
+                'is_automatic' => false,
             ],
             [
                 'financial_goal_id' => $emergencyGoal->id,
                 'amount' => 600,
                 'date' => now()->subMonths(3),
                 'description' => 'Contribution mensuelle fonds urgence',
-                'is_automatic' => true
+                'is_automatic' => true,
             ],
             [
                 'financial_goal_id' => $emergencyGoal->id,
                 'amount' => 600,
                 'date' => now()->subMonths(2),
                 'description' => 'Contribution mensuelle fonds urgence',
-                'is_automatic' => true
+                'is_automatic' => true,
             ],
             [
                 'financial_goal_id' => $emergencyGoal->id,
                 'amount' => 600,
                 'date' => now()->subMonth(),
                 'description' => 'Contribution mensuelle fonds urgence',
-                'is_automatic' => true
+                'is_automatic' => true,
             ],
 
             // Contributions voiture
@@ -336,29 +335,29 @@ class DemoUserSeeder extends Seeder
                 'amount' => 2000,
                 'date' => now()->subMonths(3),
                 'description' => 'Contribution initiale voiture',
-                'is_automatic' => false
+                'is_automatic' => false,
             ],
             [
                 'financial_goal_id' => $carGoal->id,
                 'amount' => 1600,
                 'date' => now()->subMonths(2),
                 'description' => 'Contribution voiture',
-                'is_automatic' => false
+                'is_automatic' => false,
             ],
             [
                 'financial_goal_id' => $carGoal->id,
                 'amount' => 800,
                 'date' => now()->subMonth(),
                 'description' => 'Contribution mensuelle voiture',
-                'is_automatic' => true
+                'is_automatic' => true,
             ],
             [
                 'financial_goal_id' => $carGoal->id,
                 'amount' => 800,
                 'date' => now()->subDays(3),
                 'description' => 'Contribution mensuelle voiture',
-                'is_automatic' => true
-            ]
+                'is_automatic' => true,
+            ],
         ];
 
         foreach ($contributions as $contributionData) {

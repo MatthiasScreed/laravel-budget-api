@@ -35,13 +35,13 @@ class TestGamingStreaks extends Command
         $userId = $this->argument('user_id');
         $user = $userId ? User::find($userId) : User::first();
 
-        if (!$user) {
+        if (! $user) {
             // Créer un utilisateur de test
             $user = User::create([
                 'name' => 'Test Gaming User',
                 'email' => 'gaming@test.com',
                 'password' => bcrypt('password123'),
-                'email_verified_at' => now()
+                'email_verified_at' => now(),
             ]);
             $this->info("✅ Utilisateur créé: {$user->name} (ID: {$user->id})");
         } else {
@@ -77,7 +77,7 @@ class TestGamingStreaks extends Command
                 $this->line("    - Bonus XP: {$result['bonus_xp']}");
 
                 if ($result['is_milestone']) {
-                    $this->comment("    🎉 MILESTONE ATTEINT !");
+                    $this->comment('    🎉 MILESTONE ATTEINT !');
                 }
             } else {
                 $this->error("  Échec jour {$i}: {$result['message']}");
@@ -105,7 +105,7 @@ class TestGamingStreaks extends Command
                 'amount' => 50.00,
                 'description' => "Transaction test {$i}",
                 'transaction_date' => now(),
-                'status' => 'completed'
+                'status' => 'completed',
             ]);
 
             $result = $streakService->triggerStreak($user, Streak::TYPE_DAILY_TRANSACTION);
@@ -129,7 +129,7 @@ class TestGamingStreaks extends Command
         $streak = $user->streaks()->where('type', $streakType)->first();
         if ($streak) {
             $streak->update([
-                'last_activity_date' => now()->subDay()
+                'last_activity_date' => now()->subDay(),
             ]);
         }
     }
@@ -148,13 +148,13 @@ class TestGamingStreaks extends Command
             $this->line("🔥 {$streak['type_name']}:");
             $this->line("   - Streak actuelle: {$streak['current_count']} jours");
             $this->line("   - Meilleure streak: {$streak['best_count']} jours");
-            $this->line("   - Bonus disponible: " . ($streak['bonus_available'] ? 'OUI' : 'NON'));
+            $this->line('   - Bonus disponible: '.($streak['bonus_available'] ? 'OUI' : 'NON'));
             $this->line("   - Risque: {$streak['risk_level']}");
         }
 
         // Afficher les stats gaming
         $this->line('');
-        $this->line("🎮 Stats Gaming:");
+        $this->line('🎮 Stats Gaming:');
         $this->line("   - Niveau: {$gamingStats['level_info']['current_level']}");
         $this->line("   - XP Total: {$gamingStats['level_info']['total_xp']}");
         $this->line("   - Titre: {$gamingStats['level_info']['title']}");
@@ -163,5 +163,4 @@ class TestGamingStreaks extends Command
         $this->line('');
         $this->comment('✅ Test terminé avec succès !');
     }
-
 }

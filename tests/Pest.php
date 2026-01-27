@@ -11,9 +11,6 @@
 |
 */
 
-use App\Models\User;
-use Tests\TestCase;
-
 pest()->extend(Tests\TestCase::class)
  // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
@@ -44,7 +41,6 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-
 /**
  * Helper function pour créer un utilisateur avec niveau gaming
  */
@@ -52,12 +48,12 @@ function createUserWithLevel(array $attributes = []): \App\Models\User
 {
     $user = \App\Models\User::factory()->create($attributes);
 
-    if (!$user->level) {
+    if (! $user->level) {
         $user->level()->create([
             'level' => 1,
             'total_xp' => 0,
             'current_level_xp' => 0,
-            'next_level_xp' => 100
+            'next_level_xp' => 100,
         ]);
     }
 
@@ -75,9 +71,9 @@ function assertGamingStructure(\Illuminate\Testing\TestResponse $response): void
             'level_info' => [
                 'current_level',
                 'total_xp',
-                'progress_percentage'
-            ]
-        ]
+                'progress_percentage',
+            ],
+        ],
     ]);
 }
 
@@ -89,6 +85,6 @@ function debugResponse(\Illuminate\Testing\TestResponse $response): void
     dump([
         'status' => $response->status(),
         'headers' => $response->headers->all(),
-        'content' => $response->getContent()
+        'content' => $response->getContent(),
     ]);
 }

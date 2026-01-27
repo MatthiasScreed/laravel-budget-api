@@ -20,17 +20,17 @@ class Category extends Model
         'is_active',
         'is_system',
         'sort_order',
-        'user_id'
+        'user_id',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_system' => 'boolean',
-        'sort_order' => 'integer'
+        'sort_order' => 'integer',
     ];
 
     protected $dates = [
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $attributes = [
@@ -38,18 +38,19 @@ class Category extends Model
         'color' => '#6B7280',
         'is_active' => true,
         'is_system' => false,
-        'sort_order' => 0
+        'sort_order' => 0,
     ];
 
     /**
      * Les types de catégories disponibles
      */
     public const TYPE_INCOME = 'income';
+
     public const TYPE_EXPENSE = 'expense';
 
     public const TYPES = [
         self::TYPE_INCOME => 'Revenus',
-        self::TYPE_EXPENSE => 'Dépenses'
+        self::TYPE_EXPENSE => 'Dépenses',
     ];
 
     public function user(): BelongsTo
@@ -155,7 +156,7 @@ class Category extends Model
      */
     public function setColorAttribute($value)
     {
-        if ($value && !preg_match('/^#[a-fA-F0-9]{6}$/', $value)) {
+        if ($value && ! preg_match('/^#[a-fA-F0-9]{6}$/', $value)) {
             $value = '#6B7280'; // Couleur par défaut si format invalide
         }
         $this->attributes['color'] = $value;
@@ -174,7 +175,7 @@ class Category extends Model
      */
     public function isEditable(): bool
     {
-        return !$this->is_system;
+        return ! $this->is_system;
     }
 
     /**
@@ -182,7 +183,7 @@ class Category extends Model
      */
     public function isDeletable(): bool
     {
-        return !$this->is_system && $this->transactions()->count() === 0;
+        return ! $this->is_system && $this->transactions()->count() === 0;
     }
 
     /**

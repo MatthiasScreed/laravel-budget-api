@@ -20,7 +20,7 @@ return new class extends Migration
                 'daily_login',
                 'daily_transaction',
                 'weekly_budget',
-                'monthly_saving'
+                'monthly_saving',
             ])->index();
 
             $table->integer('current_count')->default(0);

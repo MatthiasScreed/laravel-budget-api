@@ -15,21 +15,21 @@ class UserLevel extends Model
         'level',
         'total_xp',
         'current_level_xp',
-        'next_level_xp'
+        'next_level_xp',
     ];
 
     protected $casts = [
         'level' => 'integer',
         'total_xp' => 'integer',
         'current_level_xp' => 'integer',
-        'next_level_xp' => 'integer'
+        'next_level_xp' => 'integer',
     ];
 
     protected $attributes = [
         'level' => 1,
         'total_xp' => 0,
         'current_level_xp' => 0,
-        'next_level_xp' => 100
+        'next_level_xp' => 100,
     ];
 
     /**
@@ -46,7 +46,7 @@ class UserLevel extends Model
      * Formule : (niveau - 1)² × 50 + 100
      * Exemple : niveau 5 = 4² × 50 + 100 = 900 XP
      *
-     * @param int $level Niveau cible
+     * @param  int  $level  Niveau cible
      * @return int XP requis pour ce niveau
      */
     public static function getXpRequiredForLevel(int $level): int
@@ -62,7 +62,7 @@ class UserLevel extends Model
     /**
      * Ajouter de l'XP et calculer les nouveaux niveaux
      *
-     * @param int $xp Points d'expérience à ajouter
+     * @param  int  $xp  Points d'expérience à ajouter
      * @return array Résultat avec informations de montée de niveau
      */
     public function addXp(int $xp): array
@@ -106,9 +106,9 @@ class UserLevel extends Model
     /**
      * Construire le résultat de l'ajout d'XP
      *
-     * @param bool $leveledUp A monté de niveau
-     * @param int $levelsGained Niveaux gagnés
-     * @param int $xpAdded XP ajoutés
+     * @param  bool  $leveledUp  A monté de niveau
+     * @param  int  $levelsGained  Niveaux gagnés
+     * @param  int  $xpAdded  XP ajoutés
      * @return array Résultat formaté
      */
     protected function buildLevelUpResult(bool $leveledUp, int $levelsGained, int $xpAdded): array
@@ -119,7 +119,7 @@ class UserLevel extends Model
             'new_level' => $this->level,
             'xp_added' => $xpAdded,
             'total_xp' => $this->total_xp,
-            'progress_percentage' => $this->getProgressPercentage()
+            'progress_percentage' => $this->getProgressPercentage(),
         ];
     }
 
@@ -144,7 +144,7 @@ class UserLevel extends Model
      */
     public function getTitle(): string
     {
-        return match(true) {
+        return match (true) {
             $this->level >= 100 => 'Maître de l\'Épargne',
             $this->level >= 75 => 'Expert Financier',
             $this->level >= 50 => 'Gestionnaire Avancé',
@@ -161,7 +161,7 @@ class UserLevel extends Model
      */
     public function getLevelColor(): string
     {
-        return match(true) {
+        return match (true) {
             $this->level >= 100 => '#DC2626', // Rouge légendaire
             $this->level >= 75 => '#7C3AED',  // Violet épique
             $this->level >= 50 => '#059669',  // Vert rare
@@ -173,7 +173,7 @@ class UserLevel extends Model
     /**
      * Vérifier si l'utilisateur peut accéder à une fonctionnalité
      *
-     * @param int $requiredLevel Niveau requis
+     * @param  int  $requiredLevel  Niveau requis
      * @return bool Accès autorisé
      */
     public function canAccess(int $requiredLevel): bool
@@ -196,7 +196,7 @@ class UserLevel extends Model
             'progress_percentage' => round($this->getProgressPercentage(), 2),
             'title' => $this->getTitle(),
             'level_color' => $this->getLevelColor(),
-            'xp_to_next_level' => $this->next_level_xp - $this->current_level_xp
+            'xp_to_next_level' => $this->next_level_xp - $this->current_level_xp,
         ];
     }
 }

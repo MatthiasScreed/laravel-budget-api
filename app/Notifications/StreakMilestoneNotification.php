@@ -5,7 +5,6 @@ namespace App\Notifications;
 use App\Models\Streak;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class StreakMilestoneNotification extends Notification implements ShouldQueue
@@ -13,6 +12,7 @@ class StreakMilestoneNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Streak $streak;
+
     protected int $milestone;
 
     /**
@@ -48,7 +48,7 @@ class StreakMilestoneNotification extends Notification implements ShouldQueue
             'streak_id' => $this->streak->id,
             'streak_name' => $this->streak->name,
             'milestone' => $this->milestone,
-            'current_count' => $this->streak->current_count
+            'current_count' => $this->streak->current_count,
         ];
     }
 }

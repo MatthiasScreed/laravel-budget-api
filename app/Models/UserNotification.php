@@ -7,14 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 class UserNotification extends Model
 {
     protected $fillable = [
-        'user_id', 'type', 'title', 'body', 'data', 'channel'
+        'user_id', 'type', 'title', 'body', 'data', 'channel',
     ];
 
     protected $casts = [
         'data' => 'array',
         'sent_at' => 'datetime',
         'read_at' => 'datetime',
-        'clicked_at' => 'datetime'
+        'clicked_at' => 'datetime',
     ];
 
     // Relations
@@ -52,7 +52,7 @@ class UserNotification extends Model
 
     public function isRead(): bool
     {
-        return !is_null($this->read_at);
+        return ! is_null($this->read_at);
     }
 
     // Factory method pour créer différents types de notifications
@@ -64,7 +64,7 @@ class UserNotification extends Model
             'title' => "🎯 +{$xp} XP Gagné !",
             'body' => $reason,
             'data' => ['xp_amount' => $xp, 'reason' => $reason],
-            'channel' => 'web'
+            'channel' => 'web',
         ]);
     }
 
@@ -73,10 +73,10 @@ class UserNotification extends Model
         return self::create([
             'user_id' => $userId,
             'type' => 'achievement',
-            'title' => "🏆 Achievement Débloqué !",
+            'title' => '🏆 Achievement Débloqué !',
             'body' => "Badge '{$achievement['name']}' obtenu !",
             'data' => ['achievement' => $achievement],
-            'channel' => 'web'
+            'channel' => 'web',
         ]);
     }
 
@@ -85,10 +85,10 @@ class UserNotification extends Model
         return self::create([
             'user_id' => $userId,
             'type' => 'level_up',
-            'title' => "📈 Niveau Supérieur !",
+            'title' => '📈 Niveau Supérieur !',
             'body' => "Niveau {$newLevel} atteint ! Nouvelles fonctionnalités débloquées",
             'data' => ['old_level' => $oldLevel, 'new_level' => $newLevel],
-            'channel' => 'web'
+            'channel' => 'web',
         ]);
     }
 }

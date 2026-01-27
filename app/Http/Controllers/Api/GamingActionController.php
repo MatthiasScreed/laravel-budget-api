@@ -13,9 +13,6 @@ class GamingActionController extends Controller
 {
     /**
      * Action déclenchée après création d'une transaction
-     *
-     * @param TransactionCreatedRequest $request
-     * @return JsonResponse
      */
     public function transactionCreated(TransactionCreatedRequest $request): JsonResponse
     {
@@ -25,10 +22,10 @@ class GamingActionController extends Controller
         // Vérifier que la transaction appartient à l'utilisateur
         $transaction = $user->transactions()->find($transactionId);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json([
                 'success' => false,
-                'message' => 'Transaction non trouvée'
+                'message' => 'Transaction non trouvée',
             ], 404);
         }
 
@@ -50,17 +47,17 @@ class GamingActionController extends Controller
                 'unlocked_achievements' => $this->formatAchievements($unlockedAchievements),
                 'bonus_xp' => $bonusXp,
                 'total_transactions' => $user->transactions()->count(),
-                'streak_updated' => true // TODO: implémenter vraiment les streaks
+                'streak_updated' => true, // TODO: implémenter vraiment les streaks
             ],
-            'message' => 'Action transaction traitée avec succès'
+            'message' => 'Action transaction traitée avec succès',
         ];
 
         // Ajouter les détails des nouveaux succès s'il y en a
-        if (!empty($unlockedAchievements)) {
+        if (! empty($unlockedAchievements)) {
             $response['data']['achievement_notification'] = [
                 'title' => 'Nouveau succès débloqué !',
                 'count' => count($unlockedAchievements),
-                'total_xp_gained' => array_sum(array_column($unlockedAchievements, 'points'))
+                'total_xp_gained' => array_sum(array_column($unlockedAchievements, 'points')),
             ];
         }
 
@@ -69,9 +66,6 @@ class GamingActionController extends Controller
 
     /**
      * Action déclenchée après atteinte d'un objectif
-     *
-     * @param GoalAchievedRequest $request
-     * @return JsonResponse
      */
     public function goalAchieved(GoalAchievedRequest $request): JsonResponse
     {
@@ -81,10 +75,10 @@ class GamingActionController extends Controller
         // Vérifier que l'objectif appartient à l'utilisateur
         $goal = $user->financialGoals()->find($goalId);
 
-        if (!$goal) {
+        if (! $goal) {
             return response()->json([
                 'success' => false,
-                'message' => 'Objectif non trouvé'
+                'message' => 'Objectif non trouvé',
             ], 404);
         }
 
@@ -103,19 +97,16 @@ class GamingActionController extends Controller
                 'goal_info' => [
                     'name' => $goal->name,
                     'target_amount' => $goal->target_amount,
-                    'completed_at' => $goal->completed_at
+                    'completed_at' => $goal->completed_at,
                 ],
-                'total_completed_goals' => $user->financialGoals()->completed()->count()
+                'total_completed_goals' => $user->financialGoals()->completed()->count(),
             ],
-            'message' => 'Félicitations ! Objectif atteint et récompenses accordées'
+            'message' => 'Félicitations ! Objectif atteint et récompenses accordées',
         ]);
     }
 
     /**
      * Action déclenchée après création d'une catégorie
-     *
-     * @param CategoryCreatedRequest $request
-     * @return JsonResponse
      */
     public function categoryCreated(CategoryCreatedRequest $request): JsonResponse
     {
@@ -125,10 +116,10 @@ class GamingActionController extends Controller
         // Vérifier que la catégorie appartient à l'utilisateur
         $category = $user->categories()->find($categoryId);
 
-        if (!$category) {
+        if (! $category) {
             return response()->json([
                 'success' => false,
-                'message' => 'Catégorie non trouvée'
+                'message' => 'Catégorie non trouvée',
             ], 404);
         }
 
@@ -146,25 +137,22 @@ class GamingActionController extends Controller
                 'unlocked_achievements' => $this->formatAchievements($unlockedAchievements),
                 'category_info' => [
                     'name' => $category->name,
-                    'type' => $category->type
+                    'type' => $category->type,
                 ],
-                'total_categories' => $user->categories()->count()
+                'total_categories' => $user->categories()->count(),
             ],
-            'message' => 'Catégorie créée et bonus accordé'
+            'message' => 'Catégorie créée et bonus accordé',
         ]);
     }
 
     /**
      * Action générique pour ajouter de l'XP manuellement (admin/debug)
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function addXp(Request $request): JsonResponse
     {
         $request->validate([
             'xp' => 'required|integer|min:1|max:1000',
-            'reason' => 'nullable|string|max:255'
+            'reason' => 'nullable|string|max:255',
         ]);
 
         $user = $request->user();
@@ -183,17 +171,14 @@ class GamingActionController extends Controller
                 'leveled_up' => $levelUpResult['leveled_up'] ?? false,
                 'levels_gained' => $levelUpResult['levels_gained'] ?? 0,
                 'old_stats' => $beforeStats,
-                'new_stats' => $afterStats
+                'new_stats' => $afterStats,
             ],
-            'message' => "XP ajouté avec succès: +{$xp} ({$reason})"
+            'message' => "XP ajouté avec succès: +{$xp} ({$reason})",
         ]);
     }
 
     /**
      * Formater les succès pour la réponse API
-     *
-     * @param array $achievements
-     * @return array
      */
     private function formatAchievements(array $achievements): array
     {
@@ -206,7 +191,7 @@ class GamingActionController extends Controller
                 'points' => $achievement->points,
                 'rarity' => $achievement->rarity,
                 'rarity_name' => $achievement->rarity_name,
-                'rarity_color' => $achievement->rarity_color
+                'rarity_color' => $achievement->rarity_color,
             ];
         }, $achievements);
     }
@@ -214,8 +199,7 @@ class GamingActionController extends Controller
     /**
      * Calculer le bonus XP pour une transaction
      *
-     * @param \App\Models\Transaction $transaction
-     * @return int
+     * @param  \App\Models\Transaction  $transaction
      */
     private function calculateTransactionBonusXp($transaction): int
     {
@@ -238,8 +222,7 @@ class GamingActionController extends Controller
     /**
      * Calculer le bonus XP pour un objectif atteint
      *
-     * @param \App\Models\FinancialGoal $goal
-     * @return int
+     * @param  \App\Models\FinancialGoal  $goal
      */
     private function calculateGoalBonusXp($goal): int
     {
@@ -262,8 +245,7 @@ class GamingActionController extends Controller
     /**
      * Mettre à jour les streaks de transaction
      *
-     * @param \App\Models\User $user
-     * @return void
+     * @param  \App\Models\User  $user
      */
     private function updateTransactionStreaks($user): void
     {
@@ -275,7 +257,4 @@ class GamingActionController extends Controller
         // - Mettre à jour sa streak quotidienne
         // - Donner des bonus XP pour les longues streaks
     }
-
-
-
 }

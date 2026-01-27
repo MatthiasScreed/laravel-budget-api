@@ -4,11 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponseTrait;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class AnalyticsController extends Controller
 {
@@ -16,9 +15,6 @@ class AnalyticsController extends Controller
 
     /**
      * Get comprehensive dashboard analytics
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function dashboard(Request $request): JsonResponse
     {
@@ -33,14 +29,14 @@ class AnalyticsController extends Controller
                 'trends' => $this->getTrends($user, $period),
                 'goals_progress' => $this->getGoalsProgress($user),
                 'gaming_stats' => $this->getGamingAnalytics($user, $period),
-                'insights' => $this->generateInsights($user, $period)
+                'insights' => $this->generateInsights($user, $period),
             ];
 
             return $this->successResponse($analytics, 'Analytics dashboard récupérées avec succès');
 
         } catch (\Exception $e) {
             // Log l'erreur pour debug
-            \Log::error('Analytics dashboard error: ' . $e->getMessage());
+            \Log::error('Analytics dashboard error: '.$e->getMessage());
 
             // Retourner des données par défaut en cas d'erreur
             return $this->successResponse([
@@ -51,7 +47,7 @@ class AnalyticsController extends Controller
                     'transaction_count' => 23,
                     'avg_transaction' => 150.5,
                     'largest_expense' => 450,
-                    'categories_used' => 8
+                    'categories_used' => 8,
                 ],
                 'cash_flow' => [
                     'cash_flow_data' => [],
@@ -59,7 +55,7 @@ class AnalyticsController extends Controller
                     'average_weekly_expenses' => 462,
                     'best_week' => 850,
                     'worst_week' => 120,
-                    'consistency_score' => 75
+                    'consistency_score' => 75,
                 ],
                 'category_breakdown' => [
                     [
@@ -70,7 +66,7 @@ class AnalyticsController extends Controller
                         'transaction_count' => 12,
                         'total_amount' => 650,
                         'avg_amount' => 54.17,
-                        'percentage' => 35.1
+                        'percentage' => 35.1,
                     ],
                     [
                         'category_name' => 'Transport',
@@ -80,14 +76,14 @@ class AnalyticsController extends Controller
                         'transaction_count' => 8,
                         'total_amount' => 420,
                         'avg_amount' => 52.5,
-                        'percentage' => 22.7
-                    ]
+                        'percentage' => 22.7,
+                    ],
                 ],
                 'trends' => [
                     'income_change' => ['percentage' => 5.2, 'direction' => 'up', 'value' => 175],
                     'expenses_change' => ['percentage' => 2.1, 'direction' => 'down', 'value' => -38],
                     'transactions_change' => ['percentage' => 8.5, 'direction' => 'up', 'value' => 2],
-                    'net_change' => ['percentage' => 12.3, 'direction' => 'up', 'value' => 213]
+                    'net_change' => ['percentage' => 12.3, 'direction' => 'up', 'value' => 213],
                 ],
                 'goals_progress' => [
                     'total_goals' => 3,
@@ -96,7 +92,7 @@ class AnalyticsController extends Controller
                     'total_target' => 5000,
                     'total_saved' => 2750,
                     'overall_progress' => 55,
-                    'goals_on_track' => 2
+                    'goals_on_track' => 2,
                 ],
                 'gaming_stats' => [
                     'current_level' => $user->level?->level ?? 5,
@@ -105,7 +101,7 @@ class AnalyticsController extends Controller
                     'active_streaks' => 3,
                     'best_streak' => 15,
                     'xp_this_period' => 150,
-                    'achievements_this_period' => 2
+                    'achievements_this_period' => 2,
                 ],
                 'insights' => [
                     [
@@ -113,18 +109,15 @@ class AnalyticsController extends Controller
                         'title' => 'Économies possibles',
                         'message' => 'Vous pourriez réduire vos dépenses en alimentation de 15%',
                         'actionable' => true,
-                        'suggestion' => 'Essayez de cuisiner plus souvent à la maison'
-                    ]
-                ]
+                        'suggestion' => 'Essayez de cuisiner plus souvent à la maison',
+                    ],
+                ],
             ], 'Analytics avec données par défaut (erreur DB évitée)');
         }
     }
 
     /**
      * Get monthly financial report
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function monthlyReport(Request $request): JsonResponse
     {
@@ -142,14 +135,14 @@ class AnalyticsController extends Controller
                 'month' => $date->format('Y-m'),
                 'month_name' => $date->locale('fr')->format('F Y'),
                 'days_in_month' => $date->daysInMonth,
-                'days_elapsed' => min($date->day, $date->daysInMonth)
+                'days_elapsed' => min($date->day, $date->daysInMonth),
             ],
             'summary' => $this->getMonthlySummary($user, $date),
             'daily_breakdown' => $this->getDailyBreakdown($user, $date),
             'category_analysis' => $this->getMonthlyCategoryAnalysis($user, $date),
             'comparison' => $this->getMonthlyComparison($user, $date),
             'projections' => $this->getMonthlyProjections($user, $date),
-            'recommendations' => $this->getMonthlyRecommendations($user, $date)
+            'recommendations' => $this->getMonthlyRecommendations($user, $date),
         ];
 
         return $this->successResponse($report, "Rapport mensuel pour {$date->format('F Y')} généré avec succès");
@@ -157,9 +150,6 @@ class AnalyticsController extends Controller
 
     /**
      * Get yearly financial report
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function yearlyReport(Request $request): JsonResponse
     {
@@ -173,7 +163,7 @@ class AnalyticsController extends Controller
             'category_trends' => $this->getYearlyCategoryTrends($user, $year),
             'goals_achieved' => $this->getYearlyGoalsAchieved($user, $year),
             'gaming_progression' => $this->getYearlyGamingProgression($user, $year),
-            'year_over_year' => $this->getYearOverYearComparison($user, $year)
+            'year_over_year' => $this->getYearOverYearComparison($user, $year),
         ];
 
         return $this->successResponse($report, "Rapport annuel {$year} généré avec succès");
@@ -181,9 +171,6 @@ class AnalyticsController extends Controller
 
     /**
      * Get category breakdown analysis
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function categoryBreakdown(Request $request): JsonResponse
     {
@@ -195,7 +182,7 @@ class AnalyticsController extends Controller
             'summary' => $this->getCategoryBreakdownSummary($user, $period, $type),
             'detailed_breakdown' => $this->getDetailedCategoryBreakdown($user, $period, $type),
             'spending_patterns' => $this->getSpendingPatterns($user, $period, $type),
-            'recommendations' => $this->getCategoryRecommendations($user, $period, $type)
+            'recommendations' => $this->getCategoryRecommendations($user, $period, $type),
         ];
 
         return $this->successResponse($analysis, 'Analyse des catégories générée avec succès');
@@ -203,9 +190,6 @@ class AnalyticsController extends Controller
 
     /**
      * Get spending trends analysis
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function spendingTrends(Request $request): JsonResponse
     {
@@ -217,7 +201,7 @@ class AnalyticsController extends Controller
             'by_category' => $this->getSpendingTrendsByCategory($user, $months),
             'seasonal_patterns' => $this->getSeasonalPatterns($user, $months),
             'anomalies' => $this->detectSpendingAnomalies($user, $months),
-            'predictions' => $this->predictSpending($user, $months)
+            'predictions' => $this->predictSpending($user, $months),
         ];
 
         return $this->successResponse($trends, 'Analyse des tendances générée avec succès');
@@ -225,9 +209,6 @@ class AnalyticsController extends Controller
 
     /**
      * Get budget vs actual analysis
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function budgetAnalysis(Request $request): JsonResponse
     {
@@ -239,7 +220,7 @@ class AnalyticsController extends Controller
             'budget_summary' => $this->getBudgetSummary($user, $period),
             'variance_analysis' => $this->getVarianceAnalysis($user, $period),
             'budget_performance' => $this->getBudgetPerformance($user, $period),
-            'recommendations' => $this->getBudgetRecommendations($user, $period)
+            'recommendations' => $this->getBudgetRecommendations($user, $period),
         ];
 
         return $this->successResponse($analysis, 'Analyse budgétaire générée avec succès');
@@ -263,7 +244,7 @@ class AnalyticsController extends Controller
             'transaction_count' => $query->count(),
             'avg_transaction' => round($query->avg('amount'), 2),
             'largest_expense' => $user->transactions()->where('type', 'expense')->max('amount'),
-            'categories_used' => $query->distinct('category_id')->count()
+            'categories_used' => $query->distinct('category_id')->count(),
         ];
     }
 
@@ -295,7 +276,7 @@ class AnalyticsController extends Controller
             'average_weekly_expenses' => $cashFlow->avg('expenses'),
             'best_week' => $cashFlow->max('net'),
             'worst_week' => $cashFlow->min('net'),
-            'consistency_score' => $this->calculateConsistencyScore($cashFlow)
+            'consistency_score' => $this->calculateConsistencyScore($cashFlow),
         ];
     }
 
@@ -336,12 +317,12 @@ class AnalyticsController extends Controller
                     'transaction_count' => $item->transaction_count,
                     'total_amount' => $item->total_amount,
                     'avg_amount' => round($item->avg_amount, 2),
-                    'percentage' => $totalAmount > 0 ? round(($item->total_amount / $totalAmount) * 100, 2) : 0
+                    'percentage' => $totalAmount > 0 ? round(($item->total_amount / $totalAmount) * 100, 2) : 0,
                 ];
             })->toArray();
 
         } catch (\Exception $e) {
-            \Log::error('Category breakdown error: ' . $e->getMessage());
+            \Log::error('Category breakdown error: '.$e->getMessage());
 
             // Retourner des données par défaut
             return [
@@ -353,7 +334,7 @@ class AnalyticsController extends Controller
                     'transaction_count' => 12,
                     'total_amount' => 650,
                     'avg_amount' => 54.17,
-                    'percentage' => 35.1
+                    'percentage' => 35.1,
                 ],
                 [
                     'category_name' => 'Transport',
@@ -363,8 +344,8 @@ class AnalyticsController extends Controller
                     'transaction_count' => 8,
                     'total_amount' => 420,
                     'avg_amount' => 52.5,
-                    'percentage' => 22.7
-                ]
+                    'percentage' => 22.7,
+                ],
             ];
         }
     }
@@ -384,13 +365,13 @@ class AnalyticsController extends Controller
         $current = [
             'income' => $currentQuery->where('type', 'income')->sum('amount'),
             'expenses' => $currentQuery->where('type', 'expense')->sum('amount'),
-            'transactions' => $currentQuery->count()
+            'transactions' => $currentQuery->count(),
         ];
 
         $previous = [
             'income' => $previousQuery->where('type', 'income')->sum('amount'),
             'expenses' => $previousQuery->where('type', 'expense')->sum('amount'),
-            'transactions' => $previousQuery->count()
+            'transactions' => $previousQuery->count(),
         ];
 
         return [
@@ -400,7 +381,7 @@ class AnalyticsController extends Controller
             'net_change' => $this->calculateChangePercentage(
                 $previous['income'] - $previous['expenses'],
                 $current['income'] - $current['expenses']
-            )
+            ),
         ];
     }
 
@@ -422,7 +403,7 @@ class AnalyticsController extends Controller
             }), 2) : 0,
             'goals_on_track' => $goals->filter(function ($goal) {
                 return $this->isGoalOnTrack($goal);
-            })->count()
+            })->count(),
         ];
     }
 
@@ -438,7 +419,7 @@ class AnalyticsController extends Controller
             'active_streaks' => $user->streaks()->where('is_active', true)->count(),
             'best_streak' => $user->streaks()->max('best_count') ?? 0,
             'xp_this_period' => $this->getXpForPeriod($user, $period),
-            'achievements_this_period' => $this->getAchievementsForPeriod($user, $period)
+            'achievements_this_period' => $this->getAchievementsForPeriod($user, $period),
         ];
     }
 
@@ -463,9 +444,9 @@ class AnalyticsController extends Controller
                 $insights[] = [
                     'type' => 'spending',
                     'title' => 'Principale catégorie de dépenses',
-                    'message' => "Vous dépensez le plus dans la catégorie '{$topExpenseCategory->name}' avec " . number_format($topExpenseCategory->total, 2) . "€",
+                    'message' => "Vous dépensez le plus dans la catégorie '{$topExpenseCategory->name}' avec ".number_format($topExpenseCategory->total, 2).'€',
                     'actionable' => true,
-                    'suggestion' => "Analysez vos dépenses en '{$topExpenseCategory->name}' pour identifier des économies possibles"
+                    'suggestion' => "Analysez vos dépenses en '{$topExpenseCategory->name}' pour identifier des économies possibles",
                 ];
             }
 
@@ -483,12 +464,12 @@ class AnalyticsController extends Controller
                     'title' => 'Objectifs presque atteints',
                     'message' => "Vous êtes proche d'atteindre {$nearGoals->count()} objectif(s) !",
                     'actionable' => true,
-                    'suggestion' => 'Un petit effort supplémentaire pour finaliser ces objectifs'
+                    'suggestion' => 'Un petit effort supplémentaire pour finaliser ces objectifs',
                 ];
             }
 
         } catch (\Exception $e) {
-            \Log::error('Insights generation error: ' . $e->getMessage());
+            \Log::error('Insights generation error: '.$e->getMessage());
 
             // Insights par défaut en cas d'erreur
             $insights[] = [
@@ -496,7 +477,7 @@ class AnalyticsController extends Controller
                 'title' => 'Continuez vos efforts',
                 'message' => 'Votre gestion financière progresse bien !',
                 'actionable' => false,
-                'suggestion' => 'Maintenez vos bonnes habitudes de suivi budgétaire'
+                'suggestion' => 'Maintenez vos bonnes habitudes de suivi budgétaire',
             ];
         }
 
@@ -516,13 +497,13 @@ class AnalyticsController extends Controller
             case 'quarter':
                 $query->whereBetween('transaction_date', [
                     now()->startOfQuarter(),
-                    now()->endOfQuarter()
+                    now()->endOfQuarter(),
                 ]);
                 break;
             case 'year':
                 $query->whereYear('transaction_date', now()->year);
                 break;
-            // 'all' = no filter
+                // 'all' = no filter
         }
     }
 
@@ -539,7 +520,7 @@ class AnalyticsController extends Controller
             case 'quarter':
                 $query->whereBetween('transaction_date', [
                     now()->subQuarter()->startOfQuarter(),
-                    now()->subQuarter()->endOfQuarter()
+                    now()->subQuarter()->endOfQuarter(),
                 ]);
                 break;
             case 'year':
@@ -557,7 +538,7 @@ class AnalyticsController extends Controller
             return [
                 'percentage' => $current > 0 ? 100 : 0,
                 'direction' => $current > 0 ? 'up' : 'stable',
-                'value' => $current - $previous
+                'value' => $current - $previous,
             ];
         }
 
@@ -566,7 +547,7 @@ class AnalyticsController extends Controller
         return [
             'percentage' => abs($percentage),
             'direction' => $percentage > 0 ? 'up' : ($percentage < 0 ? 'down' : 'stable'),
-            'value' => $current - $previous
+            'value' => $current - $previous,
         ];
     }
 
@@ -575,13 +556,15 @@ class AnalyticsController extends Controller
      */
     private function calculateConsistencyScore($cashFlow): float
     {
-        if ($cashFlow->count() < 2) return 0;
+        if ($cashFlow->count() < 2) {
+            return 0;
+        }
 
         $netValues = $cashFlow->pluck('net')->toArray();
         $mean = array_sum($netValues) / count($netValues);
-        $variance = array_sum(array_map(function($x) use ($mean) {
-                return pow($x - $mean, 2);
-            }, $netValues)) / count($netValues);
+        $variance = array_sum(array_map(function ($x) use ($mean) {
+            return pow($x - $mean, 2);
+        }, $netValues)) / count($netValues);
 
         $standardDeviation = sqrt($variance);
 
@@ -597,7 +580,9 @@ class AnalyticsController extends Controller
         $totalDays = Carbon::parse($goal->created_at)->diffInDays(Carbon::parse($goal->target_date));
         $daysPassed = Carbon::parse($goal->created_at)->diffInDays(now());
 
-        if ($totalDays <= 0) return true;
+        if ($totalDays <= 0) {
+            return true;
+        }
 
         $expectedProgress = ($daysPassed / $totalDays) * 100;
         $actualProgress = $goal->getProgressPercentage();
@@ -645,7 +630,7 @@ class AnalyticsController extends Controller
             'income' => 0,
             'expenses' => 0,
             'net' => 0,
-            'transactions_count' => 0
+            'transactions_count' => 0,
         ];
     }
 

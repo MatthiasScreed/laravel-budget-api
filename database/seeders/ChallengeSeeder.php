@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Challenge;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class ChallengeSeeder extends Seeder
@@ -23,11 +22,11 @@ class ChallengeSeeder extends Seeder
                 'criteria' => [
                     'target_amount' => 500,
                     'period' => 'month',
-                    'type' => 'savings'
+                    'type' => 'savings',
                 ],
                 'reward_xp' => 150,
                 'start_date' => now()->startOfMonth(),
-                'end_date' => now()->endOfMonth()
+                'end_date' => now()->endOfMonth(),
             ],
             [
                 'name' => 'Défi transactions quotidiennes',
@@ -37,11 +36,11 @@ class ChallengeSeeder extends Seeder
                 'difficulty' => 'easy',
                 'criteria' => [
                     'streak_type' => 'daily_transaction',
-                    'target_count' => 7
+                    'target_count' => 7,
                 ],
                 'reward_xp' => 100,
                 'start_date' => now(),
-                'end_date' => now()->addDays(7)
+                'end_date' => now()->addDays(7),
             ],
             [
                 'name' => 'Défi budget équilibré',
@@ -51,12 +50,12 @@ class ChallengeSeeder extends Seeder
                 'difficulty' => 'hard',
                 'criteria' => [
                     'balanced_budget' => true,
-                    'period' => 'month'
+                    'period' => 'month',
                 ],
                 'reward_xp' => 300,
                 'start_date' => now()->startOfMonth(),
-                'end_date' => now()->endOfMonth()
-            ]
+                'end_date' => now()->endOfMonth(),
+            ],
         ];
 
         foreach ($challenges as $challengeData) {

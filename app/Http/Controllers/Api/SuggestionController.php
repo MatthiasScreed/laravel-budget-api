@@ -29,6 +29,7 @@ class SuggestionController extends Controller
         ]);
 
         $data['user_id'] = Auth::id();
+
         return Suggestion::create($data);
     }
 
@@ -38,6 +39,7 @@ class SuggestionController extends Controller
     public function show(Suggestion $suggestion)
     {
         $this->authorizeAccess($suggestion);
+
         return $suggestion;
     }
 
@@ -53,6 +55,7 @@ class SuggestionController extends Controller
         ]);
 
         $suggestion->update($data);
+
         return $suggestion;
     }
 
@@ -63,6 +66,7 @@ class SuggestionController extends Controller
     {
         $this->authorizeAccess($suggestion);
         $suggestion->delete();
+
         return response()->noContent();
     }
 

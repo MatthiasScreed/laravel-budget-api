@@ -32,7 +32,7 @@ class CategoryFactory extends Factory
                 'Education',
                 'Restaurants',
                 'Sport',
-                'Technologie'
+                'Technologie',
             ]),
             'description' => $this->faker->optional()->sentence(),
             'type' => $this->faker->randomElement(['income', 'expense']),
@@ -47,11 +47,11 @@ class CategoryFactory extends Factory
                 'shirt',
                 'book',
                 'dumbbell',
-                'laptop'
+                'laptop',
             ]),
             'is_active' => $this->faker->boolean(90), // 90% actives
             'is_system' => false,
-            'sort_order' => $this->faker->numberBetween(0, 100)
+            'sort_order' => $this->faker->numberBetween(0, 100),
         ];
     }
 
@@ -70,8 +70,8 @@ class CategoryFactory extends Factory
                 'Prime',
                 'Allocation',
                 'Pension',
-                'Loyer perçu'
-            ])
+                'Loyer perçu',
+            ]),
         ]);
     }
 
@@ -90,8 +90,8 @@ class CategoryFactory extends Factory
                 'Logement',
                 'Vêtements',
                 'Education',
-                'Restaurants'
-            ])
+                'Restaurants',
+            ]),
         ]);
     }
 

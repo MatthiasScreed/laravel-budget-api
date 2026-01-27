@@ -22,7 +22,7 @@ class GoalContributionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $contributions
+            'data' => $contributions,
         ]);
     }
 
@@ -43,10 +43,10 @@ class GoalContributionController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
-        if (!$goal) {
+        if (! $goal) {
             return response()->json([
                 'success' => false,
-                'message' => 'Objectif financier non trouvé'
+                'message' => 'Objectif financier non trouvé',
             ], 404);
         }
 
@@ -72,6 +72,7 @@ class GoalContributionController extends Controller
         ]);
 
         $goalContribution->update($data);
+
         return $goalContribution;
     }
 
@@ -81,6 +82,7 @@ class GoalContributionController extends Controller
     public function destroy(GoalContribution $goalContribution): \Illuminate\Http\Response
     {
         $goalContribution->delete();
+
         return response()->noContent();
     }
 
@@ -93,7 +95,7 @@ class GoalContributionController extends Controller
         if ($financialGoal->user_id !== $request->user()->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Accès non autorisé à cet objectif financier'
+                'message' => 'Accès non autorisé à cet objectif financier',
             ], 403);
         }
 
@@ -109,15 +111,13 @@ class GoalContributionController extends Controller
                     'id' => $financialGoal->id,
                     'name' => $financialGoal->name,
                     'target_amount' => $financialGoal->target_amount,
-                    'current_amount' => $financialGoal->current_amount
+                    'current_amount' => $financialGoal->current_amount,
                 ],
                 'contributions' => $contributions,
                 'total_contributions' => $contributions->sum('amount'),
-                'contributions_count' => $contributions->count()
+                'contributions_count' => $contributions->count(),
             ],
-            'message' => 'Contributions récupérées avec succès'
+            'message' => 'Contributions récupérées avec succès',
         ]);
     }
-
-
 }

@@ -6,7 +6,6 @@ use App\Models\FinancialGoal;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Messages\DatabaseMessage;
 use Illuminate\Notifications\Notification;
 
 class GoalCreatedNotification extends Notification implements ShouldQueue
@@ -43,7 +42,7 @@ class GoalCreatedNotification extends Notification implements ShouldQueue
             ->greeting("Félicitations {$notifiable->name} ! 🎉")
             ->line("Vous venez de créer un nouvel objectif financier : **{$this->goal->name}**")
             ->line("Montant cible : {$this->goal->target_amount}€")
-            ->line("Date cible : " . $this->goal->target_date->format('d/m/Y'))
+            ->line('Date cible : '.$this->goal->target_date->format('d/m/Y'))
             ->line('🏆 Vous avez gagné 50 XP pour cette action !')
             ->action('Voir mon objectif', url("/goals/{$this->goal->id}"))
             ->line('Bon courage pour atteindre cet objectif ! 💪');
@@ -63,7 +62,7 @@ class GoalCreatedNotification extends Notification implements ShouldQueue
             'goal_id' => $this->goal->id,
             'goal_name' => $this->goal->name,
             'target_amount' => $this->goal->target_amount,
-            'xp_earned' => 50
+            'xp_earned' => 50,
         ];
     }
 }

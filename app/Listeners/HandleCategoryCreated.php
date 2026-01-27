@@ -30,18 +30,18 @@ class HandleCategoryCreated implements ShouldQueue
             // Vérifier les succès liés aux catégories
             $user->checkAndUnlockAchievements();
 
-            \Log::info("Catégorie créée - XP ajoutés", [
+            \Log::info('Catégorie créée - XP ajoutés', [
                 'user_id' => $user->id,
                 'category_id' => $category->id,
                 'category_name' => $category->name,
-                'xp_added' => 25
+                'xp_added' => 25,
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Erreur lors du traitement de la création de catégorie", [
+            \Log::error('Erreur lors du traitement de la création de catégorie', [
                 'user_id' => $user->id,
                 'category_id' => $category->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }

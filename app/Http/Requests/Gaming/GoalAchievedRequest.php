@@ -25,8 +25,8 @@ class GoalAchievedRequest extends FormRequest
             'goal_id' => [
                 'required',
                 'integer',
-                'exists:financial_goals,id'
-            ]
+                'exists:financial_goals,id',
+            ],
         ];
     }
 
@@ -38,7 +38,7 @@ class GoalAchievedRequest extends FormRequest
         return [
             'goal_id.required' => 'L\'ID de l\'objectif est obligatoire.',
             'goal_id.integer' => 'L\'ID de l\'objectif doit être un nombre entier.',
-            'goal_id.exists' => 'Cet objectif n\'existe pas.'
+            'goal_id.exists' => 'Cet objectif n\'existe pas.',
         ];
     }
 

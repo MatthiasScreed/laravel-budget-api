@@ -4,7 +4,6 @@ namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 
 class ChangePasswordRequest extends FormRequest
 {
@@ -32,11 +31,11 @@ class ChangePasswordRequest extends FormRequest
                 config('app.env') === 'testing'
                     ? 'different:current_password' // ✅ Simple en test
                     : [
-                    'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
-                    'different:current_password'
-                ]
+                        'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
+                        'different:current_password',
+                    ],
             ],
-            'revoke_other_tokens' => 'boolean'
+            'revoke_other_tokens' => 'boolean',
         ];
     }
 
@@ -61,7 +60,7 @@ class ChangePasswordRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            if ($this->user() && !Hash::check($this->current_password, $this->user()->password)) {
+            if ($this->user() && ! Hash::check($this->current_password, $this->user()->password)) {
                 $validator->errors()->add('current_password', 'Le mot de passe actuel est incorrect.');
             }
         });

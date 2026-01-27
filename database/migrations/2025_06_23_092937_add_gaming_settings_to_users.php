@@ -47,7 +47,7 @@ return new class extends Migration
                 'gaming_preferences',
                 'gaming_enabled',
                 'gaming_level_visibility',
-                'gaming_last_activity'
+                'gaming_last_activity',
             ]);
         });
     }

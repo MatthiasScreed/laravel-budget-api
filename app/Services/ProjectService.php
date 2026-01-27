@@ -2,16 +2,16 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\FinancialGoal;
-use App\Models\Category;
-use App\Models\GoalContribution;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
+
 class ProjectService
 {
     protected BudgetService $budgetService;
+
     protected GamingService $gamingService;
 
     public function __construct(BudgetService $budgetService, GamingService $gamingService)
@@ -37,22 +37,22 @@ class ProjectService
             'debt_payoff' => $this->getDebtPayoffTemplate(),
             'education' => $this->getEducationTemplate(),
             'home_improvement' => $this->getHomeImprovementTemplate(),
-            'business' => $this->getBusinessTemplate()
+            'business' => $this->getBusinessTemplate(),
         ];
     }
 
     /**
      * Créer un projet basé sur un template
      *
-     * @param User $user Utilisateur propriétaire
-     * @param string $templateType Type de template
-     * @param array $customData Données personnalisées
+     * @param  User  $user  Utilisateur propriétaire
+     * @param  string  $templateType  Type de template
+     * @param  array  $customData  Données personnalisées
      * @return array Projet créé avec objectifs et catégories
      */
     public function createProjectFromTemplate(User $user, string $templateType, array $customData): array
     {
         $template = $this->getTemplate($templateType);
-        if (!$template) {
+        if (! $template) {
             throw new \InvalidArgumentException("Template {$templateType} non trouvé");
         }
 
@@ -60,7 +60,7 @@ class ProjectService
             'goal' => $this->createGoalFromTemplate($user, $template, $customData),
             'categories' => $this->createCategoriesFromTemplate($user, $template),
             'milestones' => $this->generateMilestones($template, $customData),
-            'suggestions' => $this->generateProjectSuggestions($template, $customData)
+            'suggestions' => $this->generateProjectSuggestions($template, $customData),
         ];
 
         // XP pour création de projet
@@ -87,14 +87,14 @@ class ProjectService
                 ['name' => 'Hébergement', 'percentage' => 30, 'icon' => 'home'],
                 ['name' => 'Nourriture', 'percentage' => 15, 'icon' => 'utensils'],
                 ['name' => 'Activités', 'percentage' => 10, 'icon' => 'ticket'],
-                ['name' => 'Divers', 'percentage' => 5, 'icon' => 'shopping-bag']
+                ['name' => 'Divers', 'percentage' => 5, 'icon' => 'shopping-bag'],
             ],
             'default_duration_months' => 12,
             'tips' => [
                 'Réservez vos billets d\'avion 2-3 mois à l\'avance',
                 'Recherchez des hébergements avec annulation gratuite',
-                'Prévoyez 20% de budget supplémentaire pour les imprévus'
-            ]
+                'Prévoyez 20% de budget supplémentaire pour les imprévus',
+            ],
         ];
     }
 
@@ -117,14 +117,14 @@ class ProjectService
                 ['name' => 'Frais d\'agence', 'percentage' => 5, 'icon' => 'users'],
                 ['name' => 'Travaux', 'percentage' => 12, 'icon' => 'hammer'],
                 ['name' => 'Déménagement', 'percentage' => 3, 'icon' => 'truck'],
-                ['name' => 'Garanties', 'percentage' => 2, 'icon' => 'shield']
+                ['name' => 'Garanties', 'percentage' => 2, 'icon' => 'shield'],
             ],
             'default_duration_months' => 36,
             'tips' => [
                 'Visez un apport de 10-20% du prix d\'achat',
                 'Prévoyez 7-8% de frais de notaire',
-                'Négociez les frais d\'agence'
-            ]
+                'Négociez les frais d\'agence',
+            ],
         ];
     }
 
@@ -147,14 +147,14 @@ class ProjectService
                 ['name' => 'Carte grise', 'percentage' => 2, 'icon' => 'id-card'],
                 ['name' => 'Contrôle technique', 'percentage' => 2, 'icon' => 'search'],
                 ['name' => 'Équipements', 'percentage' => 5, 'icon' => 'cog'],
-                ['name' => 'Divers', 'percentage' => 3, 'icon' => 'more-horizontal']
+                ['name' => 'Divers', 'percentage' => 3, 'icon' => 'more-horizontal'],
             ],
             'default_duration_months' => 18,
             'tips' => [
                 'Comparez les assurances avant l\'achat',
                 'Vérifiez l\'historique du véhicule',
-                'Négociez le prix d\'achat'
-            ]
+                'Négociez le prix d\'achat',
+            ],
         ];
     }
 
@@ -177,14 +177,14 @@ class ProjectService
                 ['name' => 'Décoration', 'percentage' => 15, 'icon' => 'star'],
                 ['name' => 'Animation', 'percentage' => 10, 'icon' => 'music'],
                 ['name' => 'Tenue', 'percentage' => 8, 'icon' => 'shirt'],
-                ['name' => 'Divers', 'percentage' => 7, 'icon' => 'more-horizontal']
+                ['name' => 'Divers', 'percentage' => 7, 'icon' => 'more-horizontal'],
             ],
             'default_duration_months' => 12,
             'tips' => [
                 'Réservez le lieu 6-12 mois à l\'avance',
                 'Demandez plusieurs devis pour chaque prestation',
-                'Prévoyez 15% de budget supplémentaire'
-            ]
+                'Prévoyez 15% de budget supplémentaire',
+            ],
         ];
     }
 
@@ -202,14 +202,14 @@ class ProjectService
             'color' => '#8B5CF6',
             'type' => 'emergency_fund',
             'categories' => [
-                ['name' => 'Épargne de précaution', 'percentage' => 100, 'icon' => 'shield']
+                ['name' => 'Épargne de précaution', 'percentage' => 100, 'icon' => 'shield'],
             ],
             'default_duration_months' => 24,
             'tips' => [
                 'Visez 3-6 mois de charges courantes',
                 'Placez sur un livret accessible rapidement',
-                'Alimentez régulièrement, même petit montant'
-            ]
+                'Alimentez régulièrement, même petit montant',
+            ],
         ];
     }
 
@@ -227,14 +227,14 @@ class ProjectService
             'color' => '#DC2626',
             'type' => 'debt_payoff',
             'categories' => [
-                ['name' => 'Remboursement principal', 'percentage' => 100, 'icon' => 'minus-circle']
+                ['name' => 'Remboursement principal', 'percentage' => 100, 'icon' => 'minus-circle'],
             ],
             'default_duration_months' => 24,
             'tips' => [
                 'Priorisez les dettes à taux élevé',
                 'Négociez avec vos créanciers',
-                'Évitez de nouvelles dettes'
-            ]
+                'Évitez de nouvelles dettes',
+            ],
         ];
     }
 
@@ -255,14 +255,14 @@ class ProjectService
                 ['name' => 'Frais de scolarité', 'percentage' => 60, 'icon' => 'book'],
                 ['name' => 'Matériel', 'percentage' => 15, 'icon' => 'laptop'],
                 ['name' => 'Logement', 'percentage' => 20, 'icon' => 'home'],
-                ['name' => 'Transport', 'percentage' => 5, 'icon' => 'car']
+                ['name' => 'Transport', 'percentage' => 5, 'icon' => 'car'],
             ],
             'default_duration_months' => 18,
             'tips' => [
                 'Recherchez les aides disponibles',
                 'Comparez les différents établissements',
-                'Planifiez tôt pour éviter le stress financier'
-            ]
+                'Planifiez tôt pour éviter le stress financier',
+            ],
         ];
     }
 
@@ -284,14 +284,14 @@ class ProjectService
                 ['name' => 'Main d\'œuvre', 'percentage' => 30, 'icon' => 'users'],
                 ['name' => 'Équipements', 'percentage' => 10, 'icon' => 'tool'],
                 ['name' => 'Démarches', 'percentage' => 5, 'icon' => 'file-text'],
-                ['name' => 'Imprévu', 'percentage' => 5, 'icon' => 'alert-triangle']
+                ['name' => 'Imprévu', 'percentage' => 5, 'icon' => 'alert-triangle'],
             ],
             'default_duration_months' => 15,
             'tips' => [
                 'Demandez 3 devis minimum',
                 'Prévoyez 15-20% de budget supplémentaire',
-                'Vérifiez les assurances des artisans'
-            ]
+                'Vérifiez les assurances des artisans',
+            ],
         ];
     }
 
@@ -314,35 +314,36 @@ class ProjectService
                 ['name' => 'Stock initial', 'percentage' => 15, 'icon' => 'package'],
                 ['name' => 'Marketing', 'percentage' => 10, 'icon' => 'megaphone'],
                 ['name' => 'Juridique', 'percentage' => 5, 'icon' => 'scale'],
-                ['name' => 'Divers', 'percentage' => 5, 'icon' => 'more-horizontal']
+                ['name' => 'Divers', 'percentage' => 5, 'icon' => 'more-horizontal'],
             ],
             'default_duration_months' => 18,
             'tips' => [
                 'Réalisez une étude de marché',
                 'Consultez un expert-comptable',
-                'Prévoyez de la trésorerie pour 6 mois'
-            ]
+                'Prévoyez de la trésorerie pour 6 mois',
+            ],
         ];
     }
 
     /**
      * Obtenir un template spécifique
      *
-     * @param string $type Type de template
+     * @param  string  $type  Type de template
      * @return array|null Template ou null
      */
     protected function getTemplate(string $type): ?array
     {
         $templates = $this->getAvailableTemplates();
+
         return $templates[$type] ?? null;
     }
 
     /**
      * Créer un objectif basé sur un template
      *
-     * @param User $user Utilisateur concerné
-     * @param array $template Template à utiliser
-     * @param array $customData Données personnalisées
+     * @param  User  $user  Utilisateur concerné
+     * @param  array  $template  Template à utiliser
+     * @param  array  $customData  Données personnalisées
      * @return FinancialGoal Objectif créé
      */
     protected function createGoalFromTemplate(User $user, array $template, array $customData): FinancialGoal
@@ -361,15 +362,15 @@ class ProjectService
             'color' => $template['color'],
             'icon' => $template['icon'],
             'monthly_target' => $this->calculateMonthlyTarget($targetAmount, $targetDate),
-            'tags' => ['template:' . array_search($template, $this->getAvailableTemplates())]
+            'tags' => ['template:'.array_search($template, $this->getAvailableTemplates())],
         ]);
     }
 
     /**
      * Créer les catégories basées sur un template
      *
-     * @param User $user Utilisateur concerné
-     * @param array $template Template à utiliser
+     * @param  User  $user  Utilisateur concerné
+     * @param  array  $template  Template à utiliser
      * @return Collection Catégories créées
      */
     protected function createCategoriesFromTemplate(User $user, array $template): Collection
@@ -382,7 +383,7 @@ class ProjectService
                 'type' => 'expense',
                 'color' => $this->generateCategoryColor(),
                 'icon' => $categoryData['icon'],
-                'sort_order' => count($categories)
+                'sort_order' => count($categories),
             ]);
 
             $categories->push($category);
@@ -394,13 +395,14 @@ class ProjectService
     /**
      * Calculer l'objectif mensuel
      *
-     * @param float $targetAmount Montant cible
-     * @param Carbon $targetDate Date cible
+     * @param  float  $targetAmount  Montant cible
+     * @param  Carbon  $targetDate  Date cible
      * @return float Objectif mensuel
      */
     protected function calculateMonthlyTarget(float $targetAmount, Carbon $targetDate): float
     {
         $monthsRemaining = max(1, now()->diffInMonths($targetDate));
+
         return $targetAmount / $monthsRemaining;
     }
 
@@ -413,7 +415,7 @@ class ProjectService
     {
         $colors = [
             '#3B82F6', '#EF4444', '#10B981', '#F59E0B',
-            '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
+            '#8B5CF6', '#EC4899', '#14B8A6', '#F97316',
         ];
 
         return $colors[array_rand($colors)];
@@ -422,8 +424,8 @@ class ProjectService
     /**
      * Générer les étapes intermédiaires
      *
-     * @param array $template Template utilisé
-     * @param array $customData Données personnalisées
+     * @param  array  $template  Template utilisé
+     * @param  array  $customData  Données personnalisées
      * @return array Étapes générées
      */
     protected function generateMilestones(array $template, array $customData): array
@@ -436,7 +438,7 @@ class ProjectService
             $milestones[] = [
                 'percentage' => $percentage,
                 'amount' => ($percentage / 100) * $targetAmount,
-                'description' => $this->getMilestoneDescription($percentage, $template['name'])
+                'description' => $this->getMilestoneDescription($percentage, $template['name']),
             ];
         }
 
@@ -446,13 +448,13 @@ class ProjectService
     /**
      * Obtenir la description d'une étape
      *
-     * @param int $percentage Pourcentage de l'étape
-     * @param string $projectName Nom du projet
+     * @param  int  $percentage  Pourcentage de l'étape
+     * @param  string  $projectName  Nom du projet
      * @return string Description
      */
     protected function getMilestoneDescription(int $percentage, string $projectName): string
     {
-        return match($percentage) {
+        return match ($percentage) {
             25 => "Premier quart de votre {$projectName} atteint !",
             50 => "Bravo ! Vous êtes à mi-chemin de votre {$projectName}",
             75 => "Plus que 25% ! Votre {$projectName} approche",
@@ -464,8 +466,8 @@ class ProjectService
     /**
      * Générer des suggestions pour le projet
      *
-     * @param array $template Template utilisé
-     * @param array $customData Données personnalisées
+     * @param  array  $template  Template utilisé
+     * @param  array  $customData  Données personnalisées
      * @return array Suggestions
      */
     protected function generateProjectSuggestions(array $template, array $customData): array
@@ -474,7 +476,7 @@ class ProjectService
 
         // Ajouter des suggestions génériques
         $suggestions[] = "Automatisez vos virements d'épargne";
-        $suggestions[] = "Révisez votre budget mensuel";
+        $suggestions[] = 'Révisez votre budget mensuel';
 
         return $suggestions;
     }
@@ -500,14 +502,14 @@ class ProjectService
                 'education' => 42,
                 'investment' => 38,
                 'debt_payoff' => 35,
-                'business' => 28
+                'business' => 28,
             ];
 
             return collect($templates)
                 ->map(function ($template, $key) use ($popularity) {
                     return array_merge($template, [
                         'key' => $key,
-                        'popularity_score' => $popularity[$key] ?? 0
+                        'popularity_score' => $popularity[$key] ?? 0,
                     ]);
                 })
                 ->sortByDesc('popularity_score')

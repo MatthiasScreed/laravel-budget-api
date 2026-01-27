@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\StreakMilestone;
-use App\Services\GamingService;
 use App\Notifications\StreakMilestoneNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -50,21 +50,21 @@ class HandleStreakMilestone implements ShouldQueue
             // 5. Mettre à jour les statistiques utilisateur
             $this->updateStreakStats($user, $streak, $milestone);
 
-            \Log::info("Jalon de série atteint - Récompenses distribuées", [
+            \Log::info('Jalon de série atteint - Récompenses distribuées', [
                 'user_id' => $user->id,
                 'streak_id' => $streak->id,
                 'streak_type' => $streak->type,
                 'milestone' => $milestone,
                 'bonus_xp' => $bonusXp,
-                'current_count' => $streak->current_count
+                'current_count' => $streak->current_count,
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Erreur lors du traitement du jalon de série", [
+            \Log::error('Erreur lors du traitement du jalon de série', [
                 'user_id' => $user->id,
                 'streak_id' => $streak->id,
                 'milestone' => $milestone,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -85,18 +85,18 @@ class HandleStreakMilestone implements ShouldQueue
                 7 => ['type' => 'badge', 'name' => 'Organisé'],
                 30 => ['type' => 'badge', 'name' => 'Méthodique'],
                 90 => ['type' => 'title', 'name' => 'Gestionnaire Pro'],
-            ]
+            ],
         ];
 
         if (isset($specialRewards[$streak->type][$milestone])) {
             $reward = $specialRewards[$streak->type][$milestone];
 
             // Ici vous pourriez débloquer des badges, titres, etc.
-            \Log::info("Récompense spéciale débloquée", [
+            \Log::info('Récompense spéciale débloquée', [
                 'user_id' => $user->id,
                 'streak_type' => $streak->type,
                 'milestone' => $milestone,
-                'reward' => $reward
+                'reward' => $reward,
             ]);
         }
     }
@@ -115,9 +115,9 @@ class HandleStreakMilestone implements ShouldQueue
             'active_streaks' => $user->streaks()->where('is_active', true)->count(),
         ];
 
-        \Log::info("Statistiques de séries mises à jour", [
+        \Log::info('Statistiques de séries mises à jour', [
             'user_id' => $user->id,
-            'stats' => $stats
+            'stats' => $stats,
         ]);
     }
 
@@ -126,11 +126,11 @@ class HandleStreakMilestone implements ShouldQueue
      */
     public function failed(StreakMilestone $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement StreakMilestone", [
+        \Log::error('Échec du traitement StreakMilestone', [
             'user_id' => $event->user->id,
             'streak_id' => $event->streak->id,
             'milestone' => $event->milestone,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

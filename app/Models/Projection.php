@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Carbon\Carbon;
 
 class Projection extends Model
 {
     use HasFactory, SoftDeletes;
+
     protected $fillable = [
         'financial_goal_id',
         'type',
@@ -24,7 +24,7 @@ class Projection extends Model
         'status',
         'calculated_at',
         'expires_at',
-        'calculation_data'
+        'calculation_data',
     ];
 
     protected $casts = [
@@ -36,47 +36,51 @@ class Projection extends Model
         'confidence_score' => 'decimal:2',
         'assumptions' => 'array',
         'milestones' => 'array',
-        'calculation_data' => 'array'
+        'calculation_data' => 'array',
     ];
 
     protected $dates = [
         'projected_date',
         'calculated_at',
         'expires_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $attributes = [
         'type' => 'realistic',
         'confidence_score' => 0.50,
         'status' => 'active',
-        'calculated_at' => null // Sera défini automatiquement
+        'calculated_at' => null, // Sera défini automatiquement
     ];
 
     /**
      * Types de projections
      */
     public const TYPE_OPTIMISTIC = 'optimistic';
+
     public const TYPE_REALISTIC = 'realistic';
+
     public const TYPE_PESSIMISTIC = 'pessimistic';
 
     public const TYPES = [
         self::TYPE_OPTIMISTIC => 'Optimiste',
         self::TYPE_REALISTIC => 'Réaliste',
-        self::TYPE_PESSIMISTIC => 'Pessimiste'
+        self::TYPE_PESSIMISTIC => 'Pessimiste',
     ];
 
     /**
      * Statuts de projections
      */
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_OUTDATED = 'outdated';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const STATUSES = [
         self::STATUS_ACTIVE => 'Active',
         self::STATUS_OUTDATED => 'Obsolète',
-        self::STATUS_ARCHIVED => 'Archivée'
+        self::STATUS_ARCHIVED => 'Archivée',
     ];
 
     /**
@@ -175,7 +179,7 @@ class Projection extends Model
      */
     public function getIsValidAttribute(): bool
     {
-        return $this->status === self::STATUS_ACTIVE && !$this->is_expired;
+        return $this->status === self::STATUS_ACTIVE && ! $this->is_expired;
     }
 
     /**
@@ -238,7 +242,7 @@ class Projection extends Model
             'recommendation' => $projectionData['recommendation'],
             'calculation_data' => $projectionData['calculation_data'],
             'calculated_at' => now(),
-            'expires_at' => now()->addDays(7) // Expire après 7 jours
+            'expires_at' => now()->addDays(7), // Expire après 7 jours
         ]);
     }
 
@@ -247,7 +251,7 @@ class Projection extends Model
      */
     public function getMilestoneProgress(): array
     {
-        if (!$this->milestones) {
+        if (! $this->milestones) {
             return [];
         }
 
@@ -263,7 +267,7 @@ class Projection extends Model
                 'target_amount' => $targetAmount,
                 'projected_date' => $milestone['date'],
                 'is_reached' => $isReached,
-                'description' => $milestone['description'] ?? null
+                'description' => $milestone['description'] ?? null,
             ];
         }
 
@@ -278,7 +282,7 @@ class Projection extends Model
         parent::boot();
 
         static::creating(function ($projection) {
-            if (!$projection->calculated_at) {
+            if (! $projection->calculated_at) {
                 $projection->calculated_at = now();
             }
         });

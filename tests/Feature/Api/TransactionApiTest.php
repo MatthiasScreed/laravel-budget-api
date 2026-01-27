@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\User;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -14,6 +14,7 @@ class TransactionApiTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Category $category;
 
     protected function setUp(): void
@@ -23,7 +24,7 @@ class TransactionApiTest extends TestCase
         $this->user = User::factory()->create();
         $this->category = Category::factory()->create([
             'user_id' => $this->user->id,
-            'type' => 'expense'
+            'type' => 'expense',
         ]);
     }
 
@@ -38,7 +39,7 @@ class TransactionApiTest extends TestCase
             'type' => 'expense',
             'amount' => 50.00,
             'description' => 'Test transaction',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
@@ -48,13 +49,13 @@ class TransactionApiTest extends TestCase
         if ($response->status() === 201) {
             echo "\n=== SUCCESS! Status 201 ===\n";
             echo "Full Response JSON:\n";
-            echo json_encode($response->json(), JSON_PRETTY_PRINT) . "\n";
+            echo json_encode($response->json(), JSON_PRETTY_PRINT)."\n";
 
             $data = $response->json('data');
-            echo "\nData keys: " . implode(', ', array_keys($data ?: [])) . "\n";
+            echo "\nData keys: ".implode(', ', array_keys($data ?: []))."\n";
 
             if (isset($data['id'])) {
-                echo "ID found: " . $data['id'] . "\n";
+                echo 'ID found: '.$data['id']."\n";
             } else {
                 echo "ID NOT found in data\n";
             }
@@ -78,7 +79,7 @@ class TransactionApiTest extends TestCase
         $this->assertDatabaseHas('transactions', [
             'user_id' => $this->user->id,
             'amount' => 50.00,
-            'description' => 'Test transaction'
+            'description' => 'Test transaction',
         ]);
     }
 
@@ -94,11 +95,11 @@ class TransactionApiTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    '*' => ['id', 'amount', 'description', 'category']
+                    '*' => ['id', 'amount', 'description', 'category'],
                 ],
                 'pagination' => [
-                    'current_page', 'per_page', 'total', 'last_page'
-                ]
+                    'current_page', 'per_page', 'total', 'last_page',
+                ],
             ]);
 
         $this->assertEquals(10, count($response->json('data')));
@@ -111,13 +112,13 @@ class TransactionApiTest extends TestCase
         Transaction::factory()->create([
             'user_id' => $this->user->id,
             'type' => 'income',
-            'amount' => 1000
+            'amount' => 1000,
         ]);
 
         Transaction::factory()->create([
             'user_id' => $this->user->id,
             'type' => 'expense',
-            'amount' => 50
+            'amount' => 50,
         ]);
 
         $response = $this->actingAs($this->user, 'sanctum')

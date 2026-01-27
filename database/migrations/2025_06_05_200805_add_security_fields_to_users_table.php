@@ -38,7 +38,7 @@ return new class extends Migration
                 'two_factor_enabled',
                 'two_factor_secret',
                 'two_factor_recovery_codes',
-                'security_questions'
+                'security_questions',
             ]);
         });
     }

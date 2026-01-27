@@ -30,7 +30,7 @@ return new class extends Migration
             // Métadonnées de traitement
             $table->json('raw_data'); // Données complètes de l'API
             $table->enum('processing_status', [
-                'imported', 'categorized', 'converted', 'ignored', 'duplicate'
+                'imported', 'categorized', 'converted', 'ignored', 'duplicate',
             ])->default('imported');
 
             // IA et catégorisation

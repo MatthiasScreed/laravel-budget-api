@@ -30,54 +30,54 @@ class UpdateProfileRequest extends FormRequest
                 'string',
                 'min:2',
                 'max:255',
-                'regex:/^[a-zA-ZÀ-ÿ\s\-\'\.]+$/'
+                'regex:/^[a-zA-ZÀ-ÿ\s\-\'\.]+$/',
             ],
             'email' => [
                 'sometimes',
                 'string',
                 'email:rfc', // ✅ Plus de validation DNS
                 'max:255',
-                Rule::unique('users', 'email')->ignore($userId)
+                Rule::unique('users', 'email')->ignore($userId),
             ],
             'phone' => [
                 'nullable',
                 'string',
-                'regex:/^(\+33|0)[1-9](\d{8})$/' // Format téléphone français
+                'regex:/^(\+33|0)[1-9](\d{8})$/', // Format téléphone français
             ],
             'date_of_birth' => [
                 'nullable',
                 'date',
                 'before:today',
-                'after:1900-01-01'
+                'after:1900-01-01',
             ],
             'currency' => [
                 'sometimes',
                 'string',
-                'in:EUR,USD,GBP,CHF' // Devises supportées
+                'in:EUR,USD,GBP,CHF', // Devises supportées
             ],
             'timezone' => [
                 'sometimes',
                 'string',
-                'timezone'
+                'timezone',
             ],
             'language' => [
                 'sometimes',
                 'string',
-                'in:fr,en,es,de' // Langues supportées
+                'in:fr,en,es,de', // Langues supportées
             ],
             'preferences' => [
                 'sometimes',
-                'array'
+                'array',
             ],
             'preferences.notifications' => [
                 'sometimes',
-                'array'
+                'array',
             ],
             'preferences.theme' => [
                 'sometimes',
                 'string',
-                'in:light,dark,auto'
-            ]
+                'in:light,dark,auto',
+            ],
         ];
     }
 
@@ -97,7 +97,7 @@ class UpdateProfileRequest extends FormRequest
             'currency.in' => 'La devise doit être EUR, USD, GBP ou CHF.',
             'timezone.timezone' => 'Le fuseau horaire doit être valide.',
             'language.in' => 'La langue doit être fr, en, es ou de.',
-            'preferences.theme.in' => 'Le thème doit être light, dark ou auto.'
+            'preferences.theme.in' => 'Le thème doit être light, dark ou auto.',
         ];
     }
 
@@ -108,7 +108,7 @@ class UpdateProfileRequest extends FormRequest
     {
         if ($this->has('email')) {
             $this->merge([
-                'email' => strtolower($this->email)
+                'email' => strtolower($this->email),
             ]);
         }
     }

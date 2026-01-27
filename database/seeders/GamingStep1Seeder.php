@@ -2,13 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 
 class GamingStep1Seeder extends Seeder
 {
-
     /**
      * Run the database seeds.
      * ❌ ERREUR 2 : Méthode run() était vide !
@@ -24,7 +22,7 @@ class GamingStep1Seeder extends Seeder
     public function test(): void
     {
         echo "🎮 TEST DU SYSTÈME GAMING - ÉTAPE 1 : NIVEAUX\n";
-        echo "=" . str_repeat("=", 50) . "\n";
+        echo '='.str_repeat('=', 50)."\n";
 
         // Créer un utilisateur de test
         $user = $this->createTestUser();
@@ -56,7 +54,7 @@ class GamingStep1Seeder extends Seeder
             'name' => 'Test Gaming Step 1',
             'email' => 'test-gaming-step1@example.com',
             'password' => bcrypt('password'),
-            'email_verified_at' => now()
+            'email_verified_at' => now(),
         ]);
 
         echo "👤 Utilisateur créé : {$user->name}\n";
@@ -76,7 +74,7 @@ class GamingStep1Seeder extends Seeder
         $result = $user->addXp(25);
 
         echo "⭐ XP ajoutés : 25\n";
-        echo "📈 Progression : " . round($result['progress_percentage'], 1) . "%\n";
+        echo '📈 Progression : '.round($result['progress_percentage'], 1)."%\n";
         echo "🎯 XP total : {$result['total_xp']}\n";
 
         // ❌ ERREUR 5 : assert() peut causer des problèmes en production
@@ -101,7 +99,7 @@ class GamingStep1Seeder extends Seeder
         $result = $user->addXp(100); // Devrait faire monter au niveau 2
 
         echo "⭐ XP ajoutés : 100\n";
-        echo "🆙 Montée de niveau : " . ($result['leveled_up'] ? 'OUI' : 'NON') . "\n";
+        echo '🆙 Montée de niveau : '.($result['leveled_up'] ? 'OUI' : 'NON')."\n";
         echo "📊 Nouveau niveau : {$result['new_level']}\n";
         echo "🏆 Nouveau titre : {$user->getTitle()}\n";
 
@@ -127,10 +125,10 @@ class GamingStep1Seeder extends Seeder
 
         echo "📊 Niveau : {$stats['level_info']['current_level']}\n";
         echo "⭐ XP Total : {$stats['level_info']['total_xp']}\n";
-        echo "📈 Progression : " . round($stats['level_info']['progress_percentage'], 1) . "%\n";
+        echo '📈 Progression : '.round($stats['level_info']['progress_percentage'], 1)."%\n";
         echo "🏆 Titre : {$stats['level_info']['title']}\n";
 
-        if (!isset($stats['level_info'])) {
+        if (! isset($stats['level_info'])) {
             throw new \Exception('❌ Les infos de niveau doivent exister');
         }
 
@@ -140,7 +138,6 @@ class GamingStep1Seeder extends Seeder
 
         echo "✅ Test statistiques réussi\n";
     }
-
 
     /**
      * Nettoyer les données de test

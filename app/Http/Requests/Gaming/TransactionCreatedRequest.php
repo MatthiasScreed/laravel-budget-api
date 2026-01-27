@@ -25,8 +25,8 @@ class TransactionCreatedRequest extends FormRequest
             'transaction_id' => [
                 'required',
                 'integer',
-                'exists:transactions,id'
-            ]
+                'exists:transactions,id',
+            ],
         ];
     }
 
@@ -38,7 +38,7 @@ class TransactionCreatedRequest extends FormRequest
         return [
             'transaction_id.required' => 'L\'ID de la transaction est obligatoire.',
             'transaction_id.integer' => 'L\'ID de la transaction doit être un nombre entier.',
-            'transaction_id.exists' => 'Cette transaction n\'existe pas.'
+            'transaction_id.exists' => 'Cette transaction n\'existe pas.',
         ];
     }
 
@@ -57,5 +57,4 @@ class TransactionCreatedRequest extends FormRequest
             }
         });
     }
-
 }

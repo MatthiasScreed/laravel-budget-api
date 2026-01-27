@@ -2,24 +2,22 @@
 
 namespace App\Providers;
 
-use App\Events\CategoryCreated;
-use App\Events\GoalCreated;
-use App\Events\UserRegistered;
-use App\Events\TransactionCreated;
-use App\Events\GoalCompleted;
 use App\Events\AchievementUnlocked;
+use App\Events\CategoryCreated;
+use App\Events\GoalCompleted;
+use App\Events\GoalCreated;
 use App\Events\LevelUp;
 use App\Events\StreakMilestone;
-
-use App\Listeners\HandleCategoryCreated;
-use App\Listeners\HandleGoalCreated;
-use App\Listeners\HandleUserRegistered;
-use App\Listeners\HandleTransactionCreated;
-use App\Listeners\HandleGoalCompleted;
+use App\Events\TransactionCreated;
+use App\Events\UserRegistered;
 use App\Listeners\HandleAchievementUnlocked;
+use App\Listeners\HandleCategoryCreated;
+use App\Listeners\HandleGoalCompleted;
+use App\Listeners\HandleGoalCreated;
 use App\Listeners\HandleLevelUp;
 use App\Listeners\HandleStreakMilestone;
-
+use App\Listeners\HandleTransactionCreated;
+use App\Listeners\HandleUserRegistered;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;

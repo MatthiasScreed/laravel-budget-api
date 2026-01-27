@@ -63,7 +63,7 @@ class GoalCompletedNotification extends Notification implements ShouldQueue
             'goal_name' => $this->goal->name,
             'amount_saved' => $this->goal->current_amount,
             'target_amount' => $this->goal->target_amount,
-            'xp_earned' => 200
+            'xp_earned' => 200,
         ];
     }
 }

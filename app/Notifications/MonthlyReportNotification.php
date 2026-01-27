@@ -13,6 +13,7 @@ class MonthlyReportNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected array $reportData;
+
     protected Carbon $month;
 
     /**
@@ -43,7 +44,7 @@ class MonthlyReportNotification extends Notification implements ShouldQueue
             ->subject("📊 Votre rapport mensuel - {$monthName}")
             ->greeting("Salut {$notifiable->name} ! 📊")
             ->line("Votre rapport financier pour {$monthName} est prêt !")
-            ->line("**Résumé du mois :**")
+            ->line('**Résumé du mois :**')
             ->line("• Revenus : {$this->reportData['income']}€")
             ->line("• Dépenses : {$this->reportData['expenses']}€")
             ->line("• Solde : {$this->reportData['balance']}€")
@@ -65,7 +66,7 @@ class MonthlyReportNotification extends Notification implements ShouldQueue
             'icon' => '📊',
             'action_url' => "/reports/monthly/{$this->month->format('Y-m')}",
             'month' => $this->month->format('Y-m'),
-            'report_data' => $this->reportData
+            'report_data' => $this->reportData,
         ];
     }
 }

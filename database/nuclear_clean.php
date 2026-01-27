@@ -1,13 +1,13 @@
 <?php
+
 // Fichier: database/nuclear_clean.php
 // Usage: php database/nuclear_clean.php
 
-require_once __DIR__ . '/../vendor/autoload.php';
-$app = require_once __DIR__ . '/../bootstrap/app.php';
+require_once __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 try {
     echo "💣 NETTOYAGE NUCLÉAIRE DE LA BASE DE DONNÉES\n";
@@ -18,12 +18,12 @@ try {
     echo "🔓 Contraintes de clés étrangères désactivées\n";
 
     // 2. Obtenir TOUTES les tables existantes
-    $tables = collect(DB::select('SHOW TABLES'))->map(function($table) {
-        return array_values((array)$table)[0];
+    $tables = collect(DB::select('SHOW TABLES'))->map(function ($table) {
+        return array_values((array) $table)[0];
     });
 
-    echo "📋 Tables trouvées: " . $tables->count() . "\n";
-    $tables->each(function($table) {
+    echo '📋 Tables trouvées: '.$tables->count()."\n";
+    $tables->each(function ($table) {
         echo "   - $table\n";
     });
 
@@ -34,7 +34,7 @@ try {
             DB::statement("DROP TABLE IF EXISTS `$table`");
             echo "✅ Supprimé: $table\n";
         } catch (Exception $e) {
-            echo "❌ Erreur sur $table: " . $e->getMessage() . "\n";
+            echo "❌ Erreur sur $table: ".$e->getMessage()."\n";
         }
     }
 
@@ -49,14 +49,14 @@ try {
         echo "👉 Vous pouvez maintenant lancer: php artisan migrate\n";
     } else {
         echo "⚠️  Il reste des tables:\n";
-        $remaining->each(function($table) {
-            $tableName = array_values((array)$table)[0];
+        $remaining->each(function ($table) {
+            $tableName = array_values((array) $table)[0];
             echo "   - $tableName\n";
         });
     }
 
 } catch (Exception $e) {
-    echo "💥 ERREUR CRITIQUE: " . $e->getMessage() . "\n";
+    echo '💥 ERREUR CRITIQUE: '.$e->getMessage()."\n";
     echo "🔧 Tentative de réactivation des contraintes...\n";
 
     try {
@@ -68,5 +68,5 @@ try {
     }
 
     echo "\n🆘 SOLUTION DE SECOURS:\n";
-    echo "mysql -u username -p -e \"DROP DATABASE " . env('DB_DATABASE') . "; CREATE DATABASE " . env('DB_DATABASE') . ";\"\n";
+    echo 'mysql -u username -p -e "DROP DATABASE '.env('DB_DATABASE').'; CREATE DATABASE '.env('DB_DATABASE').";\"\n";
 }

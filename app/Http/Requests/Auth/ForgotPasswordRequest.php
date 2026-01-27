@@ -44,8 +44,7 @@ class ForgotPasswordRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'email' => strtolower($this->email)
+            'email' => strtolower($this->email),
         ]);
     }
-
 }

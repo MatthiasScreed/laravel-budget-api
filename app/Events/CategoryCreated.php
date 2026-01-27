@@ -15,5 +15,4 @@ class CategoryCreated
         public User $user,
         public Category $category
     ) {}
-
 }

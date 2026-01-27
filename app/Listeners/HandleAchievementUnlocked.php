@@ -3,8 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\AchievementUnlocked;
-use App\Services\GamingService;
 use App\Notifications\AchievementUnlockedNotification;
+use App\Services\GamingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -50,20 +50,20 @@ class HandleAchievementUnlocked implements ShouldQueue
                 $this->handleRareAchievementShare($user, $achievement);
             }
 
-            \Log::info("Succès débloqué - Notifications envoyées", [
+            \Log::info('Succès débloqué - Notifications envoyées', [
                 'user_id' => $user->id,
                 'achievement_id' => $achievement->id,
                 'achievement_name' => $achievement->name,
                 'rarity' => $achievement->rarity,
                 'points' => $achievement->points,
-                'rarity_bonus' => $rarityBonus
+                'rarity_bonus' => $rarityBonus,
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Erreur lors du traitement du déblocage de succès", [
+            \Log::error('Erreur lors du traitement du déblocage de succès', [
                 'user_id' => $user->id,
                 'achievement_id' => $achievement->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -73,7 +73,7 @@ class HandleAchievementUnlocked implements ShouldQueue
      */
     private function getRarityBonus($rarity): int
     {
-        return match($rarity) {
+        return match ($rarity) {
             'common' => 0,
             'uncommon' => 25,
             'rare' => 50,
@@ -105,10 +105,10 @@ class HandleAchievementUnlocked implements ShouldQueue
     {
         // Ici vous pourriez intégrer avec des APIs sociales
         // ou envoyer des notifications aux amis, etc.
-        \Log::info("Succès rare débloqué - Partage potentiel", [
+        \Log::info('Succès rare débloqué - Partage potentiel', [
             'user_id' => $user->id,
             'achievement_name' => $achievement->name,
-            'rarity' => $achievement->rarity
+            'rarity' => $achievement->rarity,
         ]);
     }
 
@@ -117,11 +117,10 @@ class HandleAchievementUnlocked implements ShouldQueue
      */
     public function failed(AchievementUnlocked $event, \Throwable $exception): void
     {
-        \Log::error("Échec du traitement AchievementUnlocked", [
+        \Log::error('Échec du traitement AchievementUnlocked', [
             'user_id' => $event->user->id,
             'achievement_id' => $event->achievement->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }
-

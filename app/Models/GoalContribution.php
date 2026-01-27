@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class GoalContribution extends Model
 {
     protected $fillable = [
-        'financial_goal_id', 'transaction_id', 'amount', 'date'
+        'financial_goal_id', 'transaction_id', 'amount', 'date',
     ];
 
     protected $casts = [
-        'date' => 'date'
+        'date' => 'date',
     ];
 
     public function goal()

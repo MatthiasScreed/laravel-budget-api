@@ -116,7 +116,6 @@ return new class extends Migration
             $table->index(['is_automatic', 'next_automatic_date'], 'idx_financial_goals_automatic');
             $table->index(['completed_at'], 'idx_financial_goals_completed');
 
-
         });
     }
 

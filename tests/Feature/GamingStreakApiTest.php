@@ -1,19 +1,20 @@
 <?php
 
-use App\Models\User;
-use App\Models\Streak;
 use App\Models\Category;
+use App\Models\Streak;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class GamingStreakApiTest extends TestCase
 {
     use RefreshDatabase;
 
     protected User $user;
+
     protected Category $category;
 
     protected function setUp(): void
@@ -23,7 +24,7 @@ class GamingStreakApiTest extends TestCase
         $this->user = User::factory()->create([
             'name' => 'Gaming Test User',
             'email' => 'gaming@test.com',
-            'password' => bcrypt('password123')
+            'password' => bcrypt('password123'),
         ]);
 
         Sanctum::actingAs($this->user);
@@ -33,7 +34,7 @@ class GamingStreakApiTest extends TestCase
             'name' => 'Test Category',
             'type' => 'expense',
             'color' => '#3B82F6',
-            'is_active' => true
+            'is_active' => true,
         ]);
     }
 
@@ -49,7 +50,7 @@ class GamingStreakApiTest extends TestCase
         $response->assertOk()
             ->assertJsonStructure([
                 'success',
-                'data'
+                'data',
             ]);
     }
 
@@ -61,7 +62,7 @@ class GamingStreakApiTest extends TestCase
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 1,
             'best_count' => 1,
-            'last_activity_date' => now()->subDay()
+            'last_activity_date' => now()->subDay(),
         ]);
 
         $response = $this->postJson('/api/streaks/daily_login/trigger');
@@ -81,7 +82,7 @@ class GamingStreakApiTest extends TestCase
             'type' => 'expense',
             'amount' => 50.00,
             'description' => 'Test streak transaction',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ]);
 
         $response->assertStatus(201);
@@ -111,7 +112,7 @@ class GamingStreakApiTest extends TestCase
         // Dans tous les cas, vérifier qu'une streak existe
         $this->assertDatabaseHas('streaks', [
             'user_id' => $this->user->id,
-            'type' => Streak::TYPE_DAILY_TRANSACTION
+            'type' => Streak::TYPE_DAILY_TRANSACTION,
         ]);
     }
 
@@ -123,7 +124,7 @@ class GamingStreakApiTest extends TestCase
             'category_id' => $this->category->id,
             'type' => 'expense',
             'amount' => 25.00,
-            'transaction_date' => now()
+            'transaction_date' => now(),
         ]);
 
         Transaction::factory()->create([
@@ -131,7 +132,7 @@ class GamingStreakApiTest extends TestCase
             'category_id' => $this->category->id,
             'type' => 'expense',
             'amount' => 30.00,
-            'transaction_date' => now()
+            'transaction_date' => now(),
         ]);
 
         $this->assertEquals(2, $this->user->transactions()->count());
@@ -145,14 +146,14 @@ class GamingStreakApiTest extends TestCase
             'user_id' => $this->user->id,
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 7,
-            'best_count' => 10
+            'best_count' => 10,
         ]);
 
         Streak::factory()->create([
             'user_id' => $this->user->id,
             'type' => Streak::TYPE_DAILY_TRANSACTION,
             'current_count' => 3,
-            'best_count' => 5
+            'best_count' => 5,
         ]);
 
         $response = $this->getJson('/api/streaks');
@@ -172,7 +173,7 @@ class GamingStreakApiTest extends TestCase
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 7,
             'best_count' => 7,
-            'bonus_claimed_at' => null
+            'bonus_claimed_at' => null,
         ]);
 
         $initialXp = $this->user->getTotalXp();
@@ -193,7 +194,7 @@ class GamingStreakApiTest extends TestCase
             'user_id' => $this->user->id,
             'type' => Streak::TYPE_DAILY_LOGIN,
             'current_count' => 3,
-            'best_count' => 3
+            'best_count' => 3,
         ]);
 
         $response = $this->postJson("/api/streaks/{$streak->type}/claim-bonus");
@@ -216,7 +217,7 @@ class GamingStreakApiTest extends TestCase
                 'user_id' => $user->id,
                 'type' => Streak::TYPE_DAILY_LOGIN,
                 'best_count' => $expectedScores[$index],
-                'current_count' => $expectedScores[$index] - 2
+                'current_count' => $expectedScores[$index] - 2,
             ]);
         }
 
@@ -258,13 +259,13 @@ class GamingStreakApiTest extends TestCase
         Streak::factory()->create([
             'user_id' => $otherUser->id,
             'type' => Streak::TYPE_DAILY_LOGIN,
-            'current_count' => 20
+            'current_count' => 20,
         ]);
 
         Streak::factory()->create([
             'user_id' => $this->user->id,
             'type' => Streak::TYPE_DAILY_LOGIN,
-            'current_count' => 5
+            'current_count' => 5,
         ]);
 
         $this->assertEquals(1, $this->user->streaks()->count());
@@ -291,7 +292,7 @@ class GamingStreakApiTest extends TestCase
             'type' => 'expense',
             'amount' => 100.00,
             'description' => 'Gaming workflow test',
-            'transaction_date' => now()->toDateString()
+            'transaction_date' => now()->toDateString(),
         ]);
 
         // 3. ✅ CORRECTION : Gérer le cas où la streak est déjà créée aujourd'hui

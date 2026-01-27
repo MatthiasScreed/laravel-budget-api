@@ -2,8 +2,8 @@
 
 namespace App\Events;
 
-use App\Models\User;
 use App\Models\Streak;
+use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -14,8 +14,11 @@ class StreakMilestone
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public User $user;
+
     public Streak $streak;
+
     public int $milestone;
+
     public int $bonusXp;
 
     /**
@@ -35,7 +38,7 @@ class StreakMilestone
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('user.' . $this->user->id),
+            new PrivateChannel('user.'.$this->user->id),
         ];
     }
 

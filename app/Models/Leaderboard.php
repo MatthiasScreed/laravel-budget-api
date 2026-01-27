@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Leaderboard extends Model
 {
     protected $fillable = [
-        'type', 'period', 'user_id', 'username', 'score', 'rank', 'metadata', 'period_date'
+        'type', 'period', 'user_id', 'username', 'score', 'rank', 'metadata', 'period_date',
     ];
 
     protected $casts = [
@@ -31,5 +31,4 @@ class Leaderboard extends Model
     {
         return $query->where('period', $period);
     }
-
 }

@@ -226,17 +226,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('user-achievements', [AchievementController::class, 'getUserAchievements'])->name('user-achievements');
 
         // 📊 LEVEL & XP
-        Route::get('level', [UserLevelController::class, 'show'])->name('level.current');
-        Route::post('add-xp', [UserLevelController::class, 'addXP'])->name('level.add-xp');
-        Route::get('xp-events', [UserLevelController::class, 'getXPEvents'])->name('level.xp-events');
-        Route::get('level-rewards', [UserLevelController::class, 'getLevelRewards'])->name('level.rewards');
-        Route::post('level-rewards/{level}/claim', [UserLevelController::class, 'claimRewards'])->name('level.rewards.claim');
-
         Route::prefix('level')->name('level.')->group(function () {
             Route::get('/', [UserLevelController::class, 'show'])->name('show');
-            Route::post('xp', [UserLevelController::class, 'addXP'])->name('xp.add');
+            Route::post('xp', [UserLevelController::class, 'addXP'])->name('add');
             Route::get('history', [UserLevelController::class, 'getXPEvents'])->name('history');
             Route::get('rewards', [UserLevelController::class, 'getLevelRewards'])->name('rewards');
+            Route::post('rewards/{level}/claim', [UserLevelController::class, 'claimRewards'])->name('rewards.claim');
         });
 
         // 🎯 ACTIONS

@@ -21,7 +21,7 @@ class Challenge extends Model
         'reward_items',
         'start_date',
         'end_date',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [
@@ -30,40 +30,45 @@ class Challenge extends Model
         'reward_xp' => 'integer',
         'start_date' => 'date',
         'end_date' => 'date',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
     ];
 
     protected $attributes = [
         'difficulty' => 'medium',
-        'is_active' => true
+        'is_active' => true,
     ];
 
     /**
      * Types de défis
      */
     public const TYPE_PERSONAL = 'personal';
+
     public const TYPE_COMMUNITY = 'community';
+
     public const TYPE_SEASONAL = 'seasonal';
 
     public const TYPES = [
         self::TYPE_PERSONAL => 'Personnel',
         self::TYPE_COMMUNITY => 'Communauté',
-        self::TYPE_SEASONAL => 'Saisonnier'
+        self::TYPE_SEASONAL => 'Saisonnier',
     ];
 
     /**
      * Niveaux de difficulté
      */
     public const DIFFICULTY_EASY = 'easy';
+
     public const DIFFICULTY_MEDIUM = 'medium';
+
     public const DIFFICULTY_HARD = 'hard';
+
     public const DIFFICULTY_EXPERT = 'expert';
 
     public const DIFFICULTIES = [
         self::DIFFICULTY_EASY => 'Facile',
         self::DIFFICULTY_MEDIUM => 'Moyen',
         self::DIFFICULTY_HARD => 'Difficile',
-        self::DIFFICULTY_EXPERT => 'Expert'
+        self::DIFFICULTY_EXPERT => 'Expert',
     ];
 
     /**
@@ -100,6 +105,7 @@ class Challenge extends Model
     public function isAvailable(): bool
     {
         $now = now();
+
         return $this->is_active &&
             $this->start_date <= $now &&
             $this->end_date >= $now;
@@ -110,7 +116,7 @@ class Challenge extends Model
      */
     public function addParticipant(User $user): bool
     {
-        if (!$this->isAvailable()) {
+        if (! $this->isAvailable()) {
             return false;
         }
 
@@ -123,7 +129,7 @@ class Challenge extends Model
             'progress_percentage' => 0,
             'started_at' => now(),
             'created_at' => now(),
-            'updated_at' => now()
+            'updated_at' => now(),
         ]);
 
         return true;
@@ -137,7 +143,7 @@ class Challenge extends Model
         $this->users()->updateExistingPivot($user->id, [
             'progress_percentage' => min(100, $progressPercentage),
             'progress_data' => $progressData,
-            'updated_at' => now()
+            'updated_at' => now(),
         ]);
 
         // Vérifier si le défi est terminé
@@ -155,7 +161,7 @@ class Challenge extends Model
             'status' => 'completed',
             'progress_percentage' => 100,
             'completed_at' => now(),
-            'updated_at' => now()
+            'updated_at' => now(),
         ]);
 
         // Donner les récompenses

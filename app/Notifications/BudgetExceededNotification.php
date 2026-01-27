@@ -13,8 +13,11 @@ class BudgetExceededNotification extends Notification implements ShouldQueue
     use Queueable;
 
     protected Category $category;
+
     protected float $budgetLimit;
+
     protected float $currentSpending;
+
     protected float $percentage;
 
     /**
@@ -42,12 +45,12 @@ class BudgetExceededNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('⚠️ Budget dépassé - ' . $this->category->name)
+            ->subject('⚠️ Budget dépassé - '.$this->category->name)
             ->greeting("Attention {$notifiable->name} !")
             ->line("Votre budget pour la catégorie **{$this->category->name}** a été dépassé.")
             ->line("Budget fixé : {$this->budgetLimit}€")
             ->line("Dépenses actuelles : {$this->currentSpending}€")
-            ->line("Dépassement : " . round($this->percentage - 100, 1) . "%")
+            ->line('Dépassement : '.round($this->percentage - 100, 1).'%')
             ->action('Voir mes dépenses', url("/categories/{$this->category->id}"))
             ->line('Conseil : Analysez vos dernières transactions pour identifier les dépenses importantes.');
     }
@@ -68,7 +71,7 @@ class BudgetExceededNotification extends Notification implements ShouldQueue
             'budget_limit' => $this->budgetLimit,
             'current_spending' => $this->currentSpending,
             'percentage' => round($this->percentage, 1),
-            'severity' => $this->percentage > 150 ? 'high' : 'medium'
+            'severity' => $this->percentage > 150 ? 'high' : 'medium',
         ];
     }
 }

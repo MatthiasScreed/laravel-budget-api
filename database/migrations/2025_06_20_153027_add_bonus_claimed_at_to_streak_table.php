@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Vérifier si la colonne existe déjà
-        if (Schema::hasTable('streaks') && !Schema::hasColumn('streaks', 'bonus_claimed_at')) {
+        if (Schema::hasTable('streaks') && ! Schema::hasColumn('streaks', 'bonus_claimed_at')) {
             Schema::table('streaks', function (Blueprint $table) {
                 $table->timestamp('bonus_claimed_at')->nullable()->after('is_active');
             });
