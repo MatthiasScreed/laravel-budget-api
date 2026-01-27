@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\GamingActionController;
 use App\Http\Controllers\Api\GamingController;
 use App\Http\Controllers\Api\GoalContributionController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectionController;
 use App\Http\Controllers\Api\StreakController;
 use App\Http\Controllers\Api\SuggestionController;
@@ -203,6 +204,35 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::apiResource('financial-goals', FinancialGoalController::class);
     Route::apiResource('goal-contributions', GoalContributionController::class);
+
+    // ==========================================
+    // 📦 PROJECTS - PROJETS COMPLEXES (PROTECTED)
+    // ==========================================
+
+    Route::prefix('projects')->name('projects.')->group(function () {
+        // Templates de projets
+        Route::get('templates', [ProjectController::class, 'getTemplates'])->name('templates');
+
+        // Gestion des projets utilisateur
+        Route::get('/', [ProjectController::class, 'index'])->name('index');
+        Route::post('/', [ProjectController::class, 'store'])->name('store');
+        Route::get('{project}', [ProjectController::class, 'show'])->name('show');
+        Route::put('{project}', [ProjectController::class, 'update'])->name('update');
+        Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
+
+        // Créer depuis un template
+        Route::post('from-template', [ProjectController::class, 'createFromTemplate'])->name('from-template');
+
+        // Actions sur un projet
+        Route::post('{project}/start', [ProjectController::class, 'start'])->name('start');
+        Route::post('{project}/pause', [ProjectController::class, 'pause'])->name('pause');
+        Route::post('{project}/complete', [ProjectController::class, 'complete'])->name('complete');
+        Route::post('{project}/cancel', [ProjectController::class, 'cancel'])->name('cancel');
+
+        // Milestones
+        Route::get('{project}/milestones', [ProjectController::class, 'milestones'])->name('milestones');
+        Route::post('{project}/milestones/{milestone}/complete', [ProjectController::class, 'completeMilestone'])->name('milestone.complete');
+    });
 
     // ==========================================
     // 🎮 GAMING (PROTECTED)
