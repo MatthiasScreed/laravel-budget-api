@@ -24,7 +24,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://vuejs-budget-frontend-uy20rvnb.on-forge.com',
+        'https://vuejs-budget-frontend-uyz0rvnb.on-forge.com/',
         'http://localhost:5173', // Pour le dev local
     ],
 
