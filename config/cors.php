@@ -23,22 +23,19 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // ⚠️ Pour le dev, ensuite restreindre
-
-    'allowed_origins_patterns' => [
-        '/^https:\/\/.*\.sharedwithexpose\.com$/',  // ✅ Pattern pour Expose
-        '/^https:\/\/coinquest.*\.sharedwithexpose\.com$/',
+    'allowed_origins' => [
+        'https://vuejs-budget-frontend-uy20rvnb.on-forge.com',
+        'http://localhost:5173', // Pour le dev local
     ],
+
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [
-        'Authorization',
-        'Content-Type',
-    ],
+    'exposed_headers' => [],
 
     'max_age' => 0,
 
-    'supports_credentials' => true,  // ✅ Important pour Sanctum
+    'supports_credentials' => true,
 
 ];
