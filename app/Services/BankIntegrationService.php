@@ -13,37 +13,17 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * ✅ Bridge API v3 2025-01-15 - VERSION OPTIMISÉE
- * Documentation : https://docs.bridgeapi.io/docs/user-creation-authentication
- *
- * FLOW D'AUTHENTIFICATION OBLIGATOIRE :
- * 1. POST /v3/aggregation/users (créer utilisateur Bridge)
- * 2. POST /v3/aggregation/authorization/token (obtenir Bearer token)
- * 3. POST /v3/aggregation/connect-sessions (créer session avec Bearer)
- *
- * OPTIMISATIONS APPLIQUÉES :
- * - Batch processing pour import (15x plus rapide)
- * - Cache intelligent des tokens (2h)
- * - Catégorisation automatique post-import
- * - Gestion robuste des erreurs
+ * ✅ Bridge API v3 2025-01-15 - VERSION CORRIGÉE
+ * FIX: Gestion des utilisateurs Bridge existants
  */
 class BankIntegrationService
 {
     private GamingService $gamingService;
-
     private BudgetService $budgetService;
-
     private string $baseUrl;
-
     private string $version;
-
     private string $clientId;
-
     private string $clientSecret;
-
-    /**
-     * Taille des chunks pour l'import (100-200 optimal)
-     */
     protected int $chunkSize = 100;
 
     public function __construct(
@@ -60,48 +40,173 @@ class BankIntegrationService
     }
 
     // ==========================================
-    // AUTHENTIFICATION BRIDGE API
+    // ✅ AUTHENTIFICATION BRIDGE API - CORRIGÉE
     // ==========================================
 
     /**
-     * ✅ ÉTAPE 1 : Créer un utilisateur Bridge
+     * ✅ ÉTAPE 1 : Créer OU récupérer un utilisateur Bridge
+     * FIX: Gère le cas "already_exists"
      */
     public function createBridgeUser(User $user): array
     {
         $this->verifyBridgeConfig();
 
-        Log::info('📡 Création utilisateur Bridge', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-        ]);
-
-        $response = Http::withHeaders($this->getBaseHeaders())
-            ->post("{$this->baseUrl}/v3/aggregation/users", [
-                'external_user_id' => (string) $user->id,
+        // 1️⃣ Si l'utilisateur a déjà un bridge_user_uuid, le retourner
+        if ($user->bridge_user_uuid) {
+            Log::info('✅ Utilisateur Bridge déjà existant (from DB)', [
+                'user_id' => $user->id,
+                'bridge_uuid' => $user->bridge_user_uuid,
             ]);
 
-        if (! $response->successful()) {
-            $error = $response->json();
-            Log::error('❌ Erreur création utilisateur Bridge', [
-                'status' => $response->status(),
-                'error' => $error,
+            // Vérifier que l'UUID existe toujours chez Bridge
+            $existingUser = $this->getBridgeUser($user->bridge_user_uuid);
+
+            if ($existingUser) {
+                return $existingUser;
+            }
+
+            // Si l'UUID n'existe plus chez Bridge, on va en créer un nouveau
+            Log::warning('⚠️ UUID Bridge stocké mais introuvable, recréation...', [
+                'user_id' => $user->id,
             ]);
-            throw new \Exception('Failed to create Bridge user: '.($error['message'] ?? $response->body()));
+            $user->update(['bridge_user_uuid' => null]);
         }
 
-        $data = $response->json();
+        $externalUserId = (string) $user->id;
 
-        // Stocker le UUID Bridge dans la BDD
-        $user->update([
-            'bridge_user_uuid' => $data['uuid'],
+        Log::info('🔡 Création utilisateur Bridge', [
+            'user_id' => $user->id,
+            'external_user_id' => $externalUserId,
         ]);
 
-        Log::info('✅ Utilisateur Bridge créé', [
-            'bridge_uuid' => $data['uuid'],
-            'external_user_id' => $data['external_user_id'],
+        // 2️⃣ Essayer de créer l'utilisateur
+        $response = Http::withHeaders($this->getBaseHeaders())
+            ->post("{$this->baseUrl}/v3/aggregation/users", [
+                'external_user_id' => $externalUserId,
+            ]);
+
+        // 3️⃣ Si succès, sauvegarder et retourner
+        if ($response->successful()) {
+            $data = $response->json();
+
+            $user->update([
+                'bridge_user_uuid' => $data['uuid'],
+            ]);
+
+            Log::info('✅ Utilisateur Bridge créé', [
+                'bridge_uuid' => $data['uuid'],
+                'external_user_id' => $data['external_user_id'],
+            ]);
+
+            return $data;
+        }
+
+        // 4️⃣ Si erreur "already_exists", récupérer l'utilisateur existant
+        $error = $response->json();
+
+        if (isset($error['errors'][0]['code']) &&
+            $error['errors'][0]['code'] === 'users.creation.already_exists_with_external_user_id') {
+
+            Log::info('ℹ️ Utilisateur Bridge existe déjà, récupération...', [
+                'external_user_id' => $externalUserId,
+            ]);
+
+            return $this->findBridgeUserByExternalId($externalUserId, $user);
+        }
+
+        // 5️⃣ Autre erreur
+        Log::error('❌ Erreur création utilisateur Bridge', [
+            'status' => $response->status(),
+            'error' => $error,
         ]);
 
-        return $data;
+        throw new \Exception('Failed to create Bridge user: ' . ($error['message'] ?? $response->body()));
+    }
+
+    /**
+     * ✅ NOUVEAU : Récupérer un utilisateur Bridge par UUID
+     */
+    private function getBridgeUser(string $bridgeUuid): ?array
+    {
+        try {
+            Log::info('🔍 Vérification utilisateur Bridge', [
+                'bridge_uuid' => $bridgeUuid,
+            ]);
+
+            $response = Http::withHeaders($this->getBaseHeaders())
+                ->get("{$this->baseUrl}/v3/aggregation/users/{$bridgeUuid}");
+
+            if ($response->successful()) {
+                Log::info('✅ Utilisateur Bridge trouvé');
+                return $response->json();
+            }
+
+            Log::warning('⚠️ Utilisateur Bridge introuvable', [
+                'status' => $response->status(),
+            ]);
+
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('❌ Erreur vérification utilisateur Bridge', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * ✅ NOUVEAU : Trouver un utilisateur Bridge par external_user_id
+     */
+    private function findBridgeUserByExternalId(string $externalUserId, User $user): array
+    {
+        try {
+            Log::info('🔎 Recherche utilisateur Bridge par external_id', [
+                'external_user_id' => $externalUserId,
+            ]);
+
+            // Liste tous les utilisateurs Bridge
+            $response = Http::withHeaders($this->getBaseHeaders())
+                ->get("{$this->baseUrl}/v3/aggregation/users");
+
+            if (!$response->successful()) {
+                throw new \Exception('Failed to list Bridge users: ' . $response->body());
+            }
+
+            $users = $response->json()['resources'] ?? [];
+
+            // Chercher notre utilisateur par external_user_id
+            foreach ($users as $bridgeUser) {
+                if (isset($bridgeUser['external_user_id']) &&
+                    $bridgeUser['external_user_id'] === $externalUserId) {
+
+                    $bridgeUuid = $bridgeUser['uuid'];
+
+                    Log::info('✅ Utilisateur Bridge trouvé par external_id', [
+                        'bridge_uuid' => $bridgeUuid,
+                        'external_user_id' => $externalUserId,
+                    ]);
+
+                    // Sauvegarder dans la DB Laravel
+                    $user->update([
+                        'bridge_user_uuid' => $bridgeUuid,
+                    ]);
+
+                    return $bridgeUser;
+                }
+            }
+
+            // Si vraiment introuvable (cas très rare)
+            throw new \Exception("Bridge user with external_id '{$externalUserId}' not found in list");
+
+        } catch (\Exception $e) {
+            Log::error('❌ Erreur recherche utilisateur Bridge', [
+                'external_user_id' => $externalUserId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 
     /**
@@ -124,7 +229,7 @@ class BankIntegrationService
         }
 
         // S'assurer que l'utilisateur Bridge existe
-        if (! $user->bridge_user_uuid) {
+        if (!$user->bridge_user_uuid) {
             Log::info('⚠️ Utilisateur Bridge manquant, création...', [
                 'user_id' => $user->id,
             ]);
@@ -132,7 +237,7 @@ class BankIntegrationService
             $user->refresh();
         }
 
-        Log::info('📡 Obtention token Bridge', [
+        Log::info('🔡 Obtention token Bridge', [
             'user_id' => $user->id,
             'bridge_uuid' => $user->bridge_user_uuid,
         ]);
@@ -142,7 +247,7 @@ class BankIntegrationService
                 'user_uuid' => $user->bridge_user_uuid,
             ]);
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             // Si utilisateur introuvable sur Bridge, le recréer
             if ($response->status() === 404) {
                 Log::warning('⚠️ Utilisateur Bridge introuvable, recréation...', [
@@ -159,7 +264,7 @@ class BankIntegrationService
                 'status' => $response->status(),
                 'error' => $error,
             ]);
-            throw new \Exception('Failed to get Bridge access token: '.($error['message'] ?? $response->body()));
+            throw new \Exception('Failed to get Bridge access token: ' . ($error['message'] ?? $response->body()));
         }
 
         $data = $response->json();
@@ -176,7 +281,6 @@ class BankIntegrationService
         Log::info('✅ Token Bridge obtenu', [
             'user_id' => $user->id,
             'expires_at' => $data['expires_at'],
-            'token_length' => strlen($data['access_token']),
         ]);
 
         return $data['access_token'];
@@ -195,14 +299,12 @@ class BankIntegrationService
         ];
 
         // ✅ callback_url : OPTIONNEL mais doit être whitelisté dans Bridge Dashboard
-        if (! empty($options['callback_url'])) {
+        if (!empty($options['callback_url'])) {
             $body['callback_url'] = $options['callback_url'];
 
             Log::info('⚠️ callback_url fourni, assurez-vous qu\'il est whitelisté dans Bridge Dashboard', [
                 'callback_url' => $options['callback_url'],
             ]);
-        } else {
-            Log::info('ℹ️ callback_url omis, Bridge utilisera la config par défaut du dashboard');
         }
 
         // Optionnel : account_types ('payment' ou 'all')
@@ -220,7 +322,7 @@ class BankIntegrationService
             $body['provider_id'] = (int) $options['provider_id'];
         }
 
-        Log::info('📡 Création Connect Session', [
+        Log::info('🔡 Création Connect Session', [
             'user_id' => $user->id,
             'body' => $body,
         ]);
@@ -228,7 +330,7 @@ class BankIntegrationService
         $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             // Gestion expiration token (401)
             if ($response->status() === 401) {
                 Log::warning('⚠️ Token expiré, refresh...', ['user_id' => $user->id]);
@@ -240,24 +342,26 @@ class BankIntegrationService
                     ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
             }
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 $error = $response->json();
 
                 // Message spécifique pour callback_url_not_whitelisted
-                if (isset($error['errors'][0]['code']) && $error['errors'][0]['code'] === 'connect_session.callback_url_not_whitelisted') {
+                if (isset($error['errors'][0]['code']) &&
+                    $error['errors'][0]['code'] === 'connect_session.callback_url_not_whitelisted') {
+
                     Log::error('❌ callback_url non whitelisté dans Bridge Dashboard', [
                         'callback_url' => $options['callback_url'] ?? 'none',
-                        'solution' => 'Ajoutez le domaine dans Bridge Dashboard > Connect > Domaines autorisés',
                     ]);
+
                     throw new \Exception('callback_url not whitelisted in Bridge Dashboard. Please add your domain in Dashboard > Connect > Allowed domains');
                 }
 
                 Log::error('❌ Erreur Connect Session', [
                     'status' => $response->status(),
                     'error' => $error,
-                    'body_sent' => $body,
                 ]);
-                throw new \Exception('Failed to create connect session: '.($error['message'] ?? $response->body()));
+
+                throw new \Exception('Failed to create connect session: ' . ($error['message'] ?? $response->body()));
             }
         }
 
@@ -276,7 +380,7 @@ class BankIntegrationService
     // ==========================================
 
     /**
-     * ✅ Initier connexion bancaire (wrapper pour compatibility)
+     * ✅ Initier connexion bancaire
      */
     public function initiateBankConnection(User $user, array $data): array
     {
@@ -289,7 +393,7 @@ class BankIntegrationService
             ];
 
             // ✅ callback_url : seulement si explicitement fourni
-            if (! empty($data['return_url'])) {
+            if (!empty($data['return_url'])) {
                 $options['callback_url'] = $data['return_url'];
             }
 
@@ -330,8 +434,8 @@ class BankIntegrationService
         $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/items");
 
-        if (! $response->successful()) {
-            throw new \Exception('Failed to fetch items: '.$response->body());
+        if (!$response->successful()) {
+            throw new \Exception('Failed to fetch items: ' . $response->body());
         }
 
         return $response->json()['resources'] ?? [];
@@ -347,8 +451,8 @@ class BankIntegrationService
         $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/accounts");
 
-        if (! $response->successful()) {
-            throw new \Exception('Failed to fetch accounts: '.$response->body());
+        if (!$response->successful()) {
+            throw new \Exception('Failed to fetch accounts: ' . $response->body());
         }
 
         return $response->json()['resources'] ?? [];
@@ -364,28 +468,23 @@ class BankIntegrationService
         $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/transactions", $filters);
 
-        if (! $response->successful()) {
-            throw new \Exception('Failed to fetch transactions: '.$response->body());
+        if (!$response->successful()) {
+            throw new \Exception('Failed to fetch transactions: ' . $response->body());
         }
 
         return $response->json()['resources'] ?? [];
     }
 
     // ==========================================
-    // BATCH PROCESSING - OPTIMISATION
+    // BATCH PROCESSING
     // ==========================================
 
-    /**
-     * ✅ Synchroniser les transactions d'un utilisateur
-     * OPTIMISÉ avec batch processing (15x plus rapide)
-     */
     public function syncTransactions(User $user): Batch
     {
         Log::info('🚀 Démarrage sync transactions', [
             'user_id' => $user->id,
         ]);
 
-        // Récupérer les comptes depuis Bridge API
         $accounts = $this->getAccountsFromBridge($user);
 
         if (empty($accounts)) {
@@ -393,7 +492,6 @@ class BankIntegrationService
             throw new \Exception('Aucun compte bancaire trouvé');
         }
 
-        // Créer les jobs d'import
         $jobs = [];
         $totalTransactions = 0;
 
@@ -401,16 +499,10 @@ class BankIntegrationService
             $transactions = $this->getTransactionsFromBridge($user, $account['id']);
 
             if (empty($transactions)) {
-                Log::info('ℹ️ Aucune transaction pour le compte', [
-                    'account_id' => $account['id'],
-                ]);
-
                 continue;
             }
 
             $totalTransactions += count($transactions);
-
-            // Découper en chunks de 100
             $chunks = collect($transactions)->chunk($this->chunkSize);
 
             foreach ($chunks as $chunk) {
@@ -423,132 +515,58 @@ class BankIntegrationService
         }
 
         if (empty($jobs)) {
-            Log::warning('⚠️ Aucune transaction à importer', ['user_id' => $user->id]);
             throw new \Exception('Aucune transaction à importer');
         }
 
-        Log::info('📦 Jobs d\'import créés', [
-            'user_id' => $user->id,
-            'total_transactions' => $totalTransactions,
-            'total_jobs' => count($jobs),
-            'chunk_size' => $this->chunkSize,
-        ]);
-
-        // Dispatcher le batch avec callbacks
         return Bus::batch($jobs)
-            ->then(function (Batch $batch) use ($user, $totalTransactions) {
-                // ✅ Une fois l'import terminé, lancer la catégorisation
+            ->then(function (Batch $batch) use ($user) {
                 AutoCategorizeTransactions::dispatch($user->id)
                     ->onQueue('categorization');
-
-                Log::info('✅ Import terminé, catégorisation lancée', [
-                    'user_id' => $user->id,
-                    'batch_id' => $batch->id,
-                    'total_transactions' => $totalTransactions,
-                ]);
-            })
-            ->catch(function (Batch $batch, \Throwable $e) use ($user) {
-                Log::error('❌ Échec du batch', [
-                    'user_id' => $user->id,
-                    'batch_id' => $batch->id,
-                    'error' => $e->getMessage(),
-                ]);
-            })
-            ->finally(function (Batch $batch) use ($user) {
-                // Invalider le cache utilisateur (même en cas d'échec partiel)
-                Cache::tags(["user:{$user->id}"])->flush();
-
-                Log::info('🏁 Batch terminé', [
-                    'user_id' => $user->id,
-                    'batch_id' => $batch->id,
-                ]);
             })
             ->name("Import Bridge - User {$user->id}")
             ->onQueue('imports')
-            ->allowFailures() // Continuer même si certains jobs échouent
+            ->allowFailures()
             ->dispatch();
     }
 
-    /**
-     * ✅ Récupérer les comptes depuis Bridge API
-     * (Implémentation manquante)
-     */
     protected function getAccountsFromBridge(User $user): array
     {
         try {
-            Log::info('📡 Récupération des comptes Bridge', [
-                'user_id' => $user->id,
-            ]);
-
-            $accounts = $this->getAccounts($user);
-
-            Log::info('✅ Comptes récupérés', [
-                'user_id' => $user->id,
-                'count' => count($accounts),
-            ]);
-
-            return $accounts;
-
+            return $this->getAccounts($user);
         } catch (\Exception $e) {
             Log::error('❌ Erreur récupération comptes', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
-
             return [];
         }
     }
 
-    /**
-     * ✅ Récupérer les transactions d'un compte depuis Bridge API
-     * (Implémentation manquante)
-     */
     protected function getTransactionsFromBridge(User $user, int $accountId): array
     {
         try {
-            Log::info('📡 Récupération transactions', [
-                'user_id' => $user->id,
-                'account_id' => $accountId,
-            ]);
-
-            // Filtre : 90 derniers jours par défaut
             $filters = [
                 'account_ids' => [$accountId],
                 'since' => now()->subDays(90)->toISOString(),
-                'limit' => 500, // Max par requête Bridge
+                'limit' => 500,
             ];
 
-            $transactions = $this->getTransactions($user, $filters);
-
-            Log::info('✅ Transactions récupérées', [
-                'account_id' => $accountId,
-                'count' => count($transactions),
-            ]);
-
-            return $transactions;
-
+            return $this->getTransactions($user, $filters);
         } catch (\Exception $e) {
             Log::error('❌ Erreur récupération transactions', [
                 'account_id' => $accountId,
                 'error' => $e->getMessage(),
             ]);
-
             return [];
         }
     }
 
-    /**
-     * ✅ Obtenir le statut d'un batch d'import
-     */
     public function getBatchStatus(string $batchId): array
     {
         $batch = Bus::findBatch($batchId);
 
-        if (! $batch) {
-            return [
-                'status' => 'not_found',
-                'message' => 'Batch introuvable',
-            ];
+        if (!$batch) {
+            return ['status' => 'not_found'];
         }
 
         return [
@@ -558,70 +576,33 @@ class BankIntegrationService
             'processed_jobs' => $batch->processedJobs(),
             'failed_jobs' => $batch->failedJobs,
             'progress' => $batch->progress(),
-            'finished' => $batch->finished(),
-            'cancelled' => $batch->cancelled(),
         ];
     }
 
-    /**
-     * Label du statut du batch
-     */
     protected function getBatchStatusLabel(Batch $batch): string
     {
-        if ($batch->cancelled()) {
-            return 'cancelled';
-        }
-
-        if ($batch->finished()) {
-            return 'completed';
-        }
-
-        if ($batch->failedJobs > 0) {
-            return 'partial_failure';
-        }
-
+        if ($batch->cancelled()) return 'cancelled';
+        if ($batch->finished()) return 'completed';
+        if ($batch->failedJobs > 0) return 'partial_failure';
         return 'processing';
     }
 
-    /**
-     * ✅ Annuler un batch en cours
-     */
-    public function cancelBatch(string $batchId): bool
-    {
-        $batch = Bus::findBatch($batchId);
-
-        if (! $batch) {
-            return false;
-        }
-
-        $batch->cancel();
-
-        return true;
-    }
-
-    /**
-     * ✅ Obtenir statut connexions utilisateur
-     */
     public function getUserConnectionsStatus(User $user): array
     {
         return $user->bankConnections()
             ->get()
-            ->map(fn ($c) => [
+            ->map(fn($c) => [
                 'id' => $c->id,
                 'bank_name' => $c->bank_name,
                 'status' => $c->status,
                 'last_sync' => $c->last_sync_at?->diffForHumans(),
-                'transactions_count' => $c->importedTransactions()->count(),
             ])
             ->toArray();
     }
 
-    /**
-     * ✅ Supprimer un utilisateur Bridge
-     */
     public function deleteBridgeUser(User $user): bool
     {
-        if (! $user->bridge_user_uuid) {
+        if (!$user->bridge_user_uuid) {
             return true;
         }
 
@@ -631,7 +612,6 @@ class BankIntegrationService
         if ($response->successful()) {
             Cache::forget("bridge_token_{$user->id}");
             $user->update(['bridge_user_uuid' => null]);
-            Log::info('✅ Utilisateur Bridge supprimé', ['user_id' => $user->id]);
         }
 
         return $response->successful();
@@ -641,9 +621,6 @@ class BankIntegrationService
     // MÉTHODES PRIVÉES
     // ==========================================
 
-    /**
-     * Vérifier configuration Bridge
-     */
     private function verifyBridgeConfig(): void
     {
         if (empty($this->clientId)) {
@@ -655,9 +632,6 @@ class BankIntegrationService
         }
     }
 
-    /**
-     * Headers de base (sans Bearer token)
-     */
     private function getBaseHeaders(): array
     {
         return [
@@ -669,13 +643,10 @@ class BankIntegrationService
         ];
     }
 
-    /**
-     * Headers authentifiés (avec Bearer token)
-     */
     private function getAuthenticatedHeaders(string $accessToken): array
     {
         return array_merge($this->getBaseHeaders(), [
-            'Authorization' => 'Bearer '.$accessToken,
+            'Authorization' => 'Bearer ' . $accessToken,
         ]);
     }
 }
