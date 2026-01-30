@@ -19,12 +19,20 @@ use Illuminate\Support\Facades\Log;
 class BankIntegrationService
 {
     private GamingService $gamingService;
+
     private BudgetService $budgetService;
+
     private string $baseUrl;
+
     private string $version;
+
     private string $clientId;
+
     private string $clientSecret;
+
     protected int $chunkSize = 100;
+
+    protected int $timeout = 30;
 
     public function __construct(
         GamingService $gamingService,
@@ -80,7 +88,7 @@ class BankIntegrationService
         ]);
 
         // 2️⃣ Essayer de créer l'utilisateur
-        $response = Http::withHeaders($this->getBaseHeaders())
+        $response = $this->http()->withHeaders($this->getBaseHeaders())
             ->post("{$this->baseUrl}/v3/aggregation/users", [
                 'external_user_id' => $externalUserId,
             ]);
@@ -120,7 +128,7 @@ class BankIntegrationService
             'error' => $error,
         ]);
 
-        throw new \Exception('Failed to create Bridge user: ' . ($error['message'] ?? $response->body()));
+        throw new \Exception('Failed to create Bridge user: '.($error['message'] ?? $response->body()));
     }
 
     /**
@@ -133,11 +141,12 @@ class BankIntegrationService
                 'bridge_uuid' => $bridgeUuid,
             ]);
 
-            $response = Http::withHeaders($this->getBaseHeaders())
+            $response = $this->http()->withHeaders($this->getBaseHeaders())
                 ->get("{$this->baseUrl}/v3/aggregation/users/{$bridgeUuid}");
 
             if ($response->successful()) {
                 Log::info('✅ Utilisateur Bridge trouvé');
+
                 return $response->json();
             }
 
@@ -151,6 +160,7 @@ class BankIntegrationService
             Log::error('❌ Erreur vérification utilisateur Bridge', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -166,11 +176,11 @@ class BankIntegrationService
             ]);
 
             // Liste tous les utilisateurs Bridge
-            $response = Http::withHeaders($this->getBaseHeaders())
+            $response = $this->http()->withHeaders($this->getBaseHeaders())
                 ->get("{$this->baseUrl}/v3/aggregation/users");
 
-            if (!$response->successful()) {
-                throw new \Exception('Failed to list Bridge users: ' . $response->body());
+            if (! $response->successful()) {
+                throw new \Exception('Failed to list Bridge users: '.$response->body());
             }
 
             $users = $response->json()['resources'] ?? [];
@@ -198,7 +208,6 @@ class BankIntegrationService
 
             // Si vraiment introuvable (cas très rare)
             throw new \Exception("Bridge user with external_id '{$externalUserId}' not found in list");
-
         } catch (\Exception $e) {
             Log::error('❌ Erreur recherche utilisateur Bridge', [
                 'external_user_id' => $externalUserId,
@@ -229,7 +238,7 @@ class BankIntegrationService
         }
 
         // S'assurer que l'utilisateur Bridge existe
-        if (!$user->bridge_user_uuid) {
+        if (! $user->bridge_user_uuid) {
             Log::info('⚠️ Utilisateur Bridge manquant, création...', [
                 'user_id' => $user->id,
             ]);
@@ -242,12 +251,12 @@ class BankIntegrationService
             'bridge_uuid' => $user->bridge_user_uuid,
         ]);
 
-        $response = Http::withHeaders($this->getBaseHeaders())
+        $response = $this->http()->withHeaders($this->getBaseHeaders())
             ->post("{$this->baseUrl}/v3/aggregation/authorization/token", [
                 'user_uuid' => $user->bridge_user_uuid,
             ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             // Si utilisateur introuvable sur Bridge, le recréer
             if ($response->status() === 404) {
                 Log::warning('⚠️ Utilisateur Bridge introuvable, recréation...', [
@@ -264,7 +273,7 @@ class BankIntegrationService
                 'status' => $response->status(),
                 'error' => $error,
             ]);
-            throw new \Exception('Failed to get Bridge access token: ' . ($error['message'] ?? $response->body()));
+            throw new \Exception('Failed to get Bridge access token: '.($error['message'] ?? $response->body()));
         }
 
         $data = $response->json();
@@ -299,7 +308,7 @@ class BankIntegrationService
         ];
 
         // ✅ callback_url : OPTIONNEL mais doit être whitelisté dans Bridge Dashboard
-        if (!empty($options['callback_url'])) {
+        if (! empty($options['callback_url'])) {
             $body['callback_url'] = $options['callback_url'];
 
             Log::info('⚠️ callback_url fourni, assurez-vous qu\'il est whitelisté dans Bridge Dashboard', [
@@ -327,10 +336,10 @@ class BankIntegrationService
             'body' => $body,
         ]);
 
-        $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
+        $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             // Gestion expiration token (401)
             if ($response->status() === 401) {
                 Log::warning('⚠️ Token expiré, refresh...', ['user_id' => $user->id]);
@@ -338,11 +347,11 @@ class BankIntegrationService
                 $accessToken = $this->getAccessToken($user);
 
                 // Retry une fois
-                $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
+                $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
                     ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
             }
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $error = $response->json();
 
                 // Message spécifique pour callback_url_not_whitelisted
@@ -361,7 +370,7 @@ class BankIntegrationService
                     'error' => $error,
                 ]);
 
-                throw new \Exception('Failed to create connect session: ' . ($error['message'] ?? $response->body()));
+                throw new \Exception('Failed to create connect session: '.($error['message'] ?? $response->body()));
             }
         }
 
@@ -393,7 +402,7 @@ class BankIntegrationService
             ];
 
             // ✅ callback_url : seulement si explicitement fourni
-            if (!empty($data['return_url'])) {
+            if (! empty($data['return_url'])) {
                 $options['callback_url'] = $data['return_url'];
             }
 
@@ -431,11 +440,11 @@ class BankIntegrationService
     {
         $accessToken = $this->getAccessToken($user);
 
-        $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
+        $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/items");
 
-        if (!$response->successful()) {
-            throw new \Exception('Failed to fetch items: ' . $response->body());
+        if (! $response->successful()) {
+            throw new \Exception('Failed to fetch items: '.$response->body());
         }
 
         return $response->json()['resources'] ?? [];
@@ -448,11 +457,11 @@ class BankIntegrationService
     {
         $accessToken = $this->getAccessToken($user);
 
-        $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
+        $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/accounts");
 
-        if (!$response->successful()) {
-            throw new \Exception('Failed to fetch accounts: ' . $response->body());
+        if (! $response->successful()) {
+            throw new \Exception('Failed to fetch accounts: '.$response->body());
         }
 
         return $response->json()['resources'] ?? [];
@@ -465,11 +474,11 @@ class BankIntegrationService
     {
         $accessToken = $this->getAccessToken($user);
 
-        $response = Http::withHeaders($this->getAuthenticatedHeaders($accessToken))
+        $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/transactions", $filters);
 
-        if (!$response->successful()) {
-            throw new \Exception('Failed to fetch transactions: ' . $response->body());
+        if (! $response->successful()) {
+            throw new \Exception('Failed to fetch transactions: '.$response->body());
         }
 
         return $response->json()['resources'] ?? [];
@@ -538,6 +547,7 @@ class BankIntegrationService
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -557,6 +567,7 @@ class BankIntegrationService
                 'account_id' => $accountId,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -565,7 +576,7 @@ class BankIntegrationService
     {
         $batch = Bus::findBatch($batchId);
 
-        if (!$batch) {
+        if (! $batch) {
             return ['status' => 'not_found'];
         }
 
@@ -581,9 +592,16 @@ class BankIntegrationService
 
     protected function getBatchStatusLabel(Batch $batch): string
     {
-        if ($batch->cancelled()) return 'cancelled';
-        if ($batch->finished()) return 'completed';
-        if ($batch->failedJobs > 0) return 'partial_failure';
+        if ($batch->cancelled()) {
+            return 'cancelled';
+        }
+        if ($batch->finished()) {
+            return 'completed';
+        }
+        if ($batch->failedJobs > 0) {
+            return 'partial_failure';
+        }
+
         return 'processing';
     }
 
@@ -591,7 +609,7 @@ class BankIntegrationService
     {
         return $user->bankConnections()
             ->get()
-            ->map(fn($c) => [
+            ->map(fn ($c) => [
                 'id' => $c->id,
                 'bank_name' => $c->bank_name,
                 'status' => $c->status,
@@ -602,11 +620,11 @@ class BankIntegrationService
 
     public function deleteBridgeUser(User $user): bool
     {
-        if (!$user->bridge_user_uuid) {
+        if (! $user->bridge_user_uuid) {
             return true;
         }
 
-        $response = Http::withHeaders($this->getBaseHeaders())
+        $response = $this->http()->withHeaders($this->getBaseHeaders())
             ->delete("{$this->baseUrl}/v3/aggregation/users/{$user->bridge_user_uuid}");
 
         if ($response->successful()) {
@@ -650,7 +668,15 @@ class BankIntegrationService
     private function getAuthenticatedHeaders(string $accessToken): array
     {
         return array_merge($this->getBaseHeaders(), [
-            'Authorization' => 'Bearer ' . $accessToken,
+            'Authorization' => 'Bearer '.$accessToken,
         ]);
+    }
+
+    /**
+     * ✅ Helper HTTP avec timeout
+     */
+    private function http(): \Illuminate\Http\Client\PendingRequest
+    {
+        return Http::timeout($this->timeout);
     }
 }
