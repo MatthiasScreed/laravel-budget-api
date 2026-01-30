@@ -632,12 +632,16 @@ class BankIntegrationService
         }
     }
 
+    /**
+     * ✅ Headers de base avec Basic Auth (CORRIGÉ)
+     */
     private function getBaseHeaders(): array
     {
+        $credentials = base64_encode("{$this->clientId}:{$this->clientSecret}");
+
         return [
             'Bridge-Version' => $this->version,
-            'Client-Id' => $this->clientId,
-            'Client-Secret' => $this->clientSecret,
+            'Authorization' => "Basic {$credentials}",  // ✅ CORRECT
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
