@@ -119,7 +119,18 @@ class BankIntegrationService
                 'external_user_id' => $externalUserId,
             ]);
 
-            return $this->findBridgeUserByExternalId($externalUserId, $user);
+            $bridgeUser = $this->findBridgeUserByExternalId($externalUserId, $user);
+
+            // ✅ FIX : S'assurer que l'UUID est bien sauvegardé en DB
+            $user->update([
+                'bridge_user_uuid' => $bridgeUser['uuid'],
+            ]);
+
+            Log::info('✅ UUID Bridge sauvegardé en DB', [
+                'bridge_uuid' => $bridgeUser['uuid'],
+            ]);
+
+            return $bridgeUser;
         }
 
         // 5️⃣ Autre erreur
