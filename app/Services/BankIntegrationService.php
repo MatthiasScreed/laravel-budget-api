@@ -13,25 +13,18 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * ✅ Bridge API v3 2025-01-15 - VERSION FINALE CORRIGÉE
- * FIX: Gestion des utilisateurs Bridge existants + refresh objet
+ * ✅ Bridge API v3 2025-01-15 - VERSION CORRIGÉE
+ * FIX: Sauvegarde UUID avec assignation directe (bypass fillable)
  */
 class BankIntegrationService
 {
     private GamingService $gamingService;
-
     private BudgetService $budgetService;
-
     private string $baseUrl;
-
     private string $version;
-
     private string $clientId;
-
     private string $clientSecret;
-
     protected int $chunkSize = 100;
-
     protected int $timeout = 30;
 
     public function __construct(
@@ -40,11 +33,39 @@ class BankIntegrationService
     ) {
         $this->gamingService = $gamingService;
         $this->budgetService = $budgetService;
-
         $this->baseUrl = config('services.bridge.base_url', 'https://api.bridgeapi.io');
         $this->version = config('services.bridge.version', '2025-01-15');
         $this->clientId = config('services.bridge.client_id');
         $this->clientSecret = config('services.bridge.client_secret');
+    }
+
+    // ==========================================
+    // ✅ HELPER CRITIQUE : Sauvegarder UUID
+    // ==========================================
+
+    /**
+     * ✅ Sauvegarde l'UUID Bridge de manière fiable
+     * Utilise assignation directe + save() pour bypasser $fillable
+     */
+    private function saveBridgeUuid(User $user, ?string $uuid): void
+    {
+        // Assignation directe (bypass fillable)
+        $user->bridge_user_uuid = $uuid;
+        $user->save();
+
+        // Double vérification en DB
+        $user->refresh();
+
+        Log::info('💾 UUID Bridge sauvegardé', [
+            'user_id' => $user->id,
+            'uuid_saved' => $user->bridge_user_uuid,
+            'uuid_expected' => $uuid,
+            'match' => $user->bridge_user_uuid === $uuid,
+        ]);
+
+        if ($user->bridge_user_uuid !== $uuid) {
+            throw new \Exception("UUID Bridge non sauvegardé en DB - Vérifier la colonne existe");
+        }
     }
 
     // ==========================================
@@ -53,31 +74,27 @@ class BankIntegrationService
 
     /**
      * ✅ ÉTAPE 1 : Créer OU récupérer un utilisateur Bridge
-     * FIX: Gère le cas "already_exists" + refresh objet
      */
     public function createBridgeUser(User $user): User
     {
         $this->verifyBridgeConfig();
 
-        // 1️⃣ Si l'utilisateur a déjà un bridge_user_uuid, le retourner
+        // 1️⃣ Si l'utilisateur a déjà un bridge_user_uuid, vérifier qu'il existe
         if ($user->bridge_user_uuid) {
-            Log::info('✅ Utilisateur Bridge déjà existant (from DB)', [
+            Log::info('✅ Utilisateur Bridge existant (from DB)', [
                 'user_id' => $user->id,
                 'bridge_uuid' => $user->bridge_user_uuid,
             ]);
 
-            // Vérifier que l'UUID existe toujours chez Bridge
             $existingUser = $this->getBridgeUser($user->bridge_user_uuid);
-
             if ($existingUser) {
                 return $user;
             }
 
-            // Si l'UUID n'existe plus chez Bridge, on va en créer un nouveau
             Log::warning('⚠️ UUID Bridge stocké mais introuvable, recréation...', [
                 'user_id' => $user->id,
             ]);
-            $user->update(['bridge_user_uuid' => null]);
+            $this->saveBridgeUuid($user, null);
         }
 
         $externalUserId = (string) $user->id;
@@ -97,12 +114,8 @@ class BankIntegrationService
         if ($response->successful()) {
             $data = $response->json();
 
-            $user->update([
-                'bridge_user_uuid' => $data['uuid'],
-            ]);
-
-            // ✅ Rafraîchir l'objet immédiatement
-            $user->refresh();
+            // ✅ Sauvegarde fiable
+            $this->saveBridgeUuid($user, $data['uuid']);
 
             Log::info('✅ Utilisateur Bridge créé', [
                 'bridge_uuid' => $data['uuid'],
@@ -122,15 +135,12 @@ class BankIntegrationService
                 'external_user_id' => $externalUserId,
             ]);
 
-            $bridgeUser = $this->findBridgeUserByExternalId($externalUserId, $user);
+            $bridgeUser = $this->findBridgeUserByExternalId($externalUserId);
 
-            // ✅ Sauvegarder l'UUID en DB et rafraîchir
-            $user->update([
-                'bridge_user_uuid' => $bridgeUser['uuid'],
-            ]);
-            $user->refresh();
+            // ✅ Sauvegarde fiable
+            $this->saveBridgeUuid($user, $bridgeUser['uuid']);
 
-            Log::info('✅ UUID Bridge sauvegardé en DB', [
+            Log::info('✅ UUID Bridge récupéré et sauvegardé', [
                 'bridge_uuid' => $bridgeUser['uuid'],
             ]);
 
@@ -147,127 +157,80 @@ class BankIntegrationService
     }
 
     /**
-     * ✅ NOUVEAU : Récupérer un utilisateur Bridge par UUID
+     * ✅ Récupérer un utilisateur Bridge par UUID
      */
     private function getBridgeUser(string $bridgeUuid): ?array
     {
         try {
-            Log::info('🔍 Vérification utilisateur Bridge', [
-                'bridge_uuid' => $bridgeUuid,
-            ]);
-
             $response = $this->http()->withHeaders($this->getBaseHeaders())
                 ->get("{$this->baseUrl}/v3/aggregation/users/{$bridgeUuid}");
 
             if ($response->successful()) {
-                Log::info('✅ Utilisateur Bridge trouvé');
-
                 return $response->json();
             }
-
-            Log::warning('⚠️ Utilisateur Bridge introuvable', [
-                'status' => $response->status(),
-            ]);
-
             return null;
-
         } catch (\Exception $e) {
-            Log::error('❌ Erreur vérification utilisateur Bridge', [
-                'error' => $e->getMessage(),
-            ]);
-
+            Log::error('❌ Erreur vérification utilisateur Bridge', ['error' => $e->getMessage()]);
             return null;
         }
     }
 
     /**
-     * ✅ NOUVEAU : Trouver un utilisateur Bridge par external_user_id
+     * ✅ Trouver un utilisateur Bridge par external_user_id
      */
-    private function findBridgeUserByExternalId(string $externalUserId, User $user): array
+    private function findBridgeUserByExternalId(string $externalUserId): array
     {
-        try {
-            Log::info('🔎 Recherche utilisateur Bridge par external_id', [
-                'external_user_id' => $externalUserId,
-            ]);
+        Log::info('🔎 Recherche utilisateur Bridge par external_id', [
+            'external_user_id' => $externalUserId,
+        ]);
 
-            // Liste tous les utilisateurs Bridge
-            $response = $this->http()->withHeaders($this->getBaseHeaders())
-                ->get("{$this->baseUrl}/v3/aggregation/users");
+        $response = $this->http()->withHeaders($this->getBaseHeaders())
+            ->get("{$this->baseUrl}/v3/aggregation/users");
 
-            if (! $response->successful()) {
-                throw new \Exception('Failed to list Bridge users: '.$response->body());
-            }
-
-            $users = $response->json()['resources'] ?? [];
-
-            // Chercher notre utilisateur par external_user_id
-            foreach ($users as $bridgeUser) {
-                if (isset($bridgeUser['external_user_id']) &&
-                    $bridgeUser['external_user_id'] === $externalUserId) {
-
-                    $bridgeUuid = $bridgeUser['uuid'];
-
-                    Log::info('✅ Utilisateur Bridge trouvé par external_id', [
-                        'bridge_uuid' => $bridgeUuid,
-                        'external_user_id' => $externalUserId,
-                    ]);
-
-                    // ✅ Retourner simplement le bridgeUser
-                    // La sauvegarde en DB se fait dans createBridgeUser()
-                    return $bridgeUser;
-                }
-            }
-
-            // Si vraiment introuvable (cas très rare)
-            throw new \Exception("Bridge user with external_id '{$externalUserId}' not found in list");
-        } catch (\Exception $e) {
-            Log::error('❌ Erreur recherche utilisateur Bridge', [
-                'external_user_id' => $externalUserId,
-                'error' => $e->getMessage(),
-            ]);
-
-            throw $e;
+        if (! $response->successful()) {
+            throw new \Exception('Failed to list Bridge users: '.$response->body());
         }
+
+        $users = $response->json()['resources'] ?? [];
+
+        foreach ($users as $bridgeUser) {
+            if (($bridgeUser['external_user_id'] ?? null) === $externalUserId) {
+                Log::info('✅ Utilisateur Bridge trouvé', [
+                    'bridge_uuid' => $bridgeUser['uuid'],
+                ]);
+                return $bridgeUser;
+            }
+        }
+
+        throw new \Exception("Bridge user with external_id '{$externalUserId}' not found");
     }
 
     /**
      * ✅ ÉTAPE 2 : Obtenir un access token (Bearer)
-     * Token valide 2h - Mise en cache avec marge de sécurité de 5min
      */
     public function getAccessToken(User $user): string
     {
         $cacheKey = "bridge_token_{$user->id}";
 
-        // Vérifier cache (avec marge de 5 minutes)
+        // Vérifier cache
         $cached = Cache::get($cacheKey);
         if ($cached && Carbon::parse($cached['expires_at'])->subMinutes(5)->isFuture()) {
-            Log::info('🔄 Token Bridge en cache', [
-                'user_id' => $user->id,
-                'expires_at' => $cached['expires_at'],
-            ]);
-
             return $cached['access_token'];
         }
 
         // S'assurer que l'utilisateur Bridge existe
         if (! $user->bridge_user_uuid) {
-            Log::info('⚠️ Utilisateur Bridge manquant, création...', [
-                'user_id' => $user->id,
-            ]);
-
-            // ✅ Récupérer le user mis à jour
+            Log::info('⚠️ Utilisateur Bridge manquant, création...', ['user_id' => $user->id]);
             $user = $this->createBridgeUser($user);
-
-            // Vérifier que l'UUID existe maintenant
-            if (! $user->bridge_user_uuid) {
-                Log::error('❌ UUID manquant après refresh', [
-                    'user_id' => $user->id,
-                ]);
-                throw new \Exception('Bridge user created but UUID not saved to database');
-            }
         }
 
-        Log::info('🔡 Obtention token Bridge', [
+        // ✅ Vérification explicite après création
+        if (! $user->bridge_user_uuid) {
+            Log::error('❌ UUID toujours manquant après création', ['user_id' => $user->id]);
+            throw new \Exception('Bridge user UUID missing after creation - check database column');
+        }
+
+        Log::info('📡 Obtention token Bridge', [
             'user_id' => $user->id,
             'bridge_uuid' => $user->bridge_user_uuid,
         ]);
@@ -278,136 +241,70 @@ class BankIntegrationService
             ]);
 
         if (! $response->successful()) {
-            // Si utilisateur introuvable sur Bridge, le recréer
             if ($response->status() === 404) {
-                Log::warning('⚠️ Utilisateur Bridge introuvable, recréation...', [
-                    'user_id' => $user->id,
-                ]);
-                $user->update(['bridge_user_uuid' => null]);
+                Log::warning('⚠️ Utilisateur Bridge introuvable, recréation...');
+                $this->saveBridgeUuid($user, null);
                 $this->createBridgeUser($user);
-
                 return $this->getAccessToken($user);
             }
 
             $error = $response->json();
-            Log::error('❌ Erreur obtention token', [
-                'status' => $response->status(),
-                'error' => $error,
-            ]);
-            throw new \Exception('Failed to get Bridge access token: '.($error['message'] ?? $response->body()));
+            throw new \Exception('Failed to get Bridge token: '.($error['message'] ?? $response->body()));
         }
 
         $data = $response->json();
 
-        // Mettre en cache avec TTL
+        // Mettre en cache
         $expiresAt = Carbon::parse($data['expires_at']);
-        $ttlSeconds = $expiresAt->diffInSeconds(now());
-
         Cache::put($cacheKey, [
             'access_token' => $data['access_token'],
             'expires_at' => $data['expires_at'],
-        ], $ttlSeconds);
-
-        Log::info('✅ Token Bridge obtenu', [
-            'user_id' => $user->id,
-            'expires_at' => $data['expires_at'],
-        ]);
+        ], $expiresAt->diffInSeconds(now()));
 
         return $data['access_token'];
     }
 
     /**
-     * ✅ ÉTAPE 3 : Créer une Connect Session avec Bearer token
+     * ✅ ÉTAPE 3 : Créer une Connect Session
      */
     public function createConnectSession(User $user, array $options = []): array
     {
         $accessToken = $this->getAccessToken($user);
 
-        // ✅ user_email est OBLIGATOIRE
-        $body = [
-            'user_email' => $user->email,
-        ];
+        $body = ['user_email' => $user->email];
 
-        // ✅ callback_url : OPTIONNEL mais doit être whitelisté dans Bridge Dashboard
         if (! empty($options['callback_url'])) {
             $body['callback_url'] = $options['callback_url'];
-
-            Log::info('⚠️ callback_url fourni, assurez-vous qu\'il est whitelisté dans Bridge Dashboard', [
-                'callback_url' => $options['callback_url'],
-            ]);
         }
-
-        // Optionnel : account_types ('payment' ou 'all')
         if (isset($options['account_types'])) {
             $body['account_types'] = $options['account_types'];
         }
-
-        // Optionnel : item_id (pour reconnecter un item existant)
         if (isset($options['item_id'])) {
             $body['item_id'] = $options['item_id'];
         }
-
-        // Optionnel : provider_id (pré-sélectionner une banque)
         if (isset($options['provider_id'])) {
             $body['provider_id'] = (int) $options['provider_id'];
         }
-
-        Log::info('📡 Création Connect Session', [
-            'user_id' => $user->id,
-            'body' => $body,
-        ]);
 
         $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
 
         if (! $response->successful()) {
-            // Gestion expiration token (401)
             if ($response->status() === 401) {
-                Log::warning('⚠️ Token expiré, refresh...', ['user_id' => $user->id]);
                 Cache::forget("bridge_token_{$user->id}");
                 $accessToken = $this->getAccessToken($user);
-
-                // Retry une fois
                 $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
                     ->post("{$this->baseUrl}/v3/aggregation/connect-sessions", $body);
             }
 
             if (! $response->successful()) {
                 $error = $response->json();
-
-                // Message spécifique pour callback_url_not_whitelisted
-                if (isset($error['errors'][0]['code']) &&
-                    $error['errors'][0]['code'] === 'connect_session.callback_url_not_whitelisted') {
-
-                    Log::error('❌ callback_url non whitelisté dans Bridge Dashboard', [
-                        'callback_url' => $options['callback_url'] ?? 'none',
-                    ]);
-
-                    throw new \Exception('callback_url not whitelisted in Bridge Dashboard. Please add your domain in Dashboard > Connect > Allowed domains');
-                }
-
-                Log::error('❌ Erreur Connect Session', [
-                    'status' => $response->status(),
-                    'error' => $error,
-                ]);
-
                 throw new \Exception('Failed to create connect session: '.($error['message'] ?? $response->body()));
             }
         }
 
-        $data = $response->json();
-
-        Log::info('✅ Connect Session créée', [
-            'session_id' => $data['id'] ?? null,
-            'url' => $data['url'] ?? null,
-        ]);
-
-        return $data;
+        return $response->json();
     }
-
-    // ==========================================
-    // GESTION DES CONNEXIONS BANCAIRES
-    // ==========================================
 
     /**
      * ✅ Initier connexion bancaire
@@ -422,15 +319,9 @@ class BankIntegrationService
                 'provider_id' => $data['provider_id'] ?? null,
             ];
 
-            // ✅ callback_url : seulement si explicitement fourni
             if (! empty($data['return_url'])) {
                 $options['callback_url'] = $data['return_url'];
             }
-
-            Log::info('🔗 Initialisation connexion bancaire', [
-                'user_id' => $user->id,
-                'options' => $options,
-            ]);
 
             $session = $this->createConnectSession($user, $options);
 
@@ -442,66 +333,48 @@ class BankIntegrationService
             ];
 
         } catch (\Exception $e) {
-            Log::error('❌ Erreur initiation', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
+            Log::error('❌ Erreur initiation', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
-    /**
-     * ✅ Récupérer les items (connexions bancaires)
-     */
+    // ==========================================
+    // GESTION DES CONNEXIONS BANCAIRES
+    // ==========================================
+
     public function getItems(User $user): array
     {
         $accessToken = $this->getAccessToken($user);
-
         $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/items");
 
         if (! $response->successful()) {
             throw new \Exception('Failed to fetch items: '.$response->body());
         }
-
         return $response->json()['resources'] ?? [];
     }
 
-    /**
-     * ✅ Récupérer les comptes bancaires
-     */
     public function getAccounts(User $user): array
     {
         $accessToken = $this->getAccessToken($user);
-
         $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/accounts");
 
         if (! $response->successful()) {
             throw new \Exception('Failed to fetch accounts: '.$response->body());
         }
-
         return $response->json()['resources'] ?? [];
     }
 
-    /**
-     * ✅ Récupérer les transactions
-     */
     public function getTransactions(User $user, array $filters = []): array
     {
         $accessToken = $this->getAccessToken($user);
-
         $response = $this->http()->withHeaders($this->getAuthenticatedHeaders($accessToken))
             ->get("{$this->baseUrl}/v3/aggregation/transactions", $filters);
 
         if (! $response->successful()) {
             throw new \Exception('Failed to fetch transactions: '.$response->body());
         }
-
         return $response->json()['resources'] ?? [];
     }
 
@@ -511,31 +384,17 @@ class BankIntegrationService
 
     public function syncTransactions(User $user): Batch
     {
-        Log::info('🚀 Démarrage sync transactions', [
-            'user_id' => $user->id,
-        ]);
-
         $accounts = $this->getAccountsFromBridge($user);
-
         if (empty($accounts)) {
-            Log::warning('⚠️ Aucun compte trouvé', ['user_id' => $user->id]);
             throw new \Exception('Aucun compte bancaire trouvé');
         }
 
         $jobs = [];
-        $totalTransactions = 0;
-
         foreach ($accounts as $account) {
             $transactions = $this->getTransactionsFromBridge($user, $account['id']);
+            if (empty($transactions)) continue;
 
-            if (empty($transactions)) {
-                continue;
-            }
-
-            $totalTransactions += count($transactions);
-            $chunks = collect($transactions)->chunk($this->chunkSize);
-
-            foreach ($chunks as $chunk) {
+            foreach (collect($transactions)->chunk($this->chunkSize) as $chunk) {
                 $jobs[] = new ImportBridgeTransactions(
                     userId: $user->id,
                     accountId: $account['id'],
@@ -549,10 +408,7 @@ class BankIntegrationService
         }
 
         return Bus::batch($jobs)
-            ->then(function (Batch $batch) use ($user) {
-                AutoCategorizeTransactions::dispatch($user->id)
-                    ->onQueue('categorization');
-            })
+            ->then(fn (Batch $batch) => AutoCategorizeTransactions::dispatch($user->id)->onQueue('categorization'))
             ->name("Import Bridge - User {$user->id}")
             ->onQueue('imports')
             ->allowFailures()
@@ -564,11 +420,6 @@ class BankIntegrationService
         try {
             return $this->getAccounts($user);
         } catch (\Exception $e) {
-            Log::error('❌ Erreur récupération comptes', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-
             return [];
         }
     }
@@ -576,19 +427,12 @@ class BankIntegrationService
     protected function getTransactionsFromBridge(User $user, int $accountId): array
     {
         try {
-            $filters = [
+            return $this->getTransactions($user, [
                 'account_ids' => [$accountId],
                 'since' => now()->subDays(90)->toISOString(),
                 'limit' => 500,
-            ];
-
-            return $this->getTransactions($user, $filters);
-        } catch (\Exception $e) {
-            Log::error('❌ Erreur récupération transactions', [
-                'account_id' => $accountId,
-                'error' => $e->getMessage(),
             ]);
-
+        } catch (\Exception $e) {
             return [];
         }
     }
@@ -596,13 +440,10 @@ class BankIntegrationService
     public function getBatchStatus(string $batchId): array
     {
         $batch = Bus::findBatch($batchId);
-
-        if (! $batch) {
-            return ['status' => 'not_found'];
-        }
+        if (! $batch) return ['status' => 'not_found'];
 
         return [
-            'status' => $this->getBatchStatusLabel($batch),
+            'status' => $batch->cancelled() ? 'cancelled' : ($batch->finished() ? 'completed' : 'processing'),
             'total_jobs' => $batch->totalJobs,
             'pending_jobs' => $batch->pendingJobs,
             'processed_jobs' => $batch->processedJobs(),
@@ -611,48 +452,17 @@ class BankIntegrationService
         ];
     }
 
-    protected function getBatchStatusLabel(Batch $batch): string
-    {
-        if ($batch->cancelled()) {
-            return 'cancelled';
-        }
-        if ($batch->finished()) {
-            return 'completed';
-        }
-        if ($batch->failedJobs > 0) {
-            return 'partial_failure';
-        }
-
-        return 'processing';
-    }
-
-    public function getUserConnectionsStatus(User $user): array
-    {
-        return $user->bankConnections()
-            ->get()
-            ->map(fn ($c) => [
-                'id' => $c->id,
-                'bank_name' => $c->bank_name,
-                'status' => $c->status,
-                'last_sync' => $c->last_sync_at?->diffForHumans(),
-            ])
-            ->toArray();
-    }
-
     public function deleteBridgeUser(User $user): bool
     {
-        if (! $user->bridge_user_uuid) {
-            return true;
-        }
+        if (! $user->bridge_user_uuid) return true;
 
         $response = $this->http()->withHeaders($this->getBaseHeaders())
             ->delete("{$this->baseUrl}/v3/aggregation/users/{$user->bridge_user_uuid}");
 
         if ($response->successful()) {
             Cache::forget("bridge_token_{$user->id}");
-            $user->update(['bridge_user_uuid' => null]);
+            $this->saveBridgeUuid($user, null);
         }
-
         return $response->successful();
     }
 
@@ -662,18 +472,10 @@ class BankIntegrationService
 
     private function verifyBridgeConfig(): void
     {
-        if (empty($this->clientId)) {
-            throw new \Exception('BRIDGE_CLIENT_ID manquant dans .env');
-        }
-
-        if (empty($this->clientSecret)) {
-            throw new \Exception('BRIDGE_CLIENT_SECRET manquant dans .env');
-        }
+        if (empty($this->clientId)) throw new \Exception('BRIDGE_CLIENT_ID manquant');
+        if (empty($this->clientSecret)) throw new \Exception('BRIDGE_CLIENT_SECRET manquant');
     }
 
-    /**
-     * ✅ Headers de base Bridge API v3
-     */
     private function getBaseHeaders(): array
     {
         return [
@@ -687,14 +489,9 @@ class BankIntegrationService
 
     private function getAuthenticatedHeaders(string $accessToken): array
     {
-        return array_merge($this->getBaseHeaders(), [
-            'Authorization' => 'Bearer '.$accessToken,
-        ]);
+        return array_merge($this->getBaseHeaders(), ['Authorization' => 'Bearer '.$accessToken]);
     }
 
-    /**
-     * ✅ Helper HTTP avec timeout
-     */
     private function http(): \Illuminate\Http\Client\PendingRequest
     {
         return Http::timeout($this->timeout);

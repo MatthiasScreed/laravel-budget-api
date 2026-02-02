@@ -36,6 +36,7 @@ class User extends Authenticatable
         'language',
         'email_verified_at',
         'preferences',
+        'bridge_user_uuid',
     ];
 
     /**
