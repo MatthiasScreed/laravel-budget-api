@@ -243,7 +243,12 @@ class BankIntegrationService
                 'user_id' => $user->id,
             ]);
             $this->createBridgeUser($user);
-            $user->refresh();
+            $user->refresh(); // Rafraîchir l'objet
+
+            // ✅ Vérifier que le refresh a fonctionné
+            if (! $user->bridge_user_uuid) {
+                $user = User::find($user->id); // Forcer rechargement depuis DB
+            }
         }
 
         Log::info('🔡 Obtention token Bridge', [
