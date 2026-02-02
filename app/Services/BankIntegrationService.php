@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * ✅ Bridge API v3 2025-01-15 - VERSION CORRIGÉE
- * FIX: Gestion des utilisateurs Bridge existants
+ * ✅ Bridge API v3 2025-01-15 - VERSION FINALE CORRIGÉE
+ * FIX: Gestion des utilisateurs Bridge existants + refresh objet
  */
 class BankIntegrationService
 {
@@ -53,7 +53,7 @@ class BankIntegrationService
 
     /**
      * ✅ ÉTAPE 1 : Créer OU récupérer un utilisateur Bridge
-     * FIX: Gère le cas "already_exists"
+     * FIX: Gère le cas "already_exists" + refresh objet
      */
     public function createBridgeUser(User $user): array
     {
@@ -101,6 +101,9 @@ class BankIntegrationService
                 'bridge_user_uuid' => $data['uuid'],
             ]);
 
+            // ✅ Rafraîchir l'objet immédiatement
+            $user->refresh();
+
             Log::info('✅ Utilisateur Bridge créé', [
                 'bridge_uuid' => $data['uuid'],
                 'external_user_id' => $data['external_user_id'],
@@ -121,10 +124,11 @@ class BankIntegrationService
 
             $bridgeUser = $this->findBridgeUserByExternalId($externalUserId, $user);
 
-            // ✅ FIX : S'assurer que l'UUID est bien sauvegardé en DB
+            // ✅ Sauvegarder l'UUID en DB et rafraîchir
             $user->update([
                 'bridge_user_uuid' => $bridgeUser['uuid'],
             ]);
+            $user->refresh();
 
             Log::info('✅ UUID Bridge sauvegardé en DB', [
                 'bridge_uuid' => $bridgeUser['uuid'],
@@ -208,11 +212,8 @@ class BankIntegrationService
                         'external_user_id' => $externalUserId,
                     ]);
 
-                    // Sauvegarder dans la DB Laravel
-                    $user->update([
-                        'bridge_user_uuid' => $bridgeUuid,
-                    ]);
-
+                    // ✅ Retourner simplement le bridgeUser
+                    // La sauvegarde en DB se fait dans createBridgeUser()
                     return $bridgeUser;
                 }
             }
@@ -253,13 +254,18 @@ class BankIntegrationService
             Log::info('⚠️ Utilisateur Bridge manquant, création...', [
                 'user_id' => $user->id,
             ]);
-            $this->createBridgeUser($user);
 
-            // ✅ FIX : TOUJOURS forcer le rechargement depuis la DB
-            $user = User::find($user->id);
+            $bridgeUser = $this->createBridgeUser($user);
+
+            // ✅ FIX : Rafraîchir l'objet depuis la DB
+            $user->refresh();
 
             // Vérifier que l'UUID existe maintenant
             if (! $user->bridge_user_uuid) {
+                Log::error('❌ UUID manquant après refresh', [
+                    'user_id' => $user->id,
+                    'bridge_uuid_expected' => $bridgeUser['uuid'] ?? 'none',
+                ]);
                 throw new \Exception('Bridge user created but UUID not saved to database');
             }
         }
