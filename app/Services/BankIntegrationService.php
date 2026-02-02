@@ -82,7 +82,7 @@ class BankIntegrationService
 
         $externalUserId = (string) $user->id;
 
-        Log::info('🔡 Création utilisateur Bridge', [
+        Log::info('📡 Création utilisateur Bridge', [
             'user_id' => $user->id,
             'external_user_id' => $externalUserId,
         ]);
@@ -243,11 +243,13 @@ class BankIntegrationService
                 'user_id' => $user->id,
             ]);
             $this->createBridgeUser($user);
-            $user->refresh(); // Rafraîchir l'objet
 
-            // ✅ Vérifier que le refresh a fonctionné
+            // ✅ FIX : TOUJOURS forcer le rechargement depuis la DB
+            $user = User::find($user->id);
+
+            // Vérifier que l'UUID existe maintenant
             if (! $user->bridge_user_uuid) {
-                $user = User::find($user->id); // Forcer rechargement depuis DB
+                throw new \Exception('Bridge user created but UUID not saved to database');
             }
         }
 
@@ -336,7 +338,7 @@ class BankIntegrationService
             $body['provider_id'] = (int) $options['provider_id'];
         }
 
-        Log::info('🔡 Création Connect Session', [
+        Log::info('📡 Création Connect Session', [
             'user_id' => $user->id,
             'body' => $body,
         ]);
@@ -656,16 +658,14 @@ class BankIntegrationService
     }
 
     /**
-     * ✅ Headers de base avec Basic Auth (CORRIGÉ)
+     * ✅ Headers de base Bridge API v3
      */
     private function getBaseHeaders(): array
     {
-        $credentials = base64_encode("{$this->clientId}:{$this->clientSecret}");
-
         return [
             'Bridge-Version' => $this->version,
-            'Client-Id' => $this->clientId,           // ✅ CORRECT
-            'Client-Secret' => $this->clientSecret,   // ✅ CORRECT
+            'Client-Id' => $this->clientId,
+            'Client-Secret' => $this->clientSecret,
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
