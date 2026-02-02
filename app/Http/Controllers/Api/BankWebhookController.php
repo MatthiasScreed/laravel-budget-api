@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncBankTransactionsJob;
+use App\Models\BankAccount;
 use App\Models\BankConnection;
 use App\Models\Transaction;
 use App\Models\User;
@@ -38,13 +40,14 @@ class BankWebhookController extends Controller
             $eventType = $data['type'] ?? null;
             $content = $data['content'] ?? [];
 
-            // Gérer selon le type d'événement
             match ($eventType) {
                 'item.created' => $this->handleItemCreated($content),
                 'item.refreshed' => $this->handleItemRefreshed($content),
+                'item.account.created' => $this->handleAccountCreated($content),
+                'item.account.updated' => $this->handleAccountUpdated($content),
                 'transaction.created' => $this->handleTransactionCreated($content),
                 'transaction.updated' => $this->handleTransactionUpdated($content),
-                default => Log::info('ℹ️ Type événement non géré: '.$eventType)
+                default => Log::info('ℹ️ Type événement ignoré: '.$eventType)
             };
 
             return response()->json(['status' => 'received'], 200);
@@ -56,13 +59,12 @@ class BankWebhookController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Toujours retourner 200 pour éviter les retry de Bridge
             return response()->json(['status' => 'received'], 200);
         }
     }
 
     /**
-     * Gérer la création d'une connexion bancaire
+     * ✅ Item créé - Connexion bancaire établie
      */
     private function handleItemCreated(array $content): void
     {
@@ -71,7 +73,6 @@ class BankWebhookController extends Controller
 
         if (! $itemId || ! $userUuid) {
             Log::warning('⚠️ Données manquantes item.created');
-
             return;
         }
 
@@ -79,7 +80,6 @@ class BankWebhookController extends Controller
 
         if (! $user) {
             Log::error('❌ User non trouvé', ['uuid' => $userUuid]);
-
             return;
         }
 
@@ -87,6 +87,16 @@ class BankWebhookController extends Controller
             'user_id' => $user->id,
             'email' => $user->email,
         ]);
+
+        // Vérifier si connexion existe déjà
+        $existing = BankConnection::where('provider_connection_id', (string) $itemId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($existing) {
+            Log::info('ℹ️ Connexion existe déjà', ['connection_id' => $existing->id]);
+            return;
+        }
 
         // Créer la connexion bancaire
         $connection = BankConnection::create([
@@ -97,61 +107,170 @@ class BankWebhookController extends Controller
             'status' => 'active',
             'is_active' => true,
             'last_sync_at' => now(),
-            'last_successful_sync_at' => now(),
-            'metadata' => json_encode([
+            'metadata' => [
                 'bridge_item_id' => $itemId,
-                'webhook_data' => $content,
-            ]),
+                'created_via' => 'webhook',
+            ],
         ]);
 
         Log::info('✅ Connexion créée !', [
             'connection_id' => $connection->id,
             'bank' => $connection->bank_name,
-            'provider_id' => $connection->provider_connection_id,
         ]);
 
-        // Gaming: XP pour connexion bancaire
         $this->awardXP($user, 100, 'bank_connected');
     }
 
     /**
-     * Gérer le refresh d'une connexion (nouvelles transactions)
+     * ✅ NOUVEAU: Compte créé
+     */
+    private function handleAccountCreated(array $content): void
+    {
+        $accountId = $content['account_id'] ?? null;
+        $itemId = $content['item_id'] ?? null;
+        $balance = $content['balance'] ?? 0;
+
+        if (! $accountId || ! $itemId) {
+            return;
+        }
+
+        $connection = BankConnection::where('provider_connection_id', (string) $itemId)->first();
+
+        if (! $connection) {
+            Log::warning('⚠️ Connexion non trouvée pour account.created', ['item_id' => $itemId]);
+            return;
+        }
+
+        Log::info('🏦 Compte créé', [
+            'account_id' => $accountId,
+            'balance' => $balance,
+            'connection_id' => $connection->id,
+        ]);
+
+        // Optionnel: créer un enregistrement BankAccount si tu as ce modèle
+        // BankAccount::updateOrCreate(...)
+    }
+
+    /**
+     * ✅ NOUVEAU: Compte mis à jour - LANCE LA SYNC !
+     */
+    private function handleAccountUpdated(array $content): void
+    {
+        $accountId = $content['account_id'] ?? null;
+        $itemId = $content['item_id'] ?? null;
+        $nbNew = $content['nb_new_transactions'] ?? 0;
+        $nbUpdated = $content['nb_updated_transactions'] ?? 0;
+
+        if (! $itemId) {
+            return;
+        }
+
+        $connection = BankConnection::where('provider_connection_id', (string) $itemId)->first();
+
+        if (! $connection) {
+            Log::warning('⚠️ Connexion non trouvée pour account.updated', ['item_id' => $itemId]);
+            return;
+        }
+
+        Log::info('📊 Compte mis à jour', [
+            'account_id' => $accountId,
+            'nb_new_transactions' => $nbNew,
+            'nb_updated_transactions' => $nbUpdated,
+            'connection_id' => $connection->id,
+        ]);
+
+        // ✅ Lancer la sync si nouvelles transactions
+        if ($nbNew > 0 || $nbUpdated > 0) {
+            // Éviter les doublons de jobs avec un cache simple
+            $cacheKey = "sync_job_{$connection->id}";
+
+            if (! cache()->has($cacheKey)) {
+                cache()->put($cacheKey, true, 60); // 60 secondes de cooldown
+
+                SyncBankTransactionsJob::dispatch($connection)
+                    ->delay(now()->addSeconds(5)); // Petit délai pour laisser Bridge finir
+
+                Log::info('🚀 Sync programmée', [
+                    'connection_id' => $connection->id,
+                    'reason' => "new={$nbNew}, updated={$nbUpdated}",
+                ]);
+            } else {
+                Log::info('⏳ Sync déjà en cours', ['connection_id' => $connection->id]);
+            }
+        }
+    }
+
+    /**
+     * ✅ Item refreshed - Sync terminée côté Bridge
      */
     private function handleItemRefreshed(array $content): void
     {
         $itemId = $content['item_id'] ?? null;
+        $statusCode = $content['status_code'] ?? null;
+        $fullRefresh = $content['full_refresh'] ?? false;
 
         if (! $itemId) {
             Log::warning('⚠️ Item ID manquant pour refresh');
-
             return;
         }
 
-        $connection = BankConnection::where('provider_connection_id', $itemId)
-            ->first();
+        $connection = BankConnection::where('provider_connection_id', (string) $itemId)->first();
 
         if (! $connection) {
             Log::error('❌ Connexion non trouvée', ['item_id' => $itemId]);
-
             return;
         }
 
-        $connection->update([
-            'last_sync_at' => now(),
-            'last_successful_sync_at' => now(),
-        ]);
+        // Vérifier si OK (status_code 0 = succès)
+        $isSuccess = in_array($statusCode, [0, null], true);
 
-        Log::info('🔄 Connexion synchronisée', [
-            'connection_id' => $connection->id,
-        ]);
+        if ($isSuccess) {
+            $connection->update([
+                'status' => 'active',
+                'last_sync_at' => now(),
+                'last_successful_sync_at' => now(),
+                'last_error' => null,
+            ]);
 
-        // Gaming: XP pour sync
-        $this->awardXP($connection->user, 10, 'bank_synced');
+            Log::info('🔄 Connexion synchronisée', [
+                'connection_id' => $connection->id,
+                'full_refresh' => $fullRefresh,
+            ]);
+
+            // ✅ Lancer sync si full_refresh
+            if ($fullRefresh) {
+                $cacheKey = "sync_job_{$connection->id}";
+
+                if (! cache()->has($cacheKey)) {
+                    cache()->put($cacheKey, true, 60);
+
+                    SyncBankTransactionsJob::dispatch($connection)
+                        ->delay(now()->addSeconds(3));
+
+                    Log::info('🚀 Sync full_refresh programmée', [
+                        'connection_id' => $connection->id,
+                    ]);
+                }
+            }
+
+            $this->awardXP($connection->user, 10, 'bank_synced');
+
+        } else {
+            $connection->update([
+                'status' => 'error',
+                'last_error' => $content['status_code_info'] ?? 'Sync failed',
+            ]);
+
+            Log::error('❌ Erreur sync Bridge', [
+                'connection_id' => $connection->id,
+                'status_code' => $statusCode,
+                'status_info' => $content['status_code_info'] ?? null,
+            ]);
+        }
     }
 
     /**
-     * 🆕 Gérer la création d'une transaction
-     * AVEC CATÉGORISATION AUTOMATIQUE
+     * Gérer la création d'une transaction (webhook direct)
      */
     private function handleTransactionCreated(array $content): void
     {
@@ -160,41 +279,32 @@ class BankWebhookController extends Controller
 
         if (! $transactionId || ! $itemId) {
             Log::warning('⚠️ Données manquantes transaction.created');
-
             return;
         }
 
-        // Trouver la connexion
-        $connection = BankConnection::where('provider_connection_id', $itemId)
-            ->first();
+        $connection = BankConnection::where('provider_connection_id', (string) $itemId)->first();
 
         if (! $connection) {
             Log::error('❌ Connexion non trouvée', ['item_id' => $itemId]);
-
             return;
         }
 
         try {
             DB::beginTransaction();
 
-            // Vérifier si la transaction existe déjà
-            $existingTransaction = Transaction::where('bridge_transaction_id', $transactionId)
+            // Vérifier si existe déjà
+            $existing = Transaction::where('bridge_transaction_id', $transactionId)
                 ->where('user_id', $connection->user_id)
                 ->first();
 
-            if ($existingTransaction) {
-                Log::info('ℹ️ Transaction déjà importée', [
-                    'transaction_id' => $existingTransaction->id,
-                ]);
+            if ($existing) {
+                Log::info('ℹ️ Transaction déjà importée', ['id' => $existing->id]);
                 DB::commit();
-
                 return;
             }
 
-            // Créer la transaction
             $amount = abs($content['amount'] ?? 0);
             $type = ($content['amount'] ?? 0) < 0 ? 'expense' : 'income';
-            $description = $content['description'] ?? 'Transaction importée';
 
             $transaction = Transaction::create([
                 'user_id' => $connection->user_id,
@@ -202,37 +312,28 @@ class BankWebhookController extends Controller
                 'bridge_transaction_id' => $transactionId,
                 'type' => $type,
                 'amount' => $amount,
-                'description' => $description,
+                'description' => $content['description'] ?? 'Transaction importée',
                 'transaction_date' => $content['date'] ?? now(),
-                'status' => 'pending', // En attente de catégorisation
+                'status' => 'pending',
                 'is_from_bridge' => true,
                 'auto_imported' => true,
-                'metadata' => json_encode([
-                    'bridge_data' => $content,
-                ]),
             ]);
 
             Log::info('✅ Transaction créée', [
-                'transaction_id' => $transaction->id,
+                'id' => $transaction->id,
                 'amount' => $amount,
                 'type' => $type,
-                'description' => $description,
             ]);
 
-            // 🎯 CATÉGORISATION AUTOMATIQUE
             $this->autoCategorizeTransaction($transaction);
 
             DB::commit();
 
-            // Gaming: XP pour import automatique
             $this->awardXP($connection->user, 5, 'transaction_imported');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('❌ Erreur création transaction', [
-                'error' => $e->getMessage(),
-                'transaction_id' => $transactionId,
-            ]);
+            Log::error('❌ Erreur création transaction', ['error' => $e->getMessage()]);
         }
     }
 
@@ -244,58 +345,39 @@ class BankWebhookController extends Controller
         $transactionId = $content['id'] ?? null;
 
         if (! $transactionId) {
-            Log::warning('⚠️ Transaction ID manquant pour update');
-
             return;
         }
 
-        $transaction = Transaction::where('bridge_transaction_id', $transactionId)
-            ->first();
+        $transaction = Transaction::where('bridge_transaction_id', $transactionId)->first();
 
         if (! $transaction) {
-            Log::warning('⚠️ Transaction non trouvée', [
-                'bridge_id' => $transactionId,
-            ]);
-
             return;
         }
 
-        // Mettre à jour si nécessaire
         $updateData = [];
 
         if (isset($content['amount'])) {
             $updateData['amount'] = abs($content['amount']);
         }
-
         if (isset($content['description'])) {
             $updateData['description'] = $content['description'];
         }
-
         if (isset($content['date'])) {
             $updateData['transaction_date'] = $content['date'];
         }
 
         if (! empty($updateData)) {
             $transaction->update($updateData);
-
-            Log::info('✅ Transaction mise à jour', [
-                'transaction_id' => $transaction->id,
-                'changes' => array_keys($updateData),
-            ]);
+            Log::info('✅ Transaction mise à jour', ['id' => $transaction->id]);
         }
     }
 
     /**
-     * 🎯 CATÉGORISER AUTOMATIQUEMENT UNE TRANSACTION
+     * Catégoriser automatiquement une transaction
      */
     private function autoCategorizeTransaction(Transaction $transaction): void
     {
         try {
-            Log::info('🤖 Tentative auto-catégorisation', [
-                'transaction_id' => $transaction->id,
-                'description' => $transaction->description,
-            ]);
-
             $category = $this->categorizationService->categorize($transaction);
 
             if ($category) {
@@ -305,103 +387,65 @@ class BankWebhookController extends Controller
                     'auto_categorized' => true,
                 ]);
 
-                Log::info('✅ Transaction auto-catégorisée', [
-                    'transaction_id' => $transaction->id,
+                Log::info('✅ Auto-catégorisée', [
+                    'id' => $transaction->id,
                     'category' => $category->name,
                 ]);
 
-                // Gaming: XP bonus pour auto-catégorisation réussie
                 $this->awardXP($transaction->user, 3, 'auto_categorization');
             } else {
-                Log::info('ℹ️ Aucune catégorie trouvée', [
-                    'transaction_id' => $transaction->id,
-                    'description' => $transaction->description,
-                ]);
-
-                // Créer une catégorie par défaut si nécessaire
-                $this->createDefaultCategory($transaction);
+                $this->assignDefaultCategory($transaction);
             }
-
         } catch (\Exception $e) {
-            Log::error('❌ Erreur auto-catégorisation', [
-                'transaction_id' => $transaction->id,
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('❌ Erreur auto-catégorisation', ['error' => $e->getMessage()]);
         }
     }
 
     /**
-     * Créer une catégorie par défaut pour les transactions non catégorisées
+     * Assigner une catégorie par défaut
      */
-    private function createDefaultCategory(Transaction $transaction): void
+    private function assignDefaultCategory(Transaction $transaction): void
     {
-        try {
-            $user = $transaction->user;
-            $type = $transaction->type;
+        $user = $transaction->user;
+        $type = $transaction->type;
+        $name = $type === 'income' ? 'Autres Revenus' : 'Autres Dépenses';
 
-            // Nom de la catégorie par défaut
-            $categoryName = $type === 'income'
-                ? 'Autres Revenus'
-                : 'Autres Dépenses';
+        $category = $user->categories()
+            ->where('name', $name)
+            ->where('type', $type)
+            ->first();
 
-            // Vérifier si elle existe déjà
-            $category = $user->categories()
-                ->where('name', $categoryName)
-                ->where('type', $type)
-                ->first();
-
-            // Créer si nécessaire
-            if (! $category) {
-                $category = $user->categories()->create([
-                    'name' => $categoryName,
-                    'type' => $type,
-                    'color' => $type === 'income' ? '#10B981' : '#EF4444',
-                    'icon' => $type === 'income' ? 'coins' : 'shopping-bag',
-                    'is_active' => true,
-                    'is_default' => true,
-                ]);
-
-                Log::info('✅ Catégorie par défaut créée', [
-                    'category_id' => $category->id,
-                    'name' => $categoryName,
-                ]);
-            }
-
-            // Assigner la catégorie
-            $transaction->update([
-                'category_id' => $category->id,
-                'status' => 'completed',
-            ]);
-
-            Log::info('✅ Catégorie par défaut assignée', [
-                'transaction_id' => $transaction->id,
-                'category' => $categoryName,
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('❌ Erreur création catégorie défaut', [
-                'error' => $e->getMessage(),
+        if (! $category) {
+            $category = $user->categories()->create([
+                'name' => $name,
+                'type' => $type,
+                'color' => $type === 'income' ? '#10B981' : '#EF4444',
+                'icon' => $type === 'income' ? 'coins' : 'shopping-bag',
+                'is_active' => true,
             ]);
         }
+
+        $transaction->update([
+            'category_id' => $category->id,
+            'status' => 'completed',
+        ]);
     }
 
     /**
-     * Attribuer des XP gaming
+     * ✅ Attribuer des XP gaming - CORRIGÉ
      */
     private function awardXP(User $user, int $amount, string $reason): void
     {
         try {
             $gaming = app(GamingService::class);
-            $gaming->addXP($user, $amount, $reason);
+            $gaming->addExperience($user, $amount, $reason); // ✅ CORRIGÉ
 
-            Log::info("🎮 +{$amount} XP ajouté", [
+            Log::info("🎮 +{$amount} XP", [
                 'user_id' => $user->id,
                 'reason' => $reason,
             ]);
         } catch (\Exception $e) {
-            Log::warning('⚠️ Erreur attribution XP', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::warning('⚠️ Erreur XP', ['error' => $e->getMessage()]);
         }
     }
 }
