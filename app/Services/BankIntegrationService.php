@@ -55,7 +55,7 @@ class BankIntegrationService
      * ✅ ÉTAPE 1 : Créer OU récupérer un utilisateur Bridge
      * FIX: Gère le cas "already_exists" + refresh objet
      */
-    public function createBridgeUser(User $user): array
+    public function createBridgeUser(User $user): User
     {
         $this->verifyBridgeConfig();
 
@@ -70,7 +70,7 @@ class BankIntegrationService
             $existingUser = $this->getBridgeUser($user->bridge_user_uuid);
 
             if ($existingUser) {
-                return $existingUser;
+                return $user;
             }
 
             // Si l'UUID n'existe plus chez Bridge, on va en créer un nouveau
@@ -109,7 +109,7 @@ class BankIntegrationService
                 'external_user_id' => $data['external_user_id'],
             ]);
 
-            return $data;
+            return $user;
         }
 
         // 4️⃣ Si erreur "already_exists", récupérer l'utilisateur existant
@@ -134,7 +134,7 @@ class BankIntegrationService
                 'bridge_uuid' => $bridgeUser['uuid'],
             ]);
 
-            return $bridgeUser;
+            return $user;
         }
 
         // 5️⃣ Autre erreur
@@ -255,16 +255,13 @@ class BankIntegrationService
                 'user_id' => $user->id,
             ]);
 
-            $bridgeUser = $this->createBridgeUser($user);
-
-            // ✅ FIX : Rafraîchir l'objet depuis la DB
-            $user->refresh();
+            // ✅ Récupérer le user mis à jour
+            $user = $this->createBridgeUser($user);
 
             // Vérifier que l'UUID existe maintenant
             if (! $user->bridge_user_uuid) {
                 Log::error('❌ UUID manquant après refresh', [
                     'user_id' => $user->id,
-                    'bridge_uuid_expected' => $bridgeUser['uuid'] ?? 'none',
                 ]);
                 throw new \Exception('Bridge user created but UUID not saved to database');
             }
