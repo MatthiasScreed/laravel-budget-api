@@ -659,7 +659,8 @@ class BankIntegrationService
 
         return [
             'Bridge-Version' => $this->version,
-            'Authorization' => "Basic {$credentials}",  // ✅ CORRECT
+            'Client-Id' => $this->clientId,           // ✅ CORRECT
+            'Client-Secret' => $this->clientSecret,   // ✅ CORRECT
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
