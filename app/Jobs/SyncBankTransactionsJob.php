@@ -411,33 +411,48 @@ class SyncBankTransactionsJob implements ShouldQueue
     }
 
     /**
-     * 📥 Importer une transaction
+     * 📥 Importer une transaction - VERSION CORRIGÉE
      */
     private function importTransaction(array $txData, string $accountId): bool
     {
-        $externalId = $txData['id'];
+        $externalId = (string) $txData['id'];
+        $userId = $this->bankConnection->user_id;
 
-        // ✅ Vérifier doublon
-        if (BankTransaction::where('bank_connection_id', $this->bankConnection->id)
-            ->where('external_id', $externalId)
-            ->exists()) {
-            return false;
+        // ✅ Vérifier doublon GLOBAL (même user, même external_id)
+        $existingTx = BankTransaction::where('external_id', $externalId)
+            ->whereHas('bankConnection', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->first();
+
+        if ($existingTx) {
+            // ✅ Si existe mais sur autre connexion, mettre à jour la connexion
+            if ($existingTx->bank_connection_id !== $this->bankConnection->id) {
+                $existingTx->update([
+                    'bank_connection_id' => $this->bankConnection->id
+                ]);
+                Log::info('🔄 Transaction migrée vers nouvelle connexion', [
+                    'external_id' => $externalId,
+                    'old_connection' => $existingTx->bank_connection_id,
+                    'new_connection' => $this->bankConnection->id
+                ]);
+            }
+            return false; // Pas une nouvelle import
         }
 
         // 🏷️ Catégoriser
         $suggestedCategory = $this->suggestCategory($txData);
         $confidence = $this->calculateConfidence($txData);
 
-        // 💾 Créer avec les champs EXACTS de ta table
         try {
             BankTransaction::create([
                 'bank_connection_id' => $this->bankConnection->id,
-                'external_id' => (string) $externalId,
+                'external_id' => $externalId,
                 'amount' => $txData['amount'] ?? 0,
                 'description' => $txData['clean_description'] ?? $txData['description'] ?? 'Transaction',
                 'transaction_date' => $txData['date'] ?? now()->toDateString(),
                 'value_date' => $txData['value_date'] ?? null,
-                'account_balance_after' => $txData['account_balance_after'] ?? null, // ✅ Solde après transaction
+                'account_balance_after' => $txData['account_balance_after'] ?? null,
                 'merchant_name' => $txData['bank_description'] ?? null,
                 'merchant_category' => $txData['category'] ?? null,
                 'raw_data' => $txData,
@@ -453,7 +468,6 @@ class SyncBankTransactionsJob implements ShouldQueue
                 'external_id' => $externalId,
                 'error' => $e->getMessage(),
             ]);
-
             return false;
         }
     }
