@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
+use App\Models\BankConnection;
 use App\Models\FinancialGoal;
 use App\Models\Streak;
 use App\Models\Transaction;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,12 +17,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * Dashboard Controller - CoinQuest
  *
- * Gère les statistiques du dashboard avec :
- * - Capacité d'épargne = Solde bancaire - Dépenses du mois
- * - Distribution intelligente aux objectifs
- * - Suggestions d'accélération
- *
- * ✅ VERSION CORRIGÉE - Stats gaming avec valeurs SCALAIRES
+ * ✅ VERSION CORRIGÉE
+ * - Solde total = Somme des balances des comptes bancaires
+ * - Capacité d'épargne = Solde total - Dépenses du mois
  */
 class DashboardController extends Controller
 {
@@ -29,17 +27,12 @@ class DashboardController extends Controller
     // ENDPOINT PRINCIPAL
     // ==========================================
 
-    /**
-     * Récupérer les statistiques complètes du dashboard
-     */
     public function getStats(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
 
-            Log::info('📊 Dashboard stats requested', [
-                'user_id' => $user->id,
-            ]);
+            Log::info('📊 Dashboard stats requested', ['user_id' => $user->id]);
 
             $stats = $this->buildDashboardStats($user);
 
@@ -67,22 +60,21 @@ class DashboardController extends Controller
     // CONSTRUCTION DES STATISTIQUES
     // ==========================================
 
-    /**
-     * Construire l'ensemble des statistiques du dashboard
-     */
     private function buildDashboardStats($user): array
     {
         $now = now();
         $monthDates = $this->getMonthDates($now);
 
-        // Calculs financiers de base
-        $totalBalance = $this->getTotalBalance($user);
+        // ✅ CORRECTION: Solde total = Somme des comptes bancaires
+        $totalBalance = $this->getTotalBankBalance($user);
+
+        // Revenus et dépenses du mois
         $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
         $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
 
-        // ✅ CORRECTION: Capacité d'épargne = Revenus - Dépenses du mois
-        // C'est ce qu'il reste à la fin du mois pour épargner
-        $savingsCapacity = $monthlyIncome - $monthlyExpenses;
+        // ✅ CORRECTION: Capacité d'épargne = Solde total - Dépenses du mois
+        // C'est l'argent disponible MAINTENANT pour investir
+        $savingsCapacity = $totalBalance - $monthlyExpenses;
 
         return [
             'total_balance' => round($totalBalance, 2),
@@ -91,22 +83,175 @@ class DashboardController extends Controller
                 'amount' => round($savingsCapacity, 2),
                 'is_positive' => $savingsCapacity > 0,
                 'calculation' => [
-                    'monthly_income' => round($monthlyIncome, 2),
+                    'total_balance' => round($totalBalance, 2),
                     'monthly_expenses' => round($monthlyExpenses, 2),
-                    'formula' => 'monthly_income - monthly_expenses',
+                    'formula' => 'total_balance - monthly_expenses',
                 ],
             ],
             'comparison' => $this->getMonthComparison($user, $now),
             'goals' => $this->getGoalsStats($user, $savingsCapacity),
             'streak' => $this->getActiveStreak($user),
             'period' => $this->getPeriodInfo($monthDates),
-            // ✅ CORRECTION ICI - Utiliser la méthode corrigée
             'user' => $this->getUserInfo($user),
+            // ✅ AJOUT: Détail des comptes bancaires
+            'bank_accounts' => $this->getBankAccountsSummary($user),
         ];
     }
 
     // ==========================================
-    // CALCULS FINANCIERS DE BASE
+    // ✅ NOUVEAU: CALCUL DU SOLDE BANCAIRE RÉEL
+    // ==========================================
+
+    /**
+     * Récupérer le solde total de tous les comptes bancaires
+     * ✅ CORRIGÉ - Seuls les AVOIRS (checking, savings, investment)
+     * Les crédits et prêts sont des DETTES, pas des avoirs
+     */
+    private function getTotalBankBalance($user): float
+    {
+        // Option 1: Depuis la table bank_accounts
+        try {
+            // ✅ Ne compter que les comptes "avoirs" (pas les crédits/prêts)
+            $bankBalance = DB::table('bank_accounts')
+                ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
+                ->where('bank_connections.user_id', $user->id)
+                ->where('bank_connections.status', 'active')
+                ->where('bank_accounts.is_active', true)
+                ->whereIn('bank_accounts.account_type', ['checking', 'savings', 'investment'])
+                ->sum('bank_accounts.balance');
+
+            if ($bankBalance != 0) {
+                Log::info('💰 Solde bancaire (avoirs uniquement)', [
+                    'user_id' => $user->id,
+                    'balance' => $bankBalance
+                ]);
+                return (float) $bankBalance;
+            }
+
+            // Vérifier s'il y a des comptes mais tous à 0
+            $hasAccounts = DB::table('bank_accounts')
+                ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
+                ->where('bank_connections.user_id', $user->id)
+                ->where('bank_connections.status', 'active')
+                ->exists();
+
+            if ($hasAccounts) {
+                // Il y a des comptes mais le solde est 0
+                return 0.0;
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('⚠️ Erreur lecture bank_accounts', [
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        // Option 2: Fallback - Solde initial + transactions
+        try {
+            $initialBalance = $user->initial_balance ?? 0;
+
+            $transactionBalance = Transaction::where('user_id', $user->id)
+                ->sum(DB::raw("CASE
+                    WHEN type = 'income' THEN amount
+                    WHEN type = 'expense' THEN -amount
+                    ELSE 0
+                END"));
+
+            $calculatedBalance = $initialBalance + $transactionBalance;
+
+            Log::info('💰 Solde calculé (fallback)', [
+                'user_id' => $user->id,
+                'initial' => $initialBalance,
+                'transactions' => $transactionBalance,
+                'total' => $calculatedBalance
+            ]);
+
+            return (float) $calculatedBalance;
+        } catch (\Exception $e) {
+            Log::error('❌ Erreur calcul solde', ['error' => $e->getMessage()]);
+            return 0.0;
+        }
+    }
+
+    /**
+     * Résumé des comptes bancaires pour l'affichage
+     * ✅ CORRIGÉ avec les bons noms de colonnes
+     */
+    private function getBankAccountsSummary($user): array
+    {
+        try {
+            $accounts = DB::table('bank_accounts')
+                ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
+                ->where('bank_connections.user_id', $user->id)
+                ->where('bank_connections.status', 'active')
+                ->where('bank_accounts.is_active', true)
+                ->select([
+                    'bank_accounts.id',
+                    'bank_accounts.account_name',    // ✅ Corrigé
+                    'bank_accounts.account_type',    // ✅ Corrigé
+                    'bank_accounts.balance',
+                    'bank_accounts.currency',
+                    'bank_connections.bank_name'
+                ])
+                ->get();
+
+            if ($accounts->isEmpty()) {
+                return [
+                    'count' => 0,
+                    'accounts' => [],
+                    'total_assets' => 0,
+                    'total_liabilities' => 0,
+                    'net_balance' => 0,
+                    'has_bank_connection' => false,
+                ];
+            }
+
+            // ✅ Séparer avoirs et dettes
+            $assets = $accounts->whereIn('account_type', ['checking', 'savings', 'investment']);
+            $liabilities = $accounts->whereIn('account_type', ['credit', 'loan']);
+
+            $totalAssets = $assets->sum('balance');
+            $totalLiabilities = abs($liabilities->sum('balance')); // Les dettes sont souvent négatives
+            $netBalance = $totalAssets - $totalLiabilities;
+
+            return [
+                'count' => $accounts->count(),
+                'accounts' => $accounts->map(function ($account) {
+                    return [
+                        'id' => $account->id,
+                        'name' => $account->account_name,
+                        'type' => $account->account_type,
+                        'balance' => round((float) $account->balance, 2),
+                        'currency' => $account->currency,
+                        'bank_name' => $account->bank_name,
+                        'is_liability' => in_array($account->account_type, ['credit', 'loan']),
+                    ];
+                })->toArray(),
+                'total_assets' => round($totalAssets, 2),
+                'total_liabilities' => round($totalLiabilities, 2),
+                'net_balance' => round($netBalance, 2),
+                'has_bank_connection' => true,
+            ];
+
+        } catch (\Exception $e) {
+            Log::warning('⚠️ Impossible de récupérer les comptes bancaires', [
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'count' => 0,
+                'accounts' => [],
+                'total_assets' => 0,
+                'total_liabilities' => 0,
+                'net_balance' => 0,
+                'has_bank_connection' => false,
+                'error' => 'Connectez vos comptes bancaires pour voir le solde réel',
+            ];
+        }
+    }
+
+    // ==========================================
+    // CALCULS DU MOIS EN COURS
     // ==========================================
 
     private function getMonthDates($date): array
@@ -115,16 +260,6 @@ class DashboardController extends Controller
             'start' => $date->copy()->startOfMonth(),
             'end' => $date->copy()->endOfMonth(),
         ];
-    }
-
-    private function getTotalBalance($user): float
-    {
-        return Transaction::where('user_id', $user->id)
-            ->sum(DB::raw('CASE
-                WHEN type = "income" THEN amount
-                WHEN type = "expense" THEN -amount
-                ELSE 0 END'
-            ));
     }
 
     private function getCurrentMonthStats($user, array $dates): array
@@ -144,7 +279,7 @@ class DashboardController extends Controller
 
     private function getMonthlyIncome($user, array $dates): float
     {
-        return Transaction::where('user_id', $user->id)
+        return (float) Transaction::where('user_id', $user->id)
             ->where('type', 'income')
             ->whereBetween('transaction_date', [$dates['start'], $dates['end']])
             ->sum('amount');
@@ -152,7 +287,7 @@ class DashboardController extends Controller
 
     private function getMonthlyExpenses($user, array $dates): float
     {
-        return Transaction::where('user_id', $user->id)
+        return (float) Transaction::where('user_id', $user->id)
             ->where('type', 'expense')
             ->whereBetween('transaction_date', [$dates['start'], $dates['end']])
             ->sum('amount');
@@ -166,29 +301,30 @@ class DashboardController extends Controller
     }
 
     // ==========================================
-    // COMPARAISON TEMPORELLE
+    // COMPARAISON MENSUELLE
     // ==========================================
 
     private function getMonthComparison($user, $now): array
     {
         $lastMonth = $now->copy()->subMonth();
         $lastMonthDates = $this->getMonthDates($lastMonth);
+        $currentMonthDates = $this->getMonthDates($now);
 
-        // ✅ CORRECTION: Capacité = Revenus - Dépenses (pas Solde - Dépenses)
+        // ✅ Pour la comparaison, on utilise Revenus - Dépenses
+        // (car le solde bancaire du mois dernier n'est plus accessible)
         $lastMonthIncome = $this->getMonthlyIncome($user, $lastMonthDates);
         $lastMonthExpenses = $this->getMonthlyExpenses($user, $lastMonthDates);
-        $lastMonthCapacity = $lastMonthIncome - $lastMonthExpenses;
+        $lastMonthNet = $lastMonthIncome - $lastMonthExpenses;
 
-        $currentMonthDates = $this->getMonthDates($now);
         $currentIncome = $this->getMonthlyIncome($user, $currentMonthDates);
         $currentExpenses = $this->getMonthlyExpenses($user, $currentMonthDates);
-        $currentCapacity = $currentIncome - $currentExpenses;
+        $currentNet = $currentIncome - $currentExpenses;
 
-        $changePercent = $this->calculateChange($lastMonthCapacity, $currentCapacity);
+        $changePercent = $this->calculateChange($lastMonthNet, $currentNet);
 
         return [
-            'last_month_capacity' => round($lastMonthCapacity, 2),
-            'current_month_capacity' => round($currentCapacity, 2),
+            'last_month_capacity' => round($lastMonthNet, 2),
+            'current_month_capacity' => round($currentNet, 2),
             'change_percent' => $changePercent,
             'trend' => $this->getTrend($changePercent),
         ];
@@ -197,7 +333,7 @@ class DashboardController extends Controller
     private function calculateChange(float $previous, float $current): float
     {
         if ($previous == 0) {
-            return $current > 0 ? 100 : 0;
+            return $current > 0 ? 100 : ($current < 0 ? -100 : 0);
         }
         return round((($current - $previous) / abs($previous)) * 100, 1);
     }
@@ -295,7 +431,7 @@ class DashboardController extends Controller
     }
 
     // ==========================================
-    // GAMING & AUTRES INFOS
+    // GAMING & USER INFO
     // ==========================================
 
     private function getActiveStreak($user): ?array
@@ -324,21 +460,11 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * ✅ CORRECTION : Extraire les VALEURS SCALAIRES, pas les objets
-     *
-     * AVANT (bug) : 'level' => $user->level  → retourne l'objet UserLevel entier
-     * APRÈS (fix) : 'level' => $user->level?->level ?? 1  → retourne juste le nombre
-     */
     private function getUserInfo($user): array
     {
-        // ✅ Charger la relation si pas encore chargée
         $user->loadMissing('level');
-
-        // ✅ Extraire les valeurs SCALAIRES depuis l'objet UserLevel
         $userLevel = $user->level;
 
-        // Compter les achievements débloqués
         $achievementsCount = 0;
         try {
             $achievementsCount = DB::table('user_achievements')
@@ -350,178 +476,48 @@ class DashboardController extends Controller
         }
 
         return [
-            // ✅ CORRECTION : $user->level est un OBJET, on extrait ->level
             'level' => $userLevel?->level ?? 1,
-            // ✅ CORRECTION : Extraire total_xp depuis l'objet
             'xp' => $userLevel?->total_xp ?? 0,
-            // ✅ CORRECTION : Compter les achievements, pas retourner la relation
             'achievements' => $achievementsCount,
         ];
     }
 
     // ==========================================
-    // ENDPOINTS SUPPLÉMENTAIRES
+    // AUTRES ENDPOINTS
     // ==========================================
 
-    public function getGoalDistribution(Request $request): JsonResponse
+    public function getSavingsCapacity(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
-
-            // ✅ CORRECTION: Capacité = Revenus - Dépenses du mois
             $monthDates = $this->getMonthDates(now());
-            $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
+
+            $totalBalance = $this->getTotalBankBalance($user);
             $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
-            $capacity = max(0, $monthlyIncome - $monthlyExpenses);
-
-            $goals = FinancialGoal::where('user_id', $user->id)
-                ->where('status', 'active')
-                ->orderBy('priority', 'asc')
-                ->orderBy('target_date', 'asc')
-                ->get();
-
-            $suggestions = $this->generateDistributionSuggestions($goals, $capacity);
+            $capacity = $totalBalance - $monthlyExpenses;
 
             return response()->json([
                 'success' => true,
                 'data' => [
+                    'total_balance' => round($totalBalance, 2),
+                    'monthly_expenses' => round($monthlyExpenses, 2),
                     'savings_capacity' => round($capacity, 2),
-                    'goals' => $goals->map(function ($goal) {
-                        return [
-                            'id' => $goal->id,
-                            'name' => $goal->name,
-                            'icon' => $goal->icon,
-                            'color' => $goal->color,
-                            'target_amount' => $goal->target_amount,
-                            'current_amount' => $goal->current_amount,
-                            'remaining_amount' => $goal->remaining_amount,
-                            'monthly_target' => $goal->monthly_target,
-                            'months_remaining' => $goal->months_remaining,
-                            'projected_completion_date' => $goal->projected_completion_date,
-                            'progress_percentage' => $goal->progress_percentage,
-                            'can_accelerate' => $goal->can_accelerate,
-                        ];
-                    }),
-                    'suggestions' => $suggestions,
+                    'is_positive' => $capacity > 0,
                 ],
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Erreur distribution objectifs', ['error' => $e->getMessage()]);
-
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur distribution aux objectifs',
-                'error' => config('app.debug') ? $e->getMessage() : null,
+                'message' => 'Erreur calcul capacité',
             ], 500);
         }
-    }
-
-    private function generateDistributionSuggestions($goals, float $capacity): array
-    {
-        $suggestions = [];
-
-        if ($goals->isEmpty() || $capacity <= 0) {
-            return $suggestions;
-        }
-
-        $totalMonthly = $goals->sum('monthly_target');
-
-        // Suggestion 1 : Répartition égale
-        if ($goals->count() > 0) {
-            $equalAmount = $capacity / $goals->count();
-
-            $suggestions[] = [
-                'type' => 'equal',
-                'title' => 'Répartition égale',
-                'description' => 'Distribuer équitablement sur tous les objectifs',
-                'total_amount' => round($capacity, 2),
-                'distribution' => $goals->map(function ($goal) use ($equalAmount) {
-                    $amount = min($equalAmount, $goal->remaining_amount);
-                    return [
-                        'goal_id' => $goal->id,
-                        'goal_name' => $goal->name,
-                        'amount' => round($amount, 2),
-                        'simulation' => $goal->simulateContribution($amount),
-                    ];
-                })->toArray(),
-            ];
-        }
-
-        // Suggestion 2 : Priorité à l'objectif le plus proche
-        $closestGoal = $goals
-            ->filter(fn ($g) => $g->months_remaining !== null && $g->months_remaining > 0)
-            ->sortBy('months_remaining')
-            ->first();
-
-        if ($closestGoal && $capacity >= $closestGoal->remaining_amount) {
-            $suggestions[] = [
-                'type' => 'complete_closest',
-                'title' => 'Compléter le plus proche',
-                'description' => "Financer complètement '{$closestGoal->name}' et répartir le reste",
-                'total_amount' => round($capacity, 2),
-                'distribution' => [[
-                    'goal_id' => $closestGoal->id,
-                    'goal_name' => $closestGoal->name,
-                    'amount' => round($closestGoal->remaining_amount, 2),
-                    'simulation' => $closestGoal->simulateContribution($closestGoal->remaining_amount),
-                ]],
-            ];
-        }
-
-        // Suggestion 3 : Accélérer tous d'1 mois
-        if ($totalMonthly > 0 && $capacity >= $totalMonthly) {
-            $suggestions[] = [
-                'type' => 'accelerate_all',
-                'title' => 'Accélérer tous d\'1 mois',
-                'description' => 'Gagner 1 mois sur tous les objectifs',
-                'total_amount' => round(min($capacity, $totalMonthly), 2),
-                'distribution' => $goals
-                    ->filter(fn ($g) => $g->monthly_target > 0)
-                    ->map(function ($goal) {
-                        $amount = min($goal->monthly_target, $goal->remaining_amount);
-                        return [
-                            'goal_id' => $goal->id,
-                            'goal_name' => $goal->name,
-                            'amount' => round($amount, 2),
-                            'simulation' => $goal->simulateContribution($amount),
-                        ];
-                    })->toArray(),
-            ];
-        }
-
-        // Suggestion 4 : Priorités haute d'abord
-        $highPriorityGoals = $goals->where('priority', '<=', 2);
-        if ($highPriorityGoals->count() > 0) {
-            $perGoalAmount = $capacity / $highPriorityGoals->count();
-
-            $suggestions[] = [
-                'type' => 'priority',
-                'title' => 'Objectifs prioritaires',
-                'description' => 'Focus sur les objectifs à haute priorité',
-                'total_amount' => round($capacity, 2),
-                'distribution' => $highPriorityGoals->map(function ($goal) use ($perGoalAmount) {
-                    $amount = min($perGoalAmount, $goal->remaining_amount);
-                    return [
-                        'goal_id' => $goal->id,
-                        'goal_name' => $goal->name,
-                        'amount' => round($amount, 2),
-                        'simulation' => $goal->simulateContribution($amount),
-                    ];
-                })->toArray(),
-            ];
-        }
-
-        return $suggestions;
     }
 
     public function refreshAll(): JsonResponse
     {
         try {
             $user = Auth::user();
-
-            Log::info('🔄 Refresh dashboard', ['user_id' => $user->id]);
-
             $stats = $this->buildDashboardStats($user);
 
             return response()->json([
@@ -532,12 +528,9 @@ class DashboardController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Erreur refresh dashboard', ['error' => $e->getMessage()]);
-
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du rafraîchissement',
-                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
