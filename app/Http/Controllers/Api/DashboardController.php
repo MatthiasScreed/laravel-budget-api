@@ -77,10 +77,12 @@ class DashboardController extends Controller
 
         // Calculs financiers de base
         $totalBalance = $this->getTotalBalance($user);
+        $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
         $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
 
-        // ✅ CAPACITÉ D'ÉPARGNE = Solde - Dépenses du mois
-        $savingsCapacity = $totalBalance - $monthlyExpenses;
+        // ✅ CORRECTION: Capacité d'épargne = Revenus - Dépenses du mois
+        // C'est ce qu'il reste à la fin du mois pour épargner
+        $savingsCapacity = $monthlyIncome - $monthlyExpenses;
 
         return [
             'total_balance' => round($totalBalance, 2),
@@ -89,9 +91,9 @@ class DashboardController extends Controller
                 'amount' => round($savingsCapacity, 2),
                 'is_positive' => $savingsCapacity > 0,
                 'calculation' => [
-                    'total_balance' => round($totalBalance, 2),
+                    'monthly_income' => round($monthlyIncome, 2),
                     'monthly_expenses' => round($monthlyExpenses, 2),
-                    'formula' => 'total_balance - monthly_expenses',
+                    'formula' => 'monthly_income - monthly_expenses',
                 ],
             ],
             'comparison' => $this->getMonthComparison($user, $now),
@@ -172,14 +174,15 @@ class DashboardController extends Controller
         $lastMonth = $now->copy()->subMonth();
         $lastMonthDates = $this->getMonthDates($lastMonth);
 
-        $lastMonthBalance = $this->getTotalBalance($user);
+        // ✅ CORRECTION: Capacité = Revenus - Dépenses (pas Solde - Dépenses)
+        $lastMonthIncome = $this->getMonthlyIncome($user, $lastMonthDates);
         $lastMonthExpenses = $this->getMonthlyExpenses($user, $lastMonthDates);
-        $lastMonthCapacity = $lastMonthBalance - $lastMonthExpenses;
+        $lastMonthCapacity = $lastMonthIncome - $lastMonthExpenses;
 
         $currentMonthDates = $this->getMonthDates($now);
-        $currentBalance = $this->getTotalBalance($user);
+        $currentIncome = $this->getMonthlyIncome($user, $currentMonthDates);
         $currentExpenses = $this->getMonthlyExpenses($user, $currentMonthDates);
-        $currentCapacity = $currentBalance - $currentExpenses;
+        $currentCapacity = $currentIncome - $currentExpenses;
 
         $changePercent = $this->calculateChange($lastMonthCapacity, $currentCapacity);
 
@@ -365,10 +368,11 @@ class DashboardController extends Controller
         try {
             $user = Auth::user();
 
-            $totalBalance = $this->getTotalBalance($user);
+            // ✅ CORRECTION: Capacité = Revenus - Dépenses du mois
             $monthDates = $this->getMonthDates(now());
+            $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
             $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
-            $capacity = max(0, $totalBalance - $monthlyExpenses);
+            $capacity = max(0, $monthlyIncome - $monthlyExpenses);
 
             $goals = FinancialGoal::where('user_id', $user->id)
                 ->where('status', 'active')
