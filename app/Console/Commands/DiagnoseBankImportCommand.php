@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Commande de diagnostic et réimportation des transactions bancaires
@@ -156,7 +157,18 @@ class DiagnoseBankImportCommand extends Command
         }
 
         $total = $query->count();
-        $fromBridge = $query->clone()->whereNotNull('external_id')->count();
+
+        // ✅ Vérifier si la colonne external_id existe
+        $hasExternalId = Schema::hasColumn('transactions', 'external_id');
+
+        if (!$hasExternalId) {
+            $this->warn('  ⚠️ Colonne external_id manquante !');
+            $this->line('  👉 Exécutez: php artisan migrate');
+            $fromBridge = 0;
+        } else {
+            $fromBridge = $query->clone()->whereNotNull('external_id')->count();
+        }
+
         $manual = $total - $fromBridge;
 
         $this->line("  Total: {$total}");
@@ -224,6 +236,16 @@ class DiagnoseBankImportCommand extends Command
         $this->newLine();
         $this->info('🔄 Conversion des transactions bancaires...');
 
+        // ✅ Vérifier que la colonne external_id existe
+        if (!Schema::hasColumn('transactions', 'external_id')) {
+            $this->error('❌ Colonne external_id manquante dans la table transactions !');
+            $this->line('');
+            $this->line('👉 Exécutez d\'abord:');
+            $this->line('   php artisan migrate');
+            $this->line('');
+            return;
+        }
+
         $query = BankTransaction::query()
             ->whereIn('processing_status', ['imported', 'categorized'])
             ->where('converted_transaction_id', null);
@@ -285,23 +307,38 @@ class DiagnoseBankImportCommand extends Command
         $amount = abs($bankTx->amount);
         $type = $bankTx->amount >= 0 ? 'income' : 'expense';
 
-        return Transaction::create([
+        // ✅ Construire les données de base
+        $data = [
             'user_id' => $userId,
-            'external_id' => $bankTx->external_id,
             'amount' => $amount,
             'description' => $bankTx->description ?? $bankTx->formatted_description ?? 'Transaction importée',
             'type' => $type,
             'transaction_date' => $bankTx->transaction_date,
             'category_id' => $bankTx->suggested_category_id,
             'status' => 'completed',
-            'source' => 'bank_import',
-            'metadata' => [
+        ];
+
+        // ✅ Ajouter external_id si la colonne existe
+        if (Schema::hasColumn('transactions', 'external_id')) {
+            $data['external_id'] = $bankTx->external_id;
+        }
+
+        // ✅ Ajouter source si la colonne existe
+        if (Schema::hasColumn('transactions', 'source')) {
+            $data['source'] = 'bank_import';
+        }
+
+        // ✅ Ajouter metadata si la colonne existe
+        if (Schema::hasColumn('transactions', 'metadata')) {
+            $data['metadata'] = [
                 'bank_connection_id' => $connection->id,
                 'bank_transaction_id' => $bankTx->id,
                 'original_amount' => $bankTx->amount,
                 'merchant_name' => $bankTx->merchant_name,
                 'imported_at' => now()->toISOString(),
-            ],
-        ]);
+            ];
+        }
+
+        return Transaction::create($data);
     }
 }
