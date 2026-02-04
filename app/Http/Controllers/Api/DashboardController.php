@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Log;
  * - Capacité d'épargne = Solde bancaire - Dépenses du mois
  * - Distribution intelligente aux objectifs
  * - Suggestions d'accélération
+ *
+ * ✅ VERSION CORRIGÉE - Stats gaming avec valeurs SCALAIRES
  */
 class DashboardController extends Controller
 {
@@ -67,8 +69,6 @@ class DashboardController extends Controller
 
     /**
      * Construire l'ensemble des statistiques du dashboard
-     *
-     * @param  User  $user
      */
     private function buildDashboardStats($user): array
     {
@@ -83,13 +83,8 @@ class DashboardController extends Controller
         $savingsCapacity = $totalBalance - $monthlyExpenses;
 
         return [
-            // Solde bancaire total
             'total_balance' => round($totalBalance, 2),
-
-            // Statistiques du mois actuel
             'current_month' => $this->getCurrentMonthStats($user, $monthDates),
-
-            // ✅ Capacité d'épargne avec détail du calcul
             'savings_capacity' => [
                 'amount' => round($savingsCapacity, 2),
                 'is_positive' => $savingsCapacity > 0,
@@ -99,20 +94,11 @@ class DashboardController extends Controller
                     'formula' => 'total_balance - monthly_expenses',
                 ],
             ],
-
-            // Comparaison avec le mois dernier
             'comparison' => $this->getMonthComparison($user, $now),
-
-            // Statistiques des objectifs
             'goals' => $this->getGoalsStats($user, $savingsCapacity),
-
-            // Série active (gaming)
             'streak' => $this->getActiveStreak($user),
-
-            // Informations de période
             'period' => $this->getPeriodInfo($monthDates),
-
-            // Informations utilisateur
+            // ✅ CORRECTION ICI - Utiliser la méthode corrigée
             'user' => $this->getUserInfo($user),
         ];
     }
@@ -121,11 +107,6 @@ class DashboardController extends Controller
     // CALCULS FINANCIERS DE BASE
     // ==========================================
 
-    /**
-     * Obtenir les dates de début et fin du mois
-     *
-     * @param  Carbon  $date
-     */
     private function getMonthDates($date): array
     {
         return [
@@ -134,11 +115,6 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Calculer le solde bancaire total (historique complet)
-     *
-     * @param  User  $user
-     */
     private function getTotalBalance($user): float
     {
         return Transaction::where('user_id', $user->id)
@@ -149,11 +125,6 @@ class DashboardController extends Controller
             ));
     }
 
-    /**
-     * Statistiques du mois actuel
-     *
-     * @param  User  $user
-     */
     private function getCurrentMonthStats($user, array $dates): array
     {
         $income = $this->getMonthlyIncome($user, $dates);
@@ -169,12 +140,6 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Revenus du mois
-     * ✅ Utilise transaction_date
-     *
-     * @param  User  $user
-     */
     private function getMonthlyIncome($user, array $dates): float
     {
         return Transaction::where('user_id', $user->id)
@@ -183,12 +148,6 @@ class DashboardController extends Controller
             ->sum('amount');
     }
 
-    /**
-     * Dépenses du mois
-     * ✅ Utilise transaction_date
-     *
-     * @param  User  $user
-     */
     private function getMonthlyExpenses($user, array $dates): float
     {
         return Transaction::where('user_id', $user->id)
@@ -197,12 +156,6 @@ class DashboardController extends Controller
             ->sum('amount');
     }
 
-    /**
-     * Nombre de transactions du mois
-     * ✅ Utilise transaction_date
-     *
-     * @param  User  $user
-     */
     private function getTransactionCount($user, array $dates): int
     {
         return Transaction::where('user_id', $user->id)
@@ -214,33 +167,21 @@ class DashboardController extends Controller
     // COMPARAISON TEMPORELLE
     // ==========================================
 
-    /**
-     * Comparaison avec le mois dernier
-     *
-     * @param  User  $user
-     * @param  Carbon  $now
-     */
     private function getMonthComparison($user, $now): array
     {
         $lastMonth = $now->copy()->subMonth();
         $lastMonthDates = $this->getMonthDates($lastMonth);
 
-        // Capacité du mois dernier
         $lastMonthBalance = $this->getTotalBalance($user);
         $lastMonthExpenses = $this->getMonthlyExpenses($user, $lastMonthDates);
         $lastMonthCapacity = $lastMonthBalance - $lastMonthExpenses;
 
-        // Capacité du mois actuel
         $currentMonthDates = $this->getMonthDates($now);
         $currentBalance = $this->getTotalBalance($user);
         $currentExpenses = $this->getMonthlyExpenses($user, $currentMonthDates);
         $currentCapacity = $currentBalance - $currentExpenses;
 
-        // Calcul du changement
-        $changePercent = $this->calculateChange(
-            $lastMonthCapacity,
-            $currentCapacity
-        );
+        $changePercent = $this->calculateChange($lastMonthCapacity, $currentCapacity);
 
         return [
             'last_month_capacity' => round($lastMonthCapacity, 2),
@@ -250,29 +191,18 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Calculer le changement en pourcentage
-     */
     private function calculateChange(float $previous, float $current): float
     {
         if ($previous == 0) {
             return $current > 0 ? 100 : 0;
         }
-
         return round((($current - $previous) / abs($previous)) * 100, 1);
     }
 
-    /**
-     * Déterminer la tendance
-     */
     private function getTrend(float $changePercent): string
     {
-        if ($changePercent > 5) {
-            return 'up';
-        } elseif ($changePercent < -5) {
-            return 'down';
-        }
-
+        if ($changePercent > 5) return 'up';
+        if ($changePercent < -5) return 'down';
         return 'stable';
     }
 
@@ -280,35 +210,25 @@ class DashboardController extends Controller
     // STATISTIQUES DES OBJECTIFS
     // ==========================================
 
-    /**
-     * ✅ Statistiques des objectifs avec capacité d'épargne
-     *
-     * @param  User  $user
-     */
     private function getGoalsStats($user, float $savingsCapacity): array
     {
-        // Nombre d'objectifs actifs
         $activeGoals = FinancialGoal::where('user_id', $user->id)
             ->where('status', 'active')
             ->count();
 
-        // ✅ Total des contributions mensuelles souhaitées (monthly_target)
         $totalMonthlyTargets = FinancialGoal::where('user_id', $user->id)
             ->where('status', 'active')
             ->sum('monthly_target');
 
-        // Objectifs avec contribution mensuelle définie
         $goalsWithTarget = FinancialGoal::where('user_id', $user->id)
             ->where('status', 'active')
             ->where('monthly_target', '>', 0)
             ->count();
 
-        // Total déjà épargné sur tous les objectifs
         $totalSaved = FinancialGoal::where('user_id', $user->id)
             ->where('status', 'active')
             ->sum('current_amount');
 
-        // Total des objectifs (somme des target_amount)
         $totalTarget = FinancialGoal::where('user_id', $user->id)
             ->where('status', 'active')
             ->sum('target_amount');
@@ -320,21 +240,12 @@ class DashboardController extends Controller
             'total_monthly_targets' => round($totalMonthlyTargets, 2),
             'total_saved' => round($totalSaved, 2),
             'total_target' => round($totalTarget, 2),
-            'capacity_status' => $this->getCapacityStatus(
-                $savingsCapacity,
-                $totalMonthlyTargets
-            ),
+            'capacity_status' => $this->getCapacityStatus($savingsCapacity, $totalMonthlyTargets),
         ];
     }
 
-    /**
-     * ✅ Évaluer le status de la capacité vs contributions
-     */
-    private function getCapacityStatus(
-        float $capacity,
-        float $monthlyTargets
-    ): array {
-        // Aucune contribution mensuelle configurée
+    private function getCapacityStatus(float $capacity, float $monthlyTargets): array
+    {
         if ($monthlyTargets == 0) {
             return [
                 'status' => 'not_configured',
@@ -343,7 +254,6 @@ class DashboardController extends Controller
             ];
         }
 
-        // Capacité insuffisante
         if ($capacity <= 0) {
             return [
                 'status' => 'insufficient',
@@ -355,7 +265,6 @@ class DashboardController extends Controller
 
         $ratio = $capacity / $monthlyTargets;
 
-        // Capacité largement suffisante
         if ($ratio >= 1) {
             return [
                 'status' => 'excellent',
@@ -365,7 +274,6 @@ class DashboardController extends Controller
             ];
         }
 
-        // Capacité limite
         if ($ratio >= 0.8) {
             return [
                 'status' => 'warning',
@@ -375,7 +283,6 @@ class DashboardController extends Controller
             ];
         }
 
-        // Capacité insuffisante
         return [
             'status' => 'deficit',
             'message' => 'Contributions supérieures à votre capacité',
@@ -388,18 +295,13 @@ class DashboardController extends Controller
     // GAMING & AUTRES INFOS
     // ==========================================
 
-    /**
-     * Série active
-     *
-     * @param  User  $user
-     */
     private function getActiveStreak($user): ?array
     {
         $streak = Streak::where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
 
-        if (! $streak) {
+        if (!$streak) {
             return null;
         }
 
@@ -410,9 +312,6 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Informations de période
-     */
     private function getPeriodInfo(array $dates): array
     {
         return [
@@ -423,16 +322,37 @@ class DashboardController extends Controller
     }
 
     /**
-     * Informations utilisateur
+     * ✅ CORRECTION : Extraire les VALEURS SCALAIRES, pas les objets
      *
-     * @param  User  $user
+     * AVANT (bug) : 'level' => $user->level  → retourne l'objet UserLevel entier
+     * APRÈS (fix) : 'level' => $user->level?->level ?? 1  → retourne juste le nombre
      */
     private function getUserInfo($user): array
     {
+        // ✅ Charger la relation si pas encore chargée
+        $user->loadMissing('level');
+
+        // ✅ Extraire les valeurs SCALAIRES depuis l'objet UserLevel
+        $userLevel = $user->level;
+
+        // Compter les achievements débloqués
+        $achievementsCount = 0;
+        try {
+            $achievementsCount = DB::table('user_achievements')
+                ->where('user_id', $user->id)
+                ->where('unlocked', true)
+                ->count();
+        } catch (\Exception $e) {
+            // Table n'existe peut-être pas
+        }
+
         return [
-            'level' => $user->level ?? 1,
-            'xp' => $user->xp ?? 0,
-            'achievements' => $user->achievements ?? 0,
+            // ✅ CORRECTION : $user->level est un OBJET, on extrait ->level
+            'level' => $userLevel?->level ?? 1,
+            // ✅ CORRECTION : Extraire total_xp depuis l'objet
+            'xp' => $userLevel?->total_xp ?? 0,
+            // ✅ CORRECTION : Compter les achievements, pas retourner la relation
+            'achievements' => $achievementsCount,
         ];
     }
 
@@ -440,28 +360,22 @@ class DashboardController extends Controller
     // ENDPOINTS SUPPLÉMENTAIRES
     // ==========================================
 
-    /**
-     * ✅ Distribution intelligente de la capacité d'épargne
-     */
     public function getGoalDistribution(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
 
-            // Capacité disponible (Solde - Dépenses du mois)
             $totalBalance = $this->getTotalBalance($user);
             $monthDates = $this->getMonthDates(now());
             $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
             $capacity = max(0, $totalBalance - $monthlyExpenses);
 
-            // Objectifs actifs avec monthly_target
             $goals = FinancialGoal::where('user_id', $user->id)
                 ->where('status', 'active')
                 ->orderBy('priority', 'asc')
                 ->orderBy('target_date', 'asc')
                 ->get();
 
-            // Suggestions intelligentes
             $suggestions = $this->generateDistributionSuggestions($goals, $capacity);
 
             return response()->json([
@@ -489,9 +403,7 @@ class DashboardController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Erreur distribution objectifs', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('❌ Erreur distribution objectifs', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
@@ -501,11 +413,6 @@ class DashboardController extends Controller
         }
     }
 
-    /**
-     * ✅ Générer suggestions de distribution intelligente
-     *
-     * @param  Collection  $goals
-     */
     private function generateDistributionSuggestions($goals, float $capacity): array
     {
         $suggestions = [];
@@ -514,10 +421,9 @@ class DashboardController extends Controller
             return $suggestions;
         }
 
-        // Total des contributions mensuelles
         $totalMonthly = $goals->sum('monthly_target');
 
-        // ✅ Suggestion 1 : Répartition égale
+        // Suggestion 1 : Répartition égale
         if ($goals->count() > 0) {
             $equalAmount = $capacity / $goals->count();
 
@@ -528,7 +434,6 @@ class DashboardController extends Controller
                 'total_amount' => round($capacity, 2),
                 'distribution' => $goals->map(function ($goal) use ($equalAmount) {
                     $amount = min($equalAmount, $goal->remaining_amount);
-
                     return [
                         'goal_id' => $goal->id,
                         'goal_name' => $goal->name,
@@ -539,7 +444,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // ✅ Suggestion 2 : Priorité à l'objectif le plus proche
+        // Suggestion 2 : Priorité à l'objectif le plus proche
         $closestGoal = $goals
             ->filter(fn ($g) => $g->months_remaining !== null && $g->months_remaining > 0)
             ->sortBy('months_remaining')
@@ -560,7 +465,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // ✅ Suggestion 3 : Accélérer tous d'1 mois
+        // Suggestion 3 : Accélérer tous d'1 mois
         if ($totalMonthly > 0 && $capacity >= $totalMonthly) {
             $suggestions[] = [
                 'type' => 'accelerate_all',
@@ -571,7 +476,6 @@ class DashboardController extends Controller
                     ->filter(fn ($g) => $g->monthly_target > 0)
                     ->map(function ($goal) {
                         $amount = min($goal->monthly_target, $goal->remaining_amount);
-
                         return [
                             'goal_id' => $goal->id,
                             'goal_name' => $goal->name,
@@ -582,7 +486,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // ✅ Suggestion 4 : Priorités haute d'abord
+        // Suggestion 4 : Priorités haute d'abord
         $highPriorityGoals = $goals->where('priority', '<=', 2);
         if ($highPriorityGoals->count() > 0) {
             $perGoalAmount = $capacity / $highPriorityGoals->count();
@@ -594,7 +498,6 @@ class DashboardController extends Controller
                 'total_amount' => round($capacity, 2),
                 'distribution' => $highPriorityGoals->map(function ($goal) use ($perGoalAmount) {
                     $amount = min($perGoalAmount, $goal->remaining_amount);
-
                     return [
                         'goal_id' => $goal->id,
                         'goal_name' => $goal->name,
@@ -608,17 +511,12 @@ class DashboardController extends Controller
         return $suggestions;
     }
 
-    /**
-     * Rafraîchir toutes les données du dashboard
-     */
     public function refreshAll(): JsonResponse
     {
         try {
             $user = Auth::user();
 
-            Log::info('🔄 Refresh dashboard', [
-                'user_id' => $user->id,
-            ]);
+            Log::info('🔄 Refresh dashboard', ['user_id' => $user->id]);
 
             $stats = $this->buildDashboardStats($user);
 
@@ -630,9 +528,7 @@ class DashboardController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Erreur refresh dashboard', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::error('❌ Erreur refresh dashboard', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
