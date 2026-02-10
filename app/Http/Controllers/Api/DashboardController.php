@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
 class DashboardController extends Controller
 {
     // ==========================================
-    // ✅ NOUVEAU: ENDPOINT PRINCIPAL COMPLET
+    // ✅ ENDPOINT PRINCIPAL COMPLET
     // ==========================================
 
     /**
@@ -54,7 +54,7 @@ class DashboardController extends Controller
     }
 
     // ==========================================
-    // ✅ NOUVEAU: MÉTRIQUES UNIQUEMENT
+    // ✅ MÉTRIQUES UNIQUEMENT
     // ==========================================
 
     /**
@@ -78,7 +78,7 @@ class DashboardController extends Controller
     }
 
     // ==========================================
-    // ✅ NOUVEAU: RAFRAÎCHIR MÉTRIQUES
+    // ✅ RAFRAÎCHIR MÉTRIQUES
     // ==========================================
 
     /**
@@ -90,7 +90,6 @@ class DashboardController extends Controller
         try {
             $user = Auth::user();
 
-            // Vider le cache des métriques
             \Cache::forget("dashboard_metrics_{$user->id}");
 
             $metrics = $this->getMetricsData($user);
@@ -112,7 +111,8 @@ class DashboardController extends Controller
     // ==========================================
 
     /**
-     * Calcule les métriques financières
+     * ✅ CORRIGÉ: Calcule les métriques financières
+     * savings_capacity = solde réel du compte (ce qui reste)
      */
     private function getMetricsData($user): array
     {
@@ -120,19 +120,61 @@ class DashboardController extends Controller
 
         $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
         $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
-        $totalBalance = $this->getTotalBankBalance($user);
-        $savingsCapacity = $monthlyIncome - $monthlyExpenses;
-        $savingsRate = $monthlyIncome > 0 ?
-            ($savingsCapacity / $monthlyIncome) * 100 : 0;
+
+        // ✅ CORRIGÉ: Capacité d'épargne = SOLDE RÉEL DU COMPTE
+        $savingsCapacity = $this->getSavingsCapacityAmount($user);
+
+        // Variation du mois (pour info)
+        $monthlyVariation = $monthlyIncome - $monthlyExpenses;
+
+        // Taux d'épargne basé sur les revenus du mois
+        $savingsRate = $monthlyIncome > 0
+            ? ($monthlyVariation / $monthlyIncome) * 100
+            : 0;
 
         return [
             'monthly_income' => round($monthlyIncome, 2),
             'monthly_expenses' => round($monthlyExpenses, 2),
+            // ✅ CORRIGÉ: C'est le SOLDE DU COMPTE
             'savings_capacity' => round($savingsCapacity, 2),
-            'savings_rate' => round($savingsRate, 2),
-            'total_balance' => round($totalBalance, 2),
+            'savings_rate' => round($savingsRate, 1),
+            'total_balance' => round($savingsCapacity, 2),
+            'monthly_variation' => round($monthlyVariation, 2),
             'active_goals_count' => $this->getActiveGoalsCount($user),
         ];
+    }
+
+    /**
+     * ✅ NOUVEAU: Calcule la capacité d'épargne (solde réel)
+     * Priorité: Comptes bancaires Bridge > Solde calculé
+     */
+    private function getSavingsCapacityAmount($user): float
+    {
+        // 1. Essayer les comptes bancaires synchronisés (Bridge)
+        $bankBalance = $this->getTotalBankBalance($user);
+
+        if ($bankBalance > 0) {
+            return $bankBalance;
+        }
+
+        // 2. Fallback: Solde calculé depuis transactions
+        return $this->getCalculatedBalance($user);
+    }
+
+    /**
+     * ✅ NOUVEAU: Solde calculé depuis l'historique des transactions
+     */
+    private function getCalculatedBalance($user): float
+    {
+        $income = Transaction::where('user_id', $user->id)
+            ->where('type', 'income')
+            ->sum('amount');
+
+        $expenses = Transaction::where('user_id', $user->id)
+            ->where('type', 'expense')
+            ->sum('amount');
+
+        return (float) ($income - $expenses);
     }
 
     /**
@@ -144,6 +186,10 @@ class DashboardController extends Controller
             ->where('status', 'active')
             ->get()
             ->map(function ($goal) {
+                $progress = $goal->target_amount > 0
+                    ? ($goal->current_amount / $goal->target_amount) * 100
+                    : 0;
+
                 return [
                     'id' => $goal->id,
                     'name' => $goal->name,
@@ -154,9 +200,8 @@ class DashboardController extends Controller
                     'status' => $goal->status,
                     'category' => $goal->type,
                     'icon' => $goal->icon ?? '🎯',
-                    'progress_percentage' => $goal->target_amount > 0 ?
-                        round(($goal->current_amount / $goal->target_amount) * 100, 1) : 0,
-                    'estimated_completion_date' => $this->estimateCompletionDate($goal),
+                    'progress_percentage' => round($progress, 1),
+                    'estimated_completion_date' => $goal->target_date,
                 ];
             })
             ->toArray();
@@ -188,20 +233,19 @@ class DashboardController extends Controller
             )
             ->groupBy('categories.id', 'categories.name', 'categories.color', 'categories.icon')
             ->get()
-            ->map(function ($category) use ($totalExpenses) {
-                $percentage = $totalExpenses > 0 ?
-                    ($category->amount / $totalExpenses) * 100 : 0;
+            ->map(function ($cat) use ($totalExpenses) {
+                $pct = $totalExpenses > 0 ? ($cat->amount / $totalExpenses) * 100 : 0;
 
                 return [
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'amount' => round($category->amount, 2),
-                    'percentage' => round($percentage, 2),
-                    'color' => $category->color ?? '#667eea',
-                    'icon' => $category->icon ?? '📊',
+                    'id' => $cat->id,
+                    'name' => $cat->name,
+                    'amount' => round($cat->amount, 2),
+                    'percentage' => round($pct, 2),
+                    'color' => $cat->color ?? '#667eea',
+                    'icon' => $cat->icon ?? '📊',
                     'trend' => 'stable',
                     'trend_percentage' => 0,
-                    'transaction_count' => $category->transaction_count,
+                    'transaction_count' => $cat->transaction_count,
                 ];
             })
             ->toArray();
@@ -244,50 +288,37 @@ class DashboardController extends Controller
      */
     private function getProjectionsData($user): array
     {
-        // Calculer les projections simples
         $monthDates = $this->getMonthDates(now());
         $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
         $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
         $monthlySavings = $monthlyIncome - $monthlyExpenses;
 
         return [
-            [
-                'period' => '3months',
-                'period_label' => '3 mois',
-                'projected_savings' => round($monthlySavings * 3, 2),
-                'projected_income' => round($monthlyIncome * 3, 2),
-                'projected_expenses' => round($monthlyExpenses * 3, 2),
-                'confidence' => 90,
-                'variance_min' => round($monthlySavings * 3 * 0.85, 2),
-                'variance_max' => round($monthlySavings * 3 * 1.15, 2),
-                'assumptions' => ['Revenus stables', 'Dépenses constantes'],
-            ],
-            [
-                'period' => '6months',
-                'period_label' => '6 mois',
-                'projected_savings' => round($monthlySavings * 6, 2),
-                'projected_income' => round($monthlyIncome * 6, 2),
-                'projected_expenses' => round($monthlyExpenses * 6, 2),
-                'confidence' => 75,
-                'variance_min' => round($monthlySavings * 6 * 0.85, 2),
-                'variance_max' => round($monthlySavings * 6 * 1.15, 2),
-                'assumptions' => ['Revenus stables', 'Dépenses constantes'],
-            ],
-            [
-                'period' => '12months',
-                'period_label' => '12 mois',
-                'projected_savings' => round($monthlySavings * 12, 2),
-                'projected_income' => round($monthlyIncome * 12, 2),
-                'projected_expenses' => round($monthlyExpenses * 12, 2),
-                'confidence' => 60,
-                'variance_min' => round($monthlySavings * 12 * 0.85, 2),
-                'variance_max' => round($monthlySavings * 12 * 1.15, 2),
-                'assumptions' => [
-                    'Revenus stables',
-                    'Dépenses constantes',
-                    'Hors événements exceptionnels'
-                ],
-            ],
+            $this->buildProjection('3months', '3 mois', $monthlySavings, 3, 90),
+            $this->buildProjection('6months', '6 mois', $monthlySavings, 6, 75),
+            $this->buildProjection('12months', '12 mois', $monthlySavings, 12, 60),
+        ];
+    }
+
+    /**
+     * Construit une projection
+     */
+    private function buildProjection(
+        string $period,
+        string $label,
+        float $monthly,
+        int $multiplier,
+        int $confidence
+    ): array {
+        $projected = $monthly * $multiplier;
+
+        return [
+            'period' => $period,
+            'period_label' => $label,
+            'projected_savings' => round($projected, 2),
+            'confidence' => $confidence,
+            'variance_min' => round($projected * 0.85, 2),
+            'variance_max' => round($projected * 1.15, 2),
         ];
     }
 
@@ -312,23 +343,29 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * ✅ CORRIGÉ: Endpoint capacité d'épargne
+     */
     public function getSavingsCapacity(Request $request): JsonResponse
     {
         try {
             $user = Auth::user();
             $monthDates = $this->getMonthDates(now());
 
-            $totalBalance = $this->getTotalBankBalance($user);
+            // ✅ CORRIGÉ: Solde réel du compte
+            $savingsCapacity = $this->getSavingsCapacityAmount($user);
+            $monthlyIncome = $this->getMonthlyIncome($user, $monthDates);
             $monthlyExpenses = $this->getMonthlyExpenses($user, $monthDates);
-            $capacity = $totalBalance - $monthlyExpenses;
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'total_balance' => round($totalBalance, 2),
+                    // ✅ Capacité = solde du compte
+                    'savings_capacity' => round($savingsCapacity, 2),
+                    'is_positive' => $savingsCapacity >= 0,
+                    'monthly_income' => round($monthlyIncome, 2),
                     'monthly_expenses' => round($monthlyExpenses, 2),
-                    'savings_capacity' => round($capacity, 2),
-                    'is_positive' => $capacity > 0,
+                    'monthly_variation' => round($monthlyIncome - $monthlyExpenses, 2),
                 ],
             ]);
 
@@ -384,6 +421,9 @@ class DashboardController extends Controller
             ->sum('amount');
     }
 
+    /**
+     * Solde des comptes bancaires synchronisés (Bridge)
+     */
     private function getTotalBankBalance($user): float
     {
         try {
@@ -392,7 +432,6 @@ class DashboardController extends Controller
                 ->where('bank_connections.user_id', $user->id)
                 ->where('bank_connections.status', 'active')
                 ->where('bank_accounts.is_active', true)
-                ->whereIn('bank_accounts.account_type', ['checking', 'savings', 'investment'])
                 ->sum('bank_accounts.balance');
 
             return (float) $balance;
@@ -409,17 +448,8 @@ class DashboardController extends Controller
             ->count();
     }
 
-    private function estimateCompletionDate($goal): ?string
-    {
-        if (!$goal->target_date) {
-            return null;
-        }
-        return $goal->target_date;
-    }
-
     private function buildDashboardStats($user): array
     {
-        // Méthode conservée pour compatibilité
         return [
             'metrics' => $this->getMetricsData($user),
             'goals' => $this->getActiveGoalsData($user),
