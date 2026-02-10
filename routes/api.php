@@ -397,3 +397,19 @@ Route::get('/debug/transactions/{userId}', function ($userId) {
             ->get()
     ]);
 });
+
+// Dans routes/api.php - TEMPORAIRE
+Route::get('/debug/bank-balance/{userId}', function ($userId) {
+    return response()->json([
+        'bank_accounts' => \DB::table('bank_accounts')
+            ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
+            ->where('bank_connections.user_id', $userId)
+            ->select('bank_accounts.*')
+            ->get(),
+        'total_bank_balance' => \DB::table('bank_accounts')
+            ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
+            ->where('bank_connections.user_id', $userId)
+            ->where('bank_accounts.is_active', true)
+            ->sum('bank_accounts.balance'),
+    ]);
+});
