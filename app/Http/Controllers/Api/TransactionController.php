@@ -823,4 +823,90 @@ class TransactionController extends Controller
             'data' => ['updated' => $updated],
         ]);
     }
+
+    /**
+     * ✅ NOUVEAU: Transactions récentes
+     * Route: GET /api/transactions/recent
+     */
+    public function recent(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $limit = $request->get('limit', 10);
+
+        $transactions = Transaction::with('category')
+            ->where('user_id', auth()->id())
+            ->orderBy('transaction_date', 'desc')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $transactions,
+            'count' => $transactions->count(),
+        ]);
+    }
+
+    /**
+     * ✅ NOUVEAU: Transactions par période
+     * Route: GET /api/transactions/period
+     */
+    public function getByPeriod(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $transactions = Transaction::with('category')
+            ->where('user_id', auth()->id())
+            ->whereBetween('transaction_date', [
+                $request->start_date,
+                $request->end_date
+            ])
+            ->orderBy('transaction_date', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $transactions,
+            'count' => $transactions->count(),
+            'period' => [
+                'start' => $request->start_date,
+                'end' => $request->end_date,
+            ],
+        ]);
+    }
+
+    /**
+     * ✅ NOUVEAU: Transactions par catégorie
+     * Route: GET /api/transactions/category/{categoryId}
+     */
+    public function getByCategory(Request $request, int $categoryId): \Illuminate\Http\JsonResponse
+    {
+        $perPage = $request->get('per_page', 15);
+        $page = $request->get('page', 1);
+
+        $transactions = Transaction::with('category')
+            ->where('user_id', auth()->id())
+            ->where('category_id', $categoryId)
+            ->orderBy('transaction_date', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $transactions->items(),
+            'meta' => [
+                'current_page' => $transactions->currentPage(),
+                'per_page' => $transactions->perPage(),
+                'total' => $transactions->total(),
+                'last_page' => $transactions->lastPage(),
+            ],
+        ]);
+    }
 }

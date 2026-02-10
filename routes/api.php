@@ -1,6 +1,6 @@
 <?php
 
-// routes/api.php - VERSION OPTIMISÉE AVEC CATÉGORISATION INTELLIGENTE
+// routes/api.php - VERSION COMPLÈTE AVEC TOUS LES ENDPOINTS
 
 use App\Http\Controllers\Api\AchievementController;
 use App\Http\Controllers\Api\AdminController;
@@ -48,6 +48,7 @@ Route::get('/', function () {
             'health' => '/api/health',
             'docs' => '/api/docs',
             'auth' => '/api/auth/*',
+            'dashboard' => '/api/dashboard',
             'banking' => '/api/bank/*',
             'gaming' => '/api/gaming/*',
         ],
@@ -103,10 +104,20 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // ==========================================
-    // 📊 DASHBOARD (PROTECTED)
+    // 📊 DASHBOARD (PROTECTED) - COMPLÉTÉ
     // ==========================================
 
     Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        // ✅ Endpoint principal - toutes les données
+        Route::get('/', [DashboardController::class, 'index'])->name('index');
+
+        // ✅ Métriques uniquement
+        Route::get('/metrics', [DashboardController::class, 'getMetrics'])->name('metrics');
+
+        // ✅ Rafraîchir les métriques
+        Route::post('/metrics/refresh', [DashboardController::class, 'refreshMetrics'])->name('metrics.refresh');
+
+        // Endpoints existants
         Route::get('/stats', [DashboardController::class, 'getStats'])->name('stats');
         Route::get('/savings-capacity', [DashboardController::class, 'getSavingsCapacity'])->name('savings-capacity');
         Route::get('/goal-distribution', [DashboardController::class, 'getGoalDistribution'])->name('goal-distribution');
@@ -139,40 +150,48 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // ==========================================
-    // 💰 TRANSACTIONS (PROTECTED) - OPTIMISÉ
+    // 💰 TRANSACTIONS (PROTECTED) - COMPLÉTÉ
     // ==========================================
 
     Route::prefix('transactions')->name('transactions.')->group(function () {
-
-        // ✅ STATISTIQUES
+        // ✅ Statistiques
         Route::get('stats', [TransactionController::class, 'stats'])->name('stats');
 
-        // ✅ TRANSACTIONS EN ATTENTE
+        // ✅ Transactions récentes (NOUVEAU)
+        Route::get('recent', [TransactionController::class, 'recent'])->name('recent');
+
+        // ✅ Transactions en attente
         Route::get('pending', [TransactionController::class, 'pending'])->name('pending');
 
-        // ✅ SYNCHRONISATION BRIDGE (NOUVEAU)
+        // ✅ Synchronisation Bridge
         Route::post('sync', [TransactionController::class, 'sync'])->name('sync');
         Route::get('sync/{batchId}/status', [TransactionController::class, 'syncStatus'])->name('sync.status');
 
-        // ✅ CATÉGORISATION AUTOMATIQUE
+        // ✅ Catégorisation automatique
         Route::post('auto-categorize', [TransactionController::class, 'autoCategorizeAll'])->name('auto-categorize');
 
-        // ✅ SUGGESTIONS
+        // ✅ Suggestions
         Route::post('suggest-category', [TransactionController::class, 'suggestCategory'])->name('suggest-category');
 
-        // ✅ QUALITÉ DE CATÉGORISATION (NOUVEAU)
+        // ✅ Qualité de catégorisation
         Route::get('quality', [TransactionController::class, 'quality'])->name('quality');
 
-        // ✅ RECHERCHE
+        // ✅ Recherche
         Route::get('search', [TransactionController::class, 'search'])->name('search');
 
-        // ✅ EXPORT
+        // ✅ Export
         Route::get('export/csv', [TransactionController::class, 'exportCsv'])->name('export.csv');
 
-        // ✅ ACTIONS EN MASSE
+        // ✅ Actions en masse
         Route::post('bulk/categorize', [TransactionController::class, 'bulkCategorize'])->name('bulk.categorize');
         Route::post('bulk/delete', [TransactionController::class, 'bulkDelete'])->name('bulk.delete');
         Route::post('bulk/recurring', [TransactionController::class, 'bulkRecurring'])->name('bulk.recurring');
+
+        // ✅ Transactions par période (NOUVEAU)
+        Route::get('period', [TransactionController::class, 'getByPeriod'])->name('period');
+
+        // ✅ Transactions par catégorie (NOUVEAU)
+        Route::get('category/{categoryId}', [TransactionController::class, 'getByCategory'])->name('by-category');
     });
 
     // ✅ CRUD de base
@@ -182,8 +201,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('transactions')->name('transactions.')->group(function () {
         Route::put('{id}/categorize', [TransactionController::class, 'categorize'])->name('categorize');
         Route::post('{id}/auto-categorize', [TransactionController::class, 'autoCategorize'])->name('auto-categorize-single');
-
-        // ✅ SUGGESTIONS POUR UNE TRANSACTION (NOUVEAU)
         Route::get('{transaction}/suggestions', [TransactionController::class, 'suggestions'])->name('suggestions');
     });
 
@@ -203,6 +220,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ==========================================
 
     Route::apiResource('financial-goals', FinancialGoalController::class);
+
+    // ✅ Objectifs actifs (NOUVEAU)
+    Route::get('goals/active', [FinancialGoalController::class, 'active'])->name('financial-goals.active');
+
     Route::apiResource('goal-contributions', GoalContributionController::class);
 
     // ==========================================
@@ -210,28 +231,43 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ==========================================
 
     Route::prefix('projects')->name('projects.')->group(function () {
-        // Templates de projets
         Route::get('templates', [ProjectController::class, 'getTemplates'])->name('templates');
 
-        // Gestion des projets utilisateur
         Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::get('{project}', [ProjectController::class, 'show'])->name('show');
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
 
-        // Créer depuis un template
         Route::post('from-template', [ProjectController::class, 'createFromTemplate'])->name('from-template');
 
-        // Actions sur un projet
         Route::post('{project}/start', [ProjectController::class, 'start'])->name('start');
         Route::post('{project}/pause', [ProjectController::class, 'pause'])->name('pause');
         Route::post('{project}/complete', [ProjectController::class, 'complete'])->name('complete');
         Route::post('{project}/cancel', [ProjectController::class, 'cancel'])->name('cancel');
 
-        // Milestones
         Route::get('{project}/milestones', [ProjectController::class, 'milestones'])->name('milestones');
         Route::post('{project}/milestones/{milestone}/complete', [ProjectController::class, 'completeMilestone'])->name('milestone.complete');
+    });
+
+    // ==========================================
+    // 🔮 PROJECTIONS & IA (PROTECTED) - COMPLÉTÉ
+    // ==========================================
+
+    Route::prefix('projections')->name('projections.')->group(function () {
+        // ✅ Toutes les projections
+        Route::get('/', [ProjectionController::class, 'index'])->name('index');
+
+        // ✅ Insights IA (NOUVEAU)
+        Route::get('/insights', [ProjectionController::class, 'insights'])->name('insights');
+
+        // ✅ Rafraîchir les projections (NOUVEAU)
+        Route::post('/refresh', [ProjectionController::class, 'refresh'])->name('refresh');
+
+        // ✅ Projection par période (NOUVEAU)
+        Route::get('/{period}', [ProjectionController::class, 'getByPeriod'])
+            ->where('period', '3months|6months|12months')
+            ->name('by-period');
     });
 
     // ==========================================
@@ -298,7 +334,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // ==========================================
-    // 📊 ANALYTICS & PROJECTIONS (PROTECTED)
+    // 📊 ANALYTICS (PROTECTED)
     // ==========================================
 
     Route::prefix('analytics')->name('analytics.')->group(function () {
@@ -309,12 +345,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('category-breakdown', [AnalyticsController::class, 'categoryBreakdown'])->name('categories');
     });
 
+    // ==========================================
+    // 💡 SUGGESTIONS (PROTECTED)
+    // ==========================================
+
     Route::get('suggestions', [SuggestionController::class, 'index'])->name('suggestions.index');
-    Route::get('projections', [ProjectionController::class, 'index'])->name('projections.index');
 });
 
 // ==========================================
-// 👑 ADMIN ROUTES (PROTECTED + ADMIN)
+// 🛡️ ADMIN ROUTES (PROTECTED + ADMIN)
 // ==========================================
 
 Route::middleware(['auth:sanctum', 'admin'])

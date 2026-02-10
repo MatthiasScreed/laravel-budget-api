@@ -341,6 +341,57 @@ class FinancialGoalController extends Controller
     }
 
     /**
+     * ✅ NOUVEAU: Retourne uniquement les objectifs actifs
+     * Route: GET /api/goals/active
+     */
+    public function active(Request $request): JsonResponse
+    {
+        try {
+            $goals = Auth::user()
+                ->financialGoals()
+                ->where('status', 'active')
+                ->with('contributions')
+                ->orderBy('priority', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $goalsFormatted = $goals->map(function ($goal) {
+                return [
+                    'id' => $goal->id,
+                    'name' => $goal->name,
+                    'target_amount' => $goal->target_amount,
+                    'current_amount' => $goal->current_amount,
+                    'deadline' => $goal->target_date,
+                    'priority' => $goal->priority,
+                    'status' => $goal->status,
+                    'category' => $goal->type,
+                    'icon' => $goal->icon ?? '🎯',
+                    'progress_percentage' => $goal->target_amount > 0 ?
+                        round(($goal->current_amount / $goal->target_amount) * 100, 1) : 0,
+                    'estimated_completion_date' => $goal->target_date,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $goalsFormatted,
+                'count' => $goals->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur goals actifs', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur chargement objectifs actifs',
+            ], 500);
+        }
+    }
+
+    /**
      * Vérifier l'autorisation d'accès à un objectif
      */
     private function authorizeAccess(FinancialGoal $goal): void
