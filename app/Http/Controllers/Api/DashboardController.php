@@ -294,31 +294,47 @@ class DashboardController extends Controller
         $monthlySavings = $monthlyIncome - $monthlyExpenses;
 
         return [
-            $this->buildProjection('3months', '3 mois', $monthlySavings, 3, 90),
-            $this->buildProjection('6months', '6 mois', $monthlySavings, 6, 75),
-            $this->buildProjection('12months', '12 mois', $monthlySavings, 12, 60),
+            $this->buildProjection(
+                '3months', '3 mois', 3, 90,
+                $monthlyIncome, $monthlyExpenses, $monthlySavings
+            ),
+            $this->buildProjection(
+                '6months', '6 mois', 6, 75,
+                $monthlyIncome, $monthlyExpenses, $monthlySavings
+            ),
+            $this->buildProjection(
+                '12months', '12 mois', 12, 60,
+                $monthlyIncome, $monthlyExpenses, $monthlySavings
+            ),
         ];
     }
 
     /**
-     * Construit une projection
+     * Construit une projection complète
      */
     private function buildProjection(
         string $period,
         string $label,
-        float $monthly,
-        int $multiplier,
-        int $confidence
+        int $months,
+        int $confidence,
+        float $income,
+        float $expenses,
+        float $savings
     ): array {
-        $projected = $monthly * $multiplier;
+        $projectedSavings = $savings * $months;
+        $projectedIncome = $income * $months;
+        $projectedExpenses = $expenses * $months;
 
         return [
             'period' => $period,
             'period_label' => $label,
-            'projected_savings' => round($projected, 2),
+            'projected_savings' => round($projectedSavings, 2),
+            'projected_income' => round($projectedIncome, 2),
+            'projected_expenses' => round($projectedExpenses, 2),
             'confidence' => $confidence,
-            'variance_min' => round($projected * 0.85, 2),
-            'variance_max' => round($projected * 1.15, 2),
+            'variance_min' => round($projectedSavings * 0.85, 2),
+            'variance_max' => round($projectedSavings * 1.15, 2),
+            'assumptions' => ['Revenus stables', 'Dépenses constantes'],
         ];
     }
 
