@@ -378,3 +378,22 @@ Route::fallback(function () {
         'error' => 'Endpoint inexistant',
     ], 404);
 });
+
+// ⚠️ TEMPORAIRE - À SUPPRIMER APRÈS DEBUG
+Route::get('/debug/transactions/{userId}', function ($userId) {
+    return response()->json([
+        'income' => \App\Models\Transaction::where('user_id', $userId)
+            ->where('type', 'income')->sum('amount'),
+        'expense' => \App\Models\Transaction::where('user_id', $userId)
+            ->where('type', 'expense')->sum('amount'),
+        'by_type' => \App\Models\Transaction::where('user_id', $userId)
+            ->selectRaw('type, SUM(amount) as total, COUNT(*) as count')
+            ->groupBy('type')
+            ->get(),
+        'sample' => \App\Models\Transaction::where('user_id', $userId)
+            ->select('description', 'amount', 'type')
+            ->orderBy('id', 'desc')
+            ->take(10)
+            ->get()
+    ]);
+});
