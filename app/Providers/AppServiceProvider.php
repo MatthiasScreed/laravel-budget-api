@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Transaction;
+use App\Observers\TransactionObserver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Enregistrer l'Observer
+        Transaction::observe(TransactionObserver::class);
+
         Event::listen(
             \App\Events\UserRegistered::class,
             \App\Listeners\HandleUserRegistered::class
