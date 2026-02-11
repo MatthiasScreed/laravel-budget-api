@@ -379,23 +379,30 @@ Route::fallback(function () {
     ], 404);
 });
 
-Route::get('/debug/setup-categories', function () {
-    // 1. Exécuter le seeder des catégories
-    $seeder = new \Database\Seeders\CategorySeeder();
-    $seeder->setCommand(new \Illuminate\Console\Command());
+Route::get('/debug/fix-categories', function () {
+    // Règles de correspondance simples
+    $rules = [
+        'Alimentation' => ['franprix', 'monoprix', 'carrefour', 'lidl', 'auchan', 'leclerc', 'intermarche', 'casino', 'picard', 'primeur', 'bio c bon', 'naturalia', 'supermarche', 'epicerie'],
+        'Restaurants' => ['restaurant', 'resto', 'cafe', 'starbucks', 'mcdo', 'mcdonald', 'burger', 'pizza', 'sushi', 'brasserie', 'bistro', 'brazier', 'reve', 'deliveroo', 'uber eats', 'just eat', 'frichti', 'paul', 'pret a manger'],
+        'Transport' => ['uber', 'taxi', 'ratp', 'sncf', 'velib', 'lime', 'tier', 'bolt', 'total', 'shell', 'bp', 'station', 'parking', 'autoroute', 'peage', 'metro', 'navigo', 'blablacar', 'essence', 'carburant'],
+        'Shopping' => ['amazon', 'fnac', 'darty', 'zara', 'h&m', 'uniqlo', 'decathlon', 'ikea', 'sostrene', 'grene', 'action', 'primark', 'galeries', 'lafayette', 'printemps', 'zalando', 'asos', 'shein'],
+        'Streaming' => ['netflix', 'spotify', 'apple.com', 'apple com', 'google', 'amazon prime', 'deezer', 'canal', 'disney', 'youtube', 'adobe', 'microsoft', 'icloud'],
+        'Téléphone' => ['free mobile', 'orange', 'sfr', 'bouygues', 'sosh', 'red by sfr', 'b&you'],
+        'Internet' => ['free box', 'orange box', 'sfr box', 'bouygues box', 'fibre'],
+        'Logement' => ['loyer', 'edf', 'engie', 'gaz', 'electricite', 'eau', 'veolia', 'syndic', 'charges', 'bailleur'],
+        'Santé' => ['pharmacie', 'medecin', 'docteur', 'hopital', 'mutuelle', 'laboratoire', 'doctolib', 'cpam'],
+        'Banque' => ['frais bancaire', 'commission', 'agios', 'cotisation carte'],
+        'Services' => ['poste', 'la poste', 'pressing', 'coiffeur', 'elgi', 'assurance'],
+        'Loisirs' => ['cinema', 'theatre', 'concert', 'musee', 'sport', 'salle', 'fitness', 'bowling'],
+        'Voyages' => ['booking', 'airbnb', 'hotel', 'sncf', 'air france', 'easyjet', 'ryanair'],
+    ];
 
-    // Vérifier si les catégories existent déjà
-    $existingCount = \App\Models\Category::whereNull('user_id')->count();
+    // Récupérer les catégories système
+    $categories = \App\Models\Category::whereNull('user_id')->get()->keyBy('name');
 
-    if ($existingCount === 0) {
-        $seeder->run();
-        $categoriesCreated = \App\Models\Category::whereNull('user_id')->count();
-    } else {
-        $categoriesCreated = $existingCount;
-    }
-
-    // 2. Lancer la catégorisation pour tous les utilisateurs
-    $categorizationService = app(\App\Services\TransactionCategorizationService::class);
+    // Fallback
+    $defaultExpense = $categories->get('Autres dépenses') ?? $categories->get('Non catégorisé');
+    $defaultIncome = $categories->firstWhere('name', 'Remboursements');
 
     $results = [];
     $users = \App\Models\User::all();
@@ -403,19 +410,40 @@ Route::get('/debug/setup-categories', function () {
     foreach ($users as $user) {
         $transactions = $user->transactions()->whereNull('category_id')->get();
         $categorized = 0;
+        $details = [];
 
-        foreach ($transactions as $transaction) {
-            try {
-                $category = $categorizationService->categorize($transaction);
-                if ($category) {
-                    $transaction->update([
-                        'category_id' => $category->id,
-                        'auto_categorized' => true
-                    ]);
-                    $categorized++;
+        foreach ($transactions as $tx) {
+            $description = strtolower($tx->description);
+            $matchedCategory = null;
+
+            // Chercher une correspondance
+            foreach ($rules as $categoryName => $keywords) {
+                foreach ($keywords as $keyword) {
+                    if (str_contains($description, $keyword)) {
+                        $matchedCategory = $categories->get($categoryName);
+                        break 2;
+                    }
                 }
-            } catch (\Exception $e) {
-                // Ignorer les erreurs individuelles
+            }
+
+            // Fallback si pas de match
+            if (!$matchedCategory) {
+                $matchedCategory = $tx->type === 'expense' ? $defaultExpense : $defaultIncome;
+            }
+
+            if ($matchedCategory) {
+                $tx->category_id = $matchedCategory->id;
+                $tx->save();
+                $categorized++;
+
+                // Échantillon pour debug
+                if (count($details) < 15) {
+                    $details[] = [
+                        'description' => $tx->description,
+                        'category' => $matchedCategory->name,
+                        'type' => $tx->type
+                    ];
+                }
             }
         }
 
@@ -423,15 +451,15 @@ Route::get('/debug/setup-categories', function () {
             'user_id' => $user->id,
             'email' => $user->email,
             'total' => $transactions->count(),
-            'categorized' => $categorized
+            'categorized' => $categorized,
+            'sample' => $details
         ];
     }
 
     return response()->json([
         'success' => true,
-        'categories_available' => $categoriesCreated,
+        'categories_count' => $categories->count(),
         'users_processed' => count($results),
-        'details' => $results,
-        'message' => 'Setup terminé ! Recharge ton dashboard.'
+        'details' => $results
     ]);
 });
