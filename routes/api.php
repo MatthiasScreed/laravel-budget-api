@@ -378,3 +378,62 @@ Route::fallback(function () {
         'error' => 'Endpoint inexistant',
     ], 404);
 });
+
+Route::get('/debug/expenses-breakdown', function () {
+    $user = \App\Models\User::first();
+
+    if (!$user) {
+        return response()->json(['error' => 'Aucun utilisateur trouvé']);
+    }
+
+    $lastMonth = now()->subMonth();
+    $thisMonth = now();
+
+    // Transactions brutes du mois dernier
+    $lastMonthTx = $user->transactions()
+        ->where('type', 'expense')
+        ->whereMonth('transaction_date', $lastMonth->month)
+        ->whereYear('transaction_date', $lastMonth->year)
+        ->get(['id', 'description', 'amount', 'category_id', 'transaction_date']);
+
+    // Transactions ce mois-ci
+    $thisMonthTx = $user->transactions()
+        ->where('type', 'expense')
+        ->whereMonth('transaction_date', $thisMonth->month)
+        ->whereYear('transaction_date', $thisMonth->year)
+        ->get(['id', 'description', 'amount', 'category_id', 'transaction_date']);
+
+    // Catégories existantes
+    $categories = \App\Models\Category::where('user_id', $user->id)
+        ->orWhereNull('user_id')
+        ->get(['id', 'name', 'type']);
+
+    return response()->json([
+        'user' => [
+            'id' => $user->id,
+            'email' => $user->email
+        ],
+        'stats' => [
+            'total_transactions' => $user->transactions()->count(),
+            'total_expenses' => $user->transactions()->where('type', 'expense')->count(),
+            'with_category' => $user->transactions()->whereNotNull('category_id')->count(),
+            'without_category' => $user->transactions()->whereNull('category_id')->count(),
+        ],
+        'last_month' => [
+            'period' => $lastMonth->format('F Y'),
+            'count' => $lastMonthTx->count(),
+            'with_category' => $lastMonthTx->whereNotNull('category_id')->count(),
+            'total_amount' => $lastMonthTx->sum('amount'),
+            'sample' => $lastMonthTx->take(5)->toArray()
+        ],
+        'this_month' => [
+            'period' => $thisMonth->format('F Y'),
+            'count' => $thisMonthTx->count(),
+            'with_category' => $thisMonthTx->whereNotNull('category_id')->count(),
+            'total_amount' => $thisMonthTx->sum('amount'),
+            'sample' => $thisMonthTx->take(5)->toArray()
+        ],
+        'categories_available' => $categories->count(),
+        'expense_categories' => $categories->where('type', 'expense')->values()->toArray()
+    ]);
+});
