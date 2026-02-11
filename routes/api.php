@@ -379,61 +379,59 @@ Route::fallback(function () {
     ], 404);
 });
 
-Route::get('/debug/expenses-breakdown', function () {
-    $user = \App\Models\User::first();
+Route::get('/debug/setup-categories', function () {
+    // 1. Exécuter le seeder des catégories
+    $seeder = new \Database\Seeders\CategorySeeder();
+    $seeder->setCommand(new \Illuminate\Console\Command());
 
-    if (!$user) {
-        return response()->json(['error' => 'Aucun utilisateur trouvé']);
+    // Vérifier si les catégories existent déjà
+    $existingCount = \App\Models\Category::whereNull('user_id')->count();
+
+    if ($existingCount === 0) {
+        $seeder->run();
+        $categoriesCreated = \App\Models\Category::whereNull('user_id')->count();
+    } else {
+        $categoriesCreated = $existingCount;
     }
 
-    $lastMonth = now()->subMonth();
-    $thisMonth = now();
+    // 2. Lancer la catégorisation pour tous les utilisateurs
+    $categorizationService = app(\App\Services\TransactionCategorizationService::class);
 
-    // Transactions brutes du mois dernier
-    $lastMonthTx = $user->transactions()
-        ->where('type', 'expense')
-        ->whereMonth('transaction_date', $lastMonth->month)
-        ->whereYear('transaction_date', $lastMonth->year)
-        ->get(['id', 'description', 'amount', 'category_id', 'transaction_date']);
+    $results = [];
+    $users = \App\Models\User::all();
 
-    // Transactions ce mois-ci
-    $thisMonthTx = $user->transactions()
-        ->where('type', 'expense')
-        ->whereMonth('transaction_date', $thisMonth->month)
-        ->whereYear('transaction_date', $thisMonth->year)
-        ->get(['id', 'description', 'amount', 'category_id', 'transaction_date']);
+    foreach ($users as $user) {
+        $transactions = $user->transactions()->whereNull('category_id')->get();
+        $categorized = 0;
 
-    // Catégories existantes
-    $categories = \App\Models\Category::where('user_id', $user->id)
-        ->orWhereNull('user_id')
-        ->get(['id', 'name', 'type']);
+        foreach ($transactions as $transaction) {
+            try {
+                $category = $categorizationService->categorize($transaction);
+                if ($category) {
+                    $transaction->update([
+                        'category_id' => $category->id,
+                        'auto_categorized' => true
+                    ]);
+                    $categorized++;
+                }
+            } catch (\Exception $e) {
+                // Ignorer les erreurs individuelles
+            }
+        }
+
+        $results[] = [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'total' => $transactions->count(),
+            'categorized' => $categorized
+        ];
+    }
 
     return response()->json([
-        'user' => [
-            'id' => $user->id,
-            'email' => $user->email
-        ],
-        'stats' => [
-            'total_transactions' => $user->transactions()->count(),
-            'total_expenses' => $user->transactions()->where('type', 'expense')->count(),
-            'with_category' => $user->transactions()->whereNotNull('category_id')->count(),
-            'without_category' => $user->transactions()->whereNull('category_id')->count(),
-        ],
-        'last_month' => [
-            'period' => $lastMonth->format('F Y'),
-            'count' => $lastMonthTx->count(),
-            'with_category' => $lastMonthTx->whereNotNull('category_id')->count(),
-            'total_amount' => $lastMonthTx->sum('amount'),
-            'sample' => $lastMonthTx->take(5)->toArray()
-        ],
-        'this_month' => [
-            'period' => $thisMonth->format('F Y'),
-            'count' => $thisMonthTx->count(),
-            'with_category' => $thisMonthTx->whereNotNull('category_id')->count(),
-            'total_amount' => $thisMonthTx->sum('amount'),
-            'sample' => $thisMonthTx->take(5)->toArray()
-        ],
-        'categories_available' => $categories->count(),
-        'expense_categories' => $categories->where('type', 'expense')->values()->toArray()
+        'success' => true,
+        'categories_available' => $categoriesCreated,
+        'users_processed' => count($results),
+        'details' => $results,
+        'message' => 'Setup terminé ! Recharge ton dashboard.'
     ]);
 });
