@@ -378,38 +378,3 @@ Route::fallback(function () {
         'error' => 'Endpoint inexistant',
     ], 404);
 });
-
-// ⚠️ TEMPORAIRE - À SUPPRIMER APRÈS DEBUG
-Route::get('/debug/transactions/{userId}', function ($userId) {
-    return response()->json([
-        'income' => \App\Models\Transaction::where('user_id', $userId)
-            ->where('type', 'income')->sum('amount'),
-        'expense' => \App\Models\Transaction::where('user_id', $userId)
-            ->where('type', 'expense')->sum('amount'),
-        'by_type' => \App\Models\Transaction::where('user_id', $userId)
-            ->selectRaw('type, SUM(amount) as total, COUNT(*) as count')
-            ->groupBy('type')
-            ->get(),
-        'sample' => \App\Models\Transaction::where('user_id', $userId)
-            ->select('description', 'amount', 'type')
-            ->orderBy('id', 'desc')
-            ->take(10)
-            ->get()
-    ]);
-});
-
-// Dans routes/api.php - TEMPORAIRE
-Route::get('/debug/bank-balance/{userId}', function ($userId) {
-    return response()->json([
-        'bank_accounts' => \DB::table('bank_accounts')
-            ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
-            ->where('bank_connections.user_id', $userId)
-            ->select('bank_accounts.*')
-            ->get(),
-        'total_bank_balance' => \DB::table('bank_accounts')
-            ->join('bank_connections', 'bank_accounts.bank_connection_id', '=', 'bank_connections.id')
-            ->where('bank_connections.user_id', $userId)
-            ->where('bank_accounts.is_active', true)
-            ->sum('bank_accounts.balance'),
-    ]);
-});
