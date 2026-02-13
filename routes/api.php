@@ -379,6 +379,8 @@ Route::middleware('auth:sanctum')->prefix('gaming')->group(function () {
 
     // Admin/Debug
     Route::post('/recalculate', [ProgressiveGamingController::class, 'recalculateProfile']);
+
+    Route::get('/gaming/config', [ProgressiveGamingController::class, 'getConfig']);
 });
 
 // ==========================================
