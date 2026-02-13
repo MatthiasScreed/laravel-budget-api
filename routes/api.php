@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\GamingActionController;
 use App\Http\Controllers\Api\GamingController;
 use App\Http\Controllers\Api\GoalContributionController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\ProgressiveGamingController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectionController;
 use App\Http\Controllers\Api\StreakController;
@@ -352,6 +353,34 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('suggestions', [SuggestionController::class, 'index'])->name('suggestions.index');
 });
 
+// Progressive Gaming System
+Route::middleware('auth:sanctum')->prefix('gaming')->group(function () {
+
+    // Configuration & Profil
+    Route::get('/config', [ProgressiveGamingController::class, 'getConfig']);
+    Route::get('/profile', [ProgressiveGamingController::class, 'getProfile']);
+    Route::put('/preferences', [ProgressiveGamingController::class, 'updatePreferences']);
+
+    // Dashboard & Données
+    Route::get('/dashboard', [ProgressiveGamingController::class, 'getDashboard']);
+    Route::get('/encouragement', [ProgressiveGamingController::class, 'getDailyEncouragement']);
+
+    // Milestones
+    Route::get('/milestones', [ProgressiveGamingController::class, 'getMilestones']);
+    Route::post('/milestones/{id}/claim', [ProgressiveGamingController::class, 'claimMilestoneReward']);
+
+    // Événements & Tracking
+    Route::post('/event', [ProgressiveGamingController::class, 'processEvent']);
+    Route::post('/interaction', [ProgressiveGamingController::class, 'recordInteraction']);
+    Route::post('/feedback/{id}/dismiss', [ProgressiveGamingController::class, 'dismissFeedback']);
+
+    // Progression
+    Route::get('/progress', [ProgressiveGamingController::class, 'getProgress']);
+
+    // Admin/Debug
+    Route::post('/recalculate', [ProgressiveGamingController::class, 'recalculateProfile']);
+});
+
 // ==========================================
 // 🛡️ ADMIN ROUTES (PROTECTED + ADMIN)
 // ==========================================
@@ -379,87 +408,3 @@ Route::fallback(function () {
     ], 404);
 });
 
-Route::get('/debug/fix-categories', function () {
-    // Règles de correspondance simples
-    $rules = [
-        'Alimentation' => ['franprix', 'monoprix', 'carrefour', 'lidl', 'auchan', 'leclerc', 'intermarche', 'casino', 'picard', 'primeur', 'bio c bon', 'naturalia', 'supermarche', 'epicerie'],
-        'Restaurants' => ['restaurant', 'resto', 'cafe', 'starbucks', 'mcdo', 'mcdonald', 'burger', 'pizza', 'sushi', 'brasserie', 'bistro', 'brazier', 'reve', 'deliveroo', 'uber eats', 'just eat', 'frichti', 'paul', 'pret a manger'],
-        'Transport' => ['uber', 'taxi', 'ratp', 'sncf', 'velib', 'lime', 'tier', 'bolt', 'total', 'shell', 'bp', 'station', 'parking', 'autoroute', 'peage', 'metro', 'navigo', 'blablacar', 'essence', 'carburant'],
-        'Shopping' => ['amazon', 'fnac', 'darty', 'zara', 'h&m', 'uniqlo', 'decathlon', 'ikea', 'sostrene', 'grene', 'action', 'primark', 'galeries', 'lafayette', 'printemps', 'zalando', 'asos', 'shein'],
-        'Streaming' => ['netflix', 'spotify', 'apple.com', 'apple com', 'google', 'amazon prime', 'deezer', 'canal', 'disney', 'youtube', 'adobe', 'microsoft', 'icloud'],
-        'Téléphone' => ['free mobile', 'orange', 'sfr', 'bouygues', 'sosh', 'red by sfr', 'b&you'],
-        'Internet' => ['free box', 'orange box', 'sfr box', 'bouygues box', 'fibre'],
-        'Logement' => ['loyer', 'edf', 'engie', 'gaz', 'electricite', 'eau', 'veolia', 'syndic', 'charges', 'bailleur'],
-        'Santé' => ['pharmacie', 'medecin', 'docteur', 'hopital', 'mutuelle', 'laboratoire', 'doctolib', 'cpam'],
-        'Banque' => ['frais bancaire', 'commission', 'agios', 'cotisation carte'],
-        'Services' => ['poste', 'la poste', 'pressing', 'coiffeur', 'elgi', 'assurance'],
-        'Loisirs' => ['cinema', 'theatre', 'concert', 'musee', 'sport', 'salle', 'fitness', 'bowling'],
-        'Voyages' => ['booking', 'airbnb', 'hotel', 'sncf', 'air france', 'easyjet', 'ryanair'],
-    ];
-
-    // Récupérer les catégories système
-    $categories = \App\Models\Category::whereNull('user_id')->get()->keyBy('name');
-
-    // Fallback
-    $defaultExpense = $categories->get('Autres dépenses') ?? $categories->get('Non catégorisé');
-    $defaultIncome = $categories->firstWhere('name', 'Remboursements');
-
-    $results = [];
-    $users = \App\Models\User::all();
-
-    foreach ($users as $user) {
-        $transactions = $user->transactions()->whereNull('category_id')->get();
-        $categorized = 0;
-        $details = [];
-
-        foreach ($transactions as $tx) {
-            $description = strtolower($tx->description);
-            $matchedCategory = null;
-
-            // Chercher une correspondance
-            foreach ($rules as $categoryName => $keywords) {
-                foreach ($keywords as $keyword) {
-                    if (str_contains($description, $keyword)) {
-                        $matchedCategory = $categories->get($categoryName);
-                        break 2;
-                    }
-                }
-            }
-
-            // Fallback si pas de match
-            if (!$matchedCategory) {
-                $matchedCategory = $tx->type === 'expense' ? $defaultExpense : $defaultIncome;
-            }
-
-            if ($matchedCategory) {
-                $tx->category_id = $matchedCategory->id;
-                $tx->save();
-                $categorized++;
-
-                // Échantillon pour debug
-                if (count($details) < 15) {
-                    $details[] = [
-                        'description' => $tx->description,
-                        'category' => $matchedCategory->name,
-                        'type' => $tx->type
-                    ];
-                }
-            }
-        }
-
-        $results[] = [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'total' => $transactions->count(),
-            'categorized' => $categorized,
-            'sample' => $details
-        ];
-    }
-
-    return response()->json([
-        'success' => true,
-        'categories_count' => $categories->count(),
-        'users_processed' => count($results),
-        'details' => $results
-    ]);
-});
