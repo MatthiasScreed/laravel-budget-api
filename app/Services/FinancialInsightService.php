@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service de génération d'insights financiers intelligents
- * Analyse les données pour fournir des recommandations personnalisées
  */
 class FinancialInsightService
 {
@@ -24,38 +23,32 @@ class FinancialInsightService
 
     /**
      * Génère tous les insights pour l'utilisateur
-     * Maximum 5 insights les plus pertinents
      */
     public function generateInsights(): array
     {
         try {
             $insights = [];
 
-            // Analyse des opportunités d'épargne
             $savingsInsight = $this->analyzeSavings();
             if ($savingsInsight) {
                 $insights[] = $savingsInsight;
             }
 
-            // Analyse des dépenses par catégorie
             $categoryInsight = $this->analyzeCategories();
             if ($categoryInsight) {
                 $insights[] = $categoryInsight;
             }
 
-            // Analyse des objectifs
             $goalsInsight = $this->analyzeGoals();
             if ($goalsInsight) {
                 $insights[] = $goalsInsight;
             }
 
-            // Analyse des tendances
             $trendInsight = $this->analyzeTrends();
             if ($trendInsight) {
                 $insights[] = $trendInsight;
             }
 
-            // Limite à 5 insights
             return array_slice($insights, 0, 5);
 
         } catch (\Exception $e) {
@@ -98,8 +91,7 @@ class FinancialInsightService
                 'category' => 'savings',
                 'title' => 'Excellent taux d\'épargne !',
                 'message' => sprintf(
-                    'Bravo ! Vous épargnez %.1f%% de vos revenus. ' .
-                    'Continuez comme ça !',
+                    'Bravo ! Vous épargnez %.1f%% de vos revenus.',
                     $rate
                 ),
                 'priority' => 'low',
@@ -117,8 +109,8 @@ class FinancialInsightService
     {
         $month = now()->month;
 
-        // Revenus du mois
-        $income = Transaction::whereHas('account', function($q) {
+        // ✅ CORRECTION : bankAccount au lieu de account
+        $income = Transaction::whereHas('bankAccount', function($q) {
             $q->where('user_id', $this->user->id);
         })
             ->whereMonth('date', $month)
@@ -129,7 +121,6 @@ class FinancialInsightService
             return 0;
         }
 
-        // Contributions aux objectifs
         $saved = GoalContribution::whereHas('goal', function($q) {
             $q->where('user_id', $this->user->id);
         })
@@ -144,7 +135,8 @@ class FinancialInsightService
      */
     private function analyzeCategories(): ?array
     {
-        $topCategory = Transaction::whereHas('account', function($q) {
+        // ✅ CORRECTION : bankAccount au lieu de account
+        $topCategory = Transaction::whereHas('bankAccount', function($q) {
             $q->where('user_id', $this->user->id);
         })
             ->where('type', 'expense')
@@ -159,7 +151,8 @@ class FinancialInsightService
             return null;
         }
 
-        $total = Transaction::whereHas('account', function($q) {
+        // ✅ CORRECTION : bankAccount au lieu de account
+        $total = Transaction::whereHas('bankAccount', function($q) {
             $q->where('user_id', $this->user->id);
         })
             ->where('type', 'expense')
@@ -174,8 +167,7 @@ class FinancialInsightService
                 'category' => 'spending',
                 'title' => 'Catégorie dominante',
                 'message' => sprintf(
-                    '%s représente %.0f%% de vos dépenses. ' .
-                    'Identifiez des économies possibles.',
+                    '%s représente %.0f%% de vos dépenses.',
                     $topCategory->category->name,
                     $percentage
                 ),
@@ -208,15 +200,13 @@ class FinancialInsightService
                 'type' => 'info',
                 'category' => 'goals',
                 'title' => 'Créez votre premier objectif',
-                'message' => 'Définissez un objectif pour ' .
-                    'concrétiser vos projets financiers.',
+                'message' => 'Définissez un objectif financier.',
                 'priority' => 'high',
                 'action' => 'Créer un objectif',
                 'action_url' => '/goals/create'
             ];
         }
 
-        // Objectif le plus proche
         $closestGoal = $goals->sortByDesc(function($goal) {
             return $goal->progress_percentage;
         })->first();
@@ -238,9 +228,7 @@ class FinancialInsightService
                 'action_url' => '/goals/' . $closestGoal->id,
                 'metadata' => [
                     'goal_id' => $closestGoal->id,
-                    'progress' => $closestGoal->progress_percentage,
-                    'remaining' => $closestGoal->target_amount -
-                        $closestGoal->current_amount
+                    'progress' => $closestGoal->progress_percentage
                 ]
             ];
         }
@@ -253,14 +241,16 @@ class FinancialInsightService
      */
     private function analyzeTrends(): ?array
     {
-        $currentMonth = Transaction::whereHas('account', function($q) {
+        // ✅ CORRECTION : bankAccount au lieu de account
+        $currentMonth = Transaction::whereHas('bankAccount', function($q) {
             $q->where('user_id', $this->user->id);
         })
             ->where('type', 'expense')
             ->whereMonth('date', now()->month)
             ->sum(DB::raw('ABS(amount)'));
 
-        $lastMonth = Transaction::whereHas('account', function($q) {
+        // ✅ CORRECTION : bankAccount au lieu de account
+        $lastMonth = Transaction::whereHas('bankAccount', function($q) {
             $q->where('user_id', $this->user->id);
         })
             ->where('type', 'expense')
@@ -279,10 +269,8 @@ class FinancialInsightService
                 'category' => 'trends',
                 'title' => 'Dépenses en hausse',
                 'message' => sprintf(
-                    'Vos dépenses ont augmenté de %.0f%% ' .
-                    'par rapport au mois dernier (+%.2f€).',
-                    $variation,
-                    $currentMonth - $lastMonth
+                    'Vos dépenses ont augmenté de %.0f%%.',
+                    $variation
                 ),
                 'priority' => 'high',
                 'action' => 'Analyser les dépenses',
@@ -301,10 +289,8 @@ class FinancialInsightService
                 'category' => 'trends',
                 'title' => 'Belles économies !',
                 'message' => sprintf(
-                    'Vous avez réduit vos dépenses de %.0f%% ' .
-                    'ce mois-ci (%.2f€ économisés).',
-                    abs($variation),
-                    abs($currentMonth - $lastMonth)
+                    'Vous avez réduit vos dépenses de %.0f%%.',
+                    abs($variation)
                 ),
                 'priority' => 'low',
                 'metadata' => [

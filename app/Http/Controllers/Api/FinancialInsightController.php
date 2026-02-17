@@ -147,11 +147,11 @@ class FinancialInsightController extends Controller
             $insights = $insightService->generateInsights();
 
             // XP pour consultation des insights
-            $this->gamingService->awardXP(
-                $user,
-                'insight_generated',
-                5
-            );
+            //$this->gamingService->awardXP(
+                //$user,
+                //'insight_generated',
+                //5
+            //);
 
             return response()->json([
                 'success' => true,
