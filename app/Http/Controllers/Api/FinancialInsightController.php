@@ -12,36 +12,30 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Controller API pour les insights financiers
- *
- * Endpoints :
- * - GET    /api/insights           : Liste des insights
- * - GET    /api/insights/summary   : Résumé des insights
- * - GET    /api/insights/{id}      : Détail d'un insight
- * - POST   /api/insights/generate  : Générer de nouveaux insights
- * - PATCH  /api/insights/{id}/read : Marquer comme lu
- * - PATCH  /api/insights/{id}/act  : Marquer action effectuée
- * - PATCH  /api/insights/{id}/dismiss : Rejeter un insight
- * - POST   /api/insights/read-all  : Tout marquer comme lu
- * - DELETE /api/insights/{id}      : Supprimer un insight
  */
 class FinancialInsightController extends Controller
 {
-    private FinancialInsightService $insightService;
     private GamingService $gamingService;
 
-    public function __construct(
-        FinancialInsightService $insightService,
-        GamingService $gamingService
-    ) {
-        $this->insightService = $insightService;
+    // ❌ ANCIEN - Ne fonctionne pas :
+    // public function __construct(
+    //     FinancialInsightService $insightService,
+    //     GamingService $gamingService
+    // ) {
+    //     $this->insightService = $insightService;
+    //     $this->gamingService = $gamingService;
+    // }
+
+    // ✅ NOUVEAU - Fonctionne :
+    public function __construct(GamingService $gamingService)
+    {
         $this->gamingService = $gamingService;
+        // On n'injecte plus FinancialInsightService ici
+        // On le créera manuellement dans generate()
     }
 
     /**
      * Liste des insights de l'utilisateur
-     *
-     * @param Request $request Filtres optionnels
-     * @return JsonResponse Liste paginée
      */
     public function index(Request $request): JsonResponse
     {
@@ -51,10 +45,7 @@ class FinancialInsightController extends Controller
             $query = $user->financialInsights()
                 ->active();
 
-            $query = $this->applyFilters(
-                $query,
-                $request
-            );
+            $query = $this->applyFilters($query, $request);
 
             $insights = $query
                 ->byPriority()
@@ -63,9 +54,7 @@ class FinancialInsightController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $insights->items(),
-                'meta' => $this->buildPaginationMeta(
-                    $insights
-                ),
+                'meta' => $this->buildPaginationMeta($insights),
             ]);
 
         } catch (\Exception $e) {
@@ -78,8 +67,6 @@ class FinancialInsightController extends Controller
 
     /**
      * Résumé des insights (compteurs)
-     *
-     * @return JsonResponse Compteurs par statut
      */
     public function summary(): JsonResponse
     {
@@ -97,9 +84,7 @@ class FinancialInsightController extends Controller
                     ->unread()
                     ->count(),
                 'by_type' => $this->countByType($user),
-                'by_priority' => $this->countByPriority(
-                    $user
-                ),
+                'by_priority' => $this->countByPriority($user),
                 'total_potential_saving' => $user
                     ->financialInsights()
                     ->active()
@@ -125,9 +110,6 @@ class FinancialInsightController extends Controller
 
     /**
      * Détail d'un insight
-     *
-     * @param int $id Identifiant de l'insight
-     * @return JsonResponse Détail complet
      */
     public function show(int $id): JsonResponse
     {
@@ -135,9 +117,7 @@ class FinancialInsightController extends Controller
             $insight = $this->findUserInsight($id);
 
             if (!$insight) {
-                return $this->notFoundResponse(
-                    'Insight non trouvé'
-                );
+                return $this->notFoundResponse('Insight non trouvé');
             }
 
             return response()->json([
@@ -155,16 +135,16 @@ class FinancialInsightController extends Controller
 
     /**
      * Générer de nouveaux insights via le service
-     *
-     * @return JsonResponse Insights générés
+     * ⚠️ SEULE MÉTHODE MODIFIÉE
      */
     public function generate(): JsonResponse
     {
         try {
             $user = auth()->user();
 
-            $insights = $this->insightService
-                ->generateInsights($user);
+            // ✅ Instanciation manuelle du service
+            $insightService = new FinancialInsightService($user);
+            $insights = $insightService->generateInsights();
 
             // XP pour consultation des insights
             $this->gamingService->awardXP(
@@ -176,8 +156,7 @@ class FinancialInsightController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $insights,
-                'message' => count($insights)
-                    . ' insight(s) généré(s)',
+                'message' => count($insights) . ' insight(s) généré(s)',
             ]);
 
         } catch (\Exception $e) {
@@ -190,9 +169,6 @@ class FinancialInsightController extends Controller
 
     /**
      * Marquer un insight comme lu
-     *
-     * @param int $id Identifiant de l'insight
-     * @return JsonResponse Confirmation
      */
     public function markAsRead(int $id): JsonResponse
     {
@@ -200,9 +176,7 @@ class FinancialInsightController extends Controller
             $insight = $this->findUserInsight($id);
 
             if (!$insight) {
-                return $this->notFoundResponse(
-                    'Insight non trouvé'
-                );
+                return $this->notFoundResponse('Insight non trouvé');
             }
 
             $insight->markAsRead();
@@ -214,18 +188,12 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError(
-                $e,
-                'Erreur marquage lecture'
-            );
+            return $this->handleError($e, 'Erreur marquage lecture');
         }
     }
 
     /**
      * Marquer l'action comme effectuée
-     *
-     * @param int $id Identifiant de l'insight
-     * @return JsonResponse Confirmation + XP
      */
     public function markAsActed(int $id): JsonResponse
     {
@@ -233,9 +201,7 @@ class FinancialInsightController extends Controller
             $insight = $this->findUserInsight($id);
 
             if (!$insight) {
-                return $this->notFoundResponse(
-                    'Insight non trouvé'
-                );
+                return $this->notFoundResponse('Insight non trouvé');
             }
 
             $insight->markAsActed();
@@ -267,9 +233,6 @@ class FinancialInsightController extends Controller
 
     /**
      * Rejeter un insight
-     *
-     * @param int $id Identifiant de l'insight
-     * @return JsonResponse Confirmation
      */
     public function dismiss(int $id): JsonResponse
     {
@@ -277,9 +240,7 @@ class FinancialInsightController extends Controller
             $insight = $this->findUserInsight($id);
 
             if (!$insight) {
-                return $this->notFoundResponse(
-                    'Insight non trouvé'
-                );
+                return $this->notFoundResponse('Insight non trouvé');
             }
 
             $insight->dismiss();
@@ -290,17 +251,12 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError(
-                $e,
-                'Erreur rejet de l\'insight'
-            );
+            return $this->handleError($e, 'Erreur rejet de l\'insight');
         }
     }
 
     /**
      * Marquer tous les insights comme lus
-     *
-     * @return JsonResponse Nombre mis à jour
      */
     public function markAllAsRead(): JsonResponse
     {
@@ -319,18 +275,12 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError(
-                $e,
-                'Erreur marquage global'
-            );
+            return $this->handleError($e, 'Erreur marquage global');
         }
     }
 
     /**
      * Supprimer un insight
-     *
-     * @param int $id Identifiant de l'insight
-     * @return JsonResponse Confirmation
      */
     public function destroy(int $id): JsonResponse
     {
@@ -338,9 +288,7 @@ class FinancialInsightController extends Controller
             $insight = $this->findUserInsight($id);
 
             if (!$insight) {
-                return $this->notFoundResponse(
-                    'Insight non trouvé'
-                );
+                return $this->notFoundResponse('Insight non trouvé');
             }
 
             $insight->delete();
@@ -351,10 +299,7 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError(
-                $e,
-                'Erreur suppression insight'
-            );
+            return $this->handleError($e, 'Erreur suppression insight');
         }
     }
 
@@ -362,40 +307,21 @@ class FinancialInsightController extends Controller
     // MÉTHODES PRIVÉES
     // ========================================
 
-    /**
-     * Trouver un insight de l'utilisateur
-     *
-     * @param int $id Identifiant
-     * @return FinancialInsight|null
-     */
-    private function findUserInsight(
-        int $id
-    ): ?FinancialInsight {
+    private function findUserInsight(int $id): ?FinancialInsight
+    {
         return auth()->user()
             ->financialInsights()
             ->find($id);
     }
 
-    /**
-     * Appliquer les filtres à la requête
-     *
-     * @param mixed $query Query builder
-     * @param Request $request Filtres
-     * @return mixed Query modifiée
-     */
-    private function applyFilters(
-        $query,
-        Request $request
-    ) {
+    private function applyFilters($query, Request $request)
+    {
         if ($request->has('type')) {
             $query->where('type', $request->type);
         }
 
         if ($request->has('priority')) {
-            $query->where(
-                'priority',
-                $request->priority
-            );
+            $query->where('priority', $request->priority);
         }
 
         if ($request->get('unread_only')) {
@@ -405,12 +331,6 @@ class FinancialInsightController extends Controller
         return $query;
     }
 
-    /**
-     * Compter les insights par type
-     *
-     * @param mixed $user Utilisateur
-     * @return array Compteurs par type
-     */
     private function countByType($user): array
     {
         return $user->financialInsights()
@@ -421,33 +341,18 @@ class FinancialInsightController extends Controller
             ->toArray();
     }
 
-    /**
-     * Compter les insights par priorité
-     *
-     * @param mixed $user Utilisateur
-     * @return array Compteurs par priorité
-     */
     private function countByPriority($user): array
     {
         return $user->financialInsights()
             ->active()
-            ->selectRaw(
-                'priority, COUNT(*) as count'
-            )
+            ->selectRaw('priority, COUNT(*) as count')
             ->groupBy('priority')
             ->pluck('count', 'priority')
             ->toArray();
     }
 
-    /**
-     * Construire les métadonnées de pagination
-     *
-     * @param mixed $paginator Instance paginée
-     * @return array Métadonnées
-     */
-    private function buildPaginationMeta(
-        $paginator
-    ): array {
+    private function buildPaginationMeta($paginator): array
+    {
         return [
             'current_page' => $paginator->currentPage(),
             'last_page' => $paginator->lastPage(),
@@ -456,28 +361,14 @@ class FinancialInsightController extends Controller
         ];
     }
 
-    /**
-     * Réponse 404 standardisée
-     *
-     * @param string $message Message d'erreur
-     * @return JsonResponse Réponse 404
-     */
-    private function notFoundResponse(
-        string $message
-    ): JsonResponse {
+    private function notFoundResponse(string $message): JsonResponse
+    {
         return response()->json([
             'success' => false,
             'message' => $message,
         ], 404);
     }
 
-    /**
-     * Gestion centralisée des erreurs
-     *
-     * @param \Exception $e Exception capturée
-     * @param string $context Contexte de l'erreur
-     * @return JsonResponse Réponse d'erreur
-     */
     private function handleError(
         \Exception $e,
         string $context
