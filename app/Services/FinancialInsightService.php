@@ -97,9 +97,12 @@ class FinancialInsightService
      */
     private function saveInsight(array $raw): ?FinancialInsight
     {
+        $category = $raw['category'] ?? '';
+        $mappedType = $this->mapType($category);
+
         // Éviter les doublons du même jour
         $existing = FinancialInsight::where('user_id', $this->user->id)
-            ->where('type', $raw['type'] ?? 'info')
+            ->where('type', $mappedType)
             ->whereDate('created_at', today())
             ->where('title', $raw['title'] ?? '')
             ->first();
@@ -110,11 +113,11 @@ class FinancialInsightService
 
         return FinancialInsight::create([
             'user_id' => $this->user->id,
-            'type' => $raw['type'] ?? 'info',
+            'type' => $mappedType,
             'priority' => $this->mapPriority($raw['priority'] ?? 'medium'),
             'title' => $raw['title'] ?? 'Insight',
             'description' => $raw['message'] ?? '',
-            'icon' => $this->mapIcon($raw['category'] ?? ''),
+            'icon' => $this->mapIcon($category),
             'action_label' => $raw['action'] ?? null,
             'action_data' => isset($raw['action_url'])
                 ? ['url' => $raw['action_url']]
@@ -136,6 +139,24 @@ class FinancialInsightService
             'medium' => 2,
             'low' => 3,
             default => 2,
+        };
+    }
+
+    /**
+     * ✅ Mappe la catégorie vers un type ENUM valide
+     *
+     * ENUM autorisés : cost_reduction, savings_opportunity,
+     * behavioral_pattern, goal_acceleration,
+     * budget_alert, unusual_spending
+     */
+    private function mapType(string $category): string
+    {
+        return match ($category) {
+            'savings' => 'savings_opportunity',
+            'spending' => 'cost_reduction',
+            'goals' => 'goal_acceleration',
+            'trends' => 'behavioral_pattern',
+            default => 'budget_alert',
         };
     }
 
