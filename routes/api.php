@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FinancialGoalController;
+use App\Http\Controllers\Api\FinancialInsightController;
 use App\Http\Controllers\Api\GamingActionController;
 use App\Http\Controllers\Api\GamingController;
 use App\Http\Controllers\Api\GoalContributionController;
@@ -382,6 +383,64 @@ Route::middleware('auth:sanctum')->prefix('gaming')->group(function () {
 
     Route::get('/gaming/config', [ProgressiveGamingController::class, 'getConfig']);
 });
+
+
+Route::middleware('auth:sanctum')->prefix('insights')->group(function () {
+    // Liste paginée avec filtres
+    Route::get(
+        '/',
+        [FinancialInsightController::class, 'index']
+    );
+
+    // Résumé / compteurs
+    Route::get(
+        '/summary',
+        [FinancialInsightController::class, 'summary']
+    );
+
+    // Générer de nouveaux insights
+    Route::post(
+        '/generate',
+        [FinancialInsightController::class, 'generate']
+    );
+
+    // Tout marquer comme lu
+    Route::post(
+        '/read-all',
+        [FinancialInsightController::class, 'markAllAsRead']
+    );
+
+    // Détail d'un insight
+    Route::get(
+        '/{id}',
+        [FinancialInsightController::class, 'show']
+    );
+
+    // Marquer comme lu
+    Route::patch(
+        '/{id}/read',
+        [FinancialInsightController::class, 'markAsRead']
+    );
+
+    // Marquer action effectuée
+    Route::patch(
+        '/{id}/act',
+        [FinancialInsightController::class, 'markAsActed']
+    );
+
+    // Rejeter
+    Route::patch(
+        '/{id}/dismiss',
+        [FinancialInsightController::class, 'dismiss']
+    );
+
+    // Supprimer
+    Route::delete(
+        '/{id}',
+        [FinancialInsightController::class, 'destroy']
+    );
+});
+
 
 // ==========================================
 // 🛡️ ADMIN ROUTES (PROTECTED + ADMIN)

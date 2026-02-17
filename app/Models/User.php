@@ -673,6 +673,11 @@ class User extends Authenticatable
         ]);
     }
 
+    public function financialInsights(): HasMany
+    {
+        return $this->hasMany(FinancialInsight::class);
+    }
+
     /**
      * Vérifier si l'utilisateur a des connexions bancaires
      */
