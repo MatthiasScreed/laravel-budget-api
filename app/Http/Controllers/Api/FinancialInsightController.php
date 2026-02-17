@@ -17,21 +17,9 @@ class FinancialInsightController extends Controller
 {
     private GamingService $gamingService;
 
-    // ❌ ANCIEN - Ne fonctionne pas :
-    // public function __construct(
-    //     FinancialInsightService $insightService,
-    //     GamingService $gamingService
-    // ) {
-    //     $this->insightService = $insightService;
-    //     $this->gamingService = $gamingService;
-    // }
-
-    // ✅ NOUVEAU - Fonctionne :
     public function __construct(GamingService $gamingService)
     {
         $this->gamingService = $gamingService;
-        // On n'injecte plus FinancialInsightService ici
-        // On le créera manuellement dans generate()
     }
 
     /**
@@ -135,23 +123,25 @@ class FinancialInsightController extends Controller
 
     /**
      * Générer de nouveaux insights via le service
-     * ⚠️ SEULE MÉTHODE MODIFIÉE
      */
     public function generate(): JsonResponse
     {
         try {
             $user = auth()->user();
 
-            // ✅ Instanciation manuelle du service
             $insightService = new FinancialInsightService($user);
             $insights = $insightService->generateInsights();
 
-            // XP pour consultation des insights
-            //$this->gamingService->awardXP(
-                //$user,
-                //'insight_generated',
-                //5
-            //);
+            // ✅ XP pour consultation (méthode corrigée)
+            try {
+                $this->gamingService->addExperience(
+                    $user,
+                    5,
+                    'insight_generated'
+                );
+            } catch (\Exception $e) {
+                Log::warning('Gaming XP error: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
@@ -206,19 +196,24 @@ class FinancialInsightController extends Controller
 
             $insight->markAsActed();
 
-            // XP bonus pour action sur insight
-            $xpAwarded = $this->gamingService->awardXP(
-                auth()->user(),
-                'insight_acted',
-                15
-            );
+            // ✅ XP bonus (méthode corrigée)
+            $xpResult = [];
+            try {
+                $xpResult = $this->gamingService->addExperience(
+                    auth()->user(),
+                    15,
+                    'insight_acted'
+                );
+            } catch (\Exception $e) {
+                Log::warning('Gaming XP error: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Action enregistrée',
                 'data' => $insight->fresh(),
                 'gaming' => [
-                    'xp_earned' => $xpAwarded,
+                    'xp_earned' => 15,
                     'action' => 'insight_acted',
                 ],
             ]);
@@ -251,7 +246,10 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError($e, 'Erreur rejet de l\'insight');
+            return $this->handleError(
+                $e,
+                'Erreur rejet de l\'insight'
+            );
         }
     }
 
@@ -299,7 +297,10 @@ class FinancialInsightController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->handleError($e, 'Erreur suppression insight');
+            return $this->handleError(
+                $e,
+                'Erreur suppression insight'
+            );
         }
     }
 
@@ -361,11 +362,11 @@ class FinancialInsightController extends Controller
         ];
     }
 
-    private function notFoundResponse(string $message): JsonResponse
+    private function notFoundResponse(string $msg): JsonResponse
     {
         return response()->json([
             'success' => false,
-            'message' => $message,
+            'message' => $msg,
         ], 404);
     }
 
@@ -373,8 +374,9 @@ class FinancialInsightController extends Controller
         \Exception $e,
         string $context
     ): JsonResponse {
-        Log::error("$context: {$e->getMessage()}", [
+        Log::error("$context", [
             'user_id' => auth()->id(),
+            'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
 

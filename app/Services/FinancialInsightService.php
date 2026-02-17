@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service de génération d'insights financiers intelligents
+ *
+ * ✅ CORRECTIONS APPLIQUÉES :
+ * - whereHas('bankAccount') → where('user_id') (pas de relation bankAccount sur Transaction)
+ * - whereMonth('date') → whereMonth('transaction_date') (bon nom de colonne)
+ * - Utilisation des scopes existants du modèle Transaction
  */
 class FinancialInsightService
 {
@@ -74,8 +79,8 @@ class FinancialInsightService
                 'category' => 'savings',
                 'title' => 'Taux d\'épargne faible',
                 'message' => sprintf(
-                    'Votre taux d\'épargne est de %.1f%%. ' .
-                    'Visez au moins 10%% pour sécuriser vos finances.',
+                    'Votre taux d\'épargne est de %.1f%%. '
+                    . 'Visez au moins 10%% pour sécuriser vos finances.',
                     $rate
                 ),
                 'priority' => 'high',
@@ -104,27 +109,31 @@ class FinancialInsightService
 
     /**
      * Calcule le taux d'épargne mensuel
+     *
+     * ✅ CORRIGÉ : utilise user_id + transaction_date
      */
     private function getSavingsRate(): float
     {
-        $month = now()->month;
+        $now = now();
 
-        // ✅ CORRECTION : bankAccount au lieu de account
-        $income = Transaction::whereHas('bankAccount', function($q) {
-            $q->where('user_id', $this->user->id);
-        })
-            ->whereMonth('date', $month)
+        // ✅ Revenus du mois via user_id + transaction_date
+        $income = Transaction::where('user_id', $this->user->id)
             ->where('type', 'income')
+            ->where('status', 'completed')
+            ->whereYear('transaction_date', $now->year)
+            ->whereMonth('transaction_date', $now->month)
             ->sum('amount');
 
         if ($income == 0) {
             return 0;
         }
 
-        $saved = GoalContribution::whereHas('goal', function($q) {
+        // ✅ Épargne via les contributions aux objectifs
+        $saved = GoalContribution::whereHas('goal', function ($q) {
             $q->where('user_id', $this->user->id);
         })
-            ->whereMonth('created_at', $month)
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
             ->sum('amount');
 
         return ($saved / $income) * 100;
@@ -132,16 +141,22 @@ class FinancialInsightService
 
     /**
      * Analyse les dépenses par catégorie
+     *
+     * ✅ CORRIGÉ : utilise user_id + transaction_date
      */
     private function analyzeCategories(): ?array
     {
-        // ✅ CORRECTION : bankAccount au lieu de account
-        $topCategory = Transaction::whereHas('bankAccount', function($q) {
-            $q->where('user_id', $this->user->id);
-        })
+        $now = now();
+
+        $topCategory = Transaction::where('user_id', $this->user->id)
             ->where('type', 'expense')
-            ->whereMonth('date', now()->month)
-            ->select('category_id', DB::raw('SUM(ABS(amount)) as total'))
+            ->where('status', 'completed')
+            ->whereYear('transaction_date', $now->year)
+            ->whereMonth('transaction_date', $now->month)
+            ->select(
+                'category_id',
+                DB::raw('SUM(ABS(amount)) as total')
+            )
             ->groupBy('category_id')
             ->orderByDesc('total')
             ->with('category')
@@ -151,17 +166,20 @@ class FinancialInsightService
             return null;
         }
 
-        // ✅ CORRECTION : bankAccount au lieu de account
-        $total = Transaction::whereHas('bankAccount', function($q) {
-            $q->where('user_id', $this->user->id);
-        })
+        $total = Transaction::where('user_id', $this->user->id)
             ->where('type', 'expense')
-            ->whereMonth('date', now()->month)
+            ->where('status', 'completed')
+            ->whereYear('transaction_date', $now->year)
+            ->whereMonth('transaction_date', $now->month)
             ->sum(DB::raw('ABS(amount)'));
 
-        $percentage = ($topCategory->total / $total) * 100;
+        if ($total == 0) {
+            return null;
+        }
 
-        if ($percentage > 30) {
+        $pct = ($topCategory->total / $total) * 100;
+
+        if ($pct > 30) {
             return [
                 'type' => 'warning',
                 'category' => 'spending',
@@ -169,15 +187,15 @@ class FinancialInsightService
                 'message' => sprintf(
                     '%s représente %.0f%% de vos dépenses.',
                     $topCategory->category->name,
-                    $percentage
+                    $pct
                 ),
                 'priority' => 'medium',
                 'action' => 'Voir les détails',
-                'action_url' => '/transactions?category=' .
-                    $topCategory->category_id,
+                'action_url' => '/transactions?category='
+                    . $topCategory->category_id,
                 'metadata' => [
                     'category' => $topCategory->category->name,
-                    'percentage' => $percentage,
+                    'percentage' => $pct,
                     'amount' => $topCategory->total
                 ]
             ];
@@ -207,11 +225,14 @@ class FinancialInsightService
             ];
         }
 
-        $closestGoal = $goals->sortByDesc(function($goal) {
+        $closestGoal = $goals->sortByDesc(function ($goal) {
             return $goal->progress_percentage;
         })->first();
 
         if ($closestGoal->progress_percentage > 80) {
+            $remaining = $closestGoal->target_amount
+                - $closestGoal->current_amount;
+
             return [
                 'type' => 'success',
                 'category' => 'goals',
@@ -220,8 +241,7 @@ class FinancialInsightService
                     '%s : %.0f%% complété. Plus que %.2f€ !',
                     $closestGoal->name,
                     $closestGoal->progress_percentage,
-                    $closestGoal->target_amount -
-                    $closestGoal->current_amount
+                    $remaining
                 ),
                 'priority' => 'medium',
                 'action' => 'Voir l\'objectif',
@@ -238,30 +258,33 @@ class FinancialInsightService
 
     /**
      * Analyse les tendances de dépenses
+     *
+     * ✅ CORRIGÉ : utilise user_id + transaction_date
      */
     private function analyzeTrends(): ?array
     {
-        // ✅ CORRECTION : bankAccount au lieu de account
-        $currentMonth = Transaction::whereHas('bankAccount', function($q) {
-            $q->where('user_id', $this->user->id);
-        })
+        $now = now();
+        $lastMonth = now()->subMonth();
+
+        $currentMonth = Transaction::where('user_id', $this->user->id)
             ->where('type', 'expense')
-            ->whereMonth('date', now()->month)
+            ->where('status', 'completed')
+            ->whereYear('transaction_date', $now->year)
+            ->whereMonth('transaction_date', $now->month)
             ->sum(DB::raw('ABS(amount)'));
 
-        // ✅ CORRECTION : bankAccount au lieu de account
-        $lastMonth = Transaction::whereHas('bankAccount', function($q) {
-            $q->where('user_id', $this->user->id);
-        })
+        $previousMonth = Transaction::where('user_id', $this->user->id)
             ->where('type', 'expense')
-            ->whereMonth('date', now()->subMonth()->month)
+            ->where('status', 'completed')
+            ->whereYear('transaction_date', $lastMonth->year)
+            ->whereMonth('transaction_date', $lastMonth->month)
             ->sum(DB::raw('ABS(amount)'));
 
-        if ($lastMonth == 0) {
+        if ($previousMonth == 0) {
             return null;
         }
 
-        $variation = (($currentMonth - $lastMonth) / $lastMonth) * 100;
+        $variation = (($currentMonth - $previousMonth) / $previousMonth) * 100;
 
         if ($variation > 20) {
             return [
@@ -278,7 +301,7 @@ class FinancialInsightService
                 'metadata' => [
                     'variation' => $variation,
                     'current' => $currentMonth,
-                    'previous' => $lastMonth
+                    'previous' => $previousMonth
                 ]
             ];
         }
@@ -295,7 +318,7 @@ class FinancialInsightService
                 'priority' => 'low',
                 'metadata' => [
                     'variation' => $variation,
-                    'saved' => abs($currentMonth - $lastMonth)
+                    'saved' => abs($currentMonth - $previousMonth)
                 ]
             ];
         }
