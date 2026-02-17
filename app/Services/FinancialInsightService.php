@@ -11,7 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class FinancialInsightsService
+class FinancialInsightService
 {
     /**
      * Génère tous les insights pour un utilisateur

@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\User;
-use App\Services\FinancialInsightsService;
+use App\Services\FinancialInsightService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -49,11 +49,11 @@ class GenerateDailyInsightsJob implements ShouldQueue
     /**
      * Exécuter le job
      *
-     * @param FinancialInsightsService $service
+     * @param FinancialInsightService $service
      * @return void
      */
     public function handle(
-        FinancialInsightsService $service
+        FinancialInsightService $service
     ): void {
         $users = $this->getTargetUsers();
 
@@ -92,12 +92,12 @@ class GenerateDailyInsightsJob implements ShouldQueue
      * Traiter les utilisateurs par batch
      *
      * @param mixed $users Collection d'utilisateurs
-     * @param FinancialInsightsService $service
+     * @param FinancialInsightService $service
      * @return array Statistiques de traitement
      */
     private function processUsers(
         $users,
-        FinancialInsightsService $service
+        FinancialInsightService $service
     ): array {
         $stats = [
             'processed' => 0,
@@ -126,12 +126,12 @@ class GenerateDailyInsightsJob implements ShouldQueue
      * Générer les insights pour un utilisateur
      *
      * @param User $user Utilisateur cible
-     * @param FinancialInsightsService $service
+     * @param FinancialInsightService $service
      * @return int Nombre d'insights créés (-1 si erreur)
      */
     private function processOneUser(
         User $user,
-        FinancialInsightsService $service
+        FinancialInsightService $service
     ): int {
         try {
             $insights = $service->generateInsights($user);
