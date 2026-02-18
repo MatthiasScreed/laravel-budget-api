@@ -38,7 +38,7 @@ class FinancialInsightService
      * Mapping des URLs frontend (avec préfixe /app)
      */
     private const ROUTE_MAP = [
-        '/goals/create'  => '/app/goals',
+        '/goals/create'  => '/app/goals?action=create', // ✅ Ouvre le modal directement
         '/goals'         => '/app/goals',
         '/transactions'  => '/app/transactions',
         '/analytics'     => '/app/analytics',
