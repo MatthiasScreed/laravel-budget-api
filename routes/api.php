@@ -469,3 +469,8 @@ Route::fallback(function () {
     ], 404);
 });
 
+Route::get('/temp-clear-insights', function () {
+    $count = \App\Models\FinancialInsight::truncate();
+    return 'Insights supprimés';
+});
+
