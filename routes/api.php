@@ -469,8 +469,8 @@ Route::fallback(function () {
     ], 404);
 });
 
+// TEMPORAIRE - supprimer après usage
 Route::get('/temp-clear-insights', function () {
     $count = \App\Models\FinancialInsight::truncate();
     return 'Insights supprimés';
 });
-
