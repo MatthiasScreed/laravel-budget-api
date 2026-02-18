@@ -13,14 +13,37 @@ use Illuminate\Support\Facades\Log;
  * Service de génération d'insights financiers intelligents
  *
  * ✅ CORRECTIONS :
- * - Persiste les insights dans la table financial_insights
- * - Utilise where('user_id') au lieu de whereHas('bankAccount')
- * - Utilise transaction_date au lieu de date
- * - Mappe les champs vers le schéma FinancialInsight
+ * - URLs corrigées : /goals/create → /app/goals, etc.
+ * - mapType() : 'default' → 'unusual_spending' (plus de 'budget_alert' non mappé)
+ * - Séparation claire type interne / type ENUM BDD
  */
 class FinancialInsightService
 {
     private $user;
+
+    /**
+     * Types ENUM valides en base de données
+     */
+    private const VALID_TYPES = [
+        'cost_reduction',
+        'savings_opportunity',
+        'behavioral_pattern',
+        'goal_acceleration',
+        'budget_alert',
+        'unusual_spending',
+        'warning',
+    ];
+
+    /**
+     * Mapping des URLs frontend (avec préfixe /app)
+     */
+    private const ROUTE_MAP = [
+        '/goals/create'  => '/app/goals',
+        '/goals'         => '/app/goals',
+        '/transactions'  => '/app/transactions',
+        '/analytics'     => '/app/analytics',
+        '/dashboard'     => '/app/dashboard',
+    ];
 
     public function __construct($user)
     {
@@ -33,50 +56,29 @@ class FinancialInsightService
     public function generateInsights(): array
     {
         try {
-            $rawInsights = [];
+            $rawInsights = array_filter([
+                $this->analyzeSavings(),
+                $this->analyzeCategories(),
+                $this->analyzeGoals(),
+                $this->analyzeTrends(),
+            ]);
 
-            $savings = $this->analyzeSavings();
-            if ($savings) {
-                $rawInsights[] = $savings;
-            }
-
-            $categories = $this->analyzeCategories();
-            if ($categories) {
-                $rawInsights[] = $categories;
-            }
-
-            $goals = $this->analyzeGoals();
-            if ($goals) {
-                $rawInsights[] = $goals;
-            }
-
-            $trends = $this->analyzeTrends();
-            if ($trends) {
-                $rawInsights[] = $trends;
-            }
-
-            // ✅ Persister en BDD et retourner les modèles
-            $saved = $this->persistInsights(
-                array_slice($rawInsights, 0, 5)
+            return $this->persistInsights(
+                array_slice(array_values($rawInsights), 0, 5)
             );
-
-            return $saved;
 
         } catch (\Exception $e) {
             Log::error('Erreur génération insights', [
                 'user_id' => $this->user->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
             ]);
             return [];
         }
     }
 
     /**
-     * ✅ Persiste les insights bruts en BDD
-     *
-     * Évite les doublons en vérifiant le type+catégorie
-     * du même jour pour cet utilisateur
+     * Persiste les insights bruts en BDD
      */
     private function persistInsights(array $rawInsights): array
     {
@@ -93,14 +95,13 @@ class FinancialInsightService
     }
 
     /**
-     * ✅ Sauvegarde un insight individuel
+     * Sauvegarde un insight individuel (évite les doublons du jour)
      */
     private function saveInsight(array $raw): ?FinancialInsight
     {
-        $category = $raw['category'] ?? '';
+        $category   = $raw['category'] ?? '';
         $mappedType = $this->mapType($category);
 
-        // Éviter les doublons du même jour
         $existing = FinancialInsight::where('user_id', $this->user->id)
             ->where('type', $mappedType)
             ->whereDate('created_at', today())
@@ -111,66 +112,102 @@ class FinancialInsightService
             return $existing;
         }
 
+        // ✅ Corriger l'URL avant de sauvegarder
+        $actionData = null;
+        if (isset($raw['action_url'])) {
+            $actionData = ['url' => $this->normalizeUrl($raw['action_url'])];
+        }
+
         return FinancialInsight::create([
-            'user_id' => $this->user->id,
-            'type' => $mappedType,
-            'priority' => $this->mapPriority($raw['priority'] ?? 'medium'),
-            'title' => $raw['title'] ?? 'Insight',
-            'description' => $raw['message'] ?? '',
-            'icon' => $this->mapIcon($category),
-            'action_label' => $raw['action'] ?? null,
-            'action_data' => isset($raw['action_url'])
-                ? ['url' => $raw['action_url']]
-                : null,
+            'user_id'         => $this->user->id,
+            'type'            => $mappedType,
+            'priority'        => $this->mapPriority($raw['priority'] ?? 'medium'),
+            'title'           => $raw['title'] ?? 'Insight',
+            'description'     => $raw['message'] ?? '',
+            'icon'            => $this->mapIcon($category),
+            'action_label'    => $raw['action'] ?? null,
+            'action_data'     => $actionData,
             'potential_saving' => $raw['metadata']['saved'] ?? null,
-            'metadata' => $raw['metadata'] ?? null,
-            'is_read' => false,
-            'is_dismissed' => false,
+            'metadata'        => $raw['metadata'] ?? null,
+            'is_read'         => false,
+            'is_dismissed'    => false,
         ]);
     }
 
     /**
-     * ✅ Mappe la priorité texte vers un entier
+     * ✅ Normalise les URLs vers les routes /app/...
+     *
+     * Gère aussi les URLs avec query string (ex: /transactions?category=5)
+     */
+    private function normalizeUrl(string $url): string
+    {
+        // Extraire le path sans query string
+        $path  = strtok($url, '?');
+        $query = strstr($url, '?') ?: '';
+
+        // Cherche une correspondance exacte d'abord
+        if (isset(self::ROUTE_MAP[$path])) {
+            return self::ROUTE_MAP[$path] . $query;
+        }
+
+        // Cherche une correspondance par préfixe (ex: /goals/123)
+        foreach (self::ROUTE_MAP as $from => $to) {
+            if (str_starts_with($path, $from . '/')) {
+                $suffix = substr($path, strlen($from));
+                return $to . $suffix . $query;
+            }
+        }
+
+        // Déjà préfixé en /app ou URL externe
+        if (str_starts_with($url, '/app') || str_starts_with($url, 'http')) {
+            return $url;
+        }
+
+        // Fallback : ajouter /app par défaut
+        return '/app' . $url;
+    }
+
+    /**
+     * Mappe la priorité texte vers un entier
      */
     private function mapPriority(string $priority): int
     {
         return match ($priority) {
-            'high' => 1,
+            'high'   => 1,
             'medium' => 2,
-            'low' => 3,
-            default => 2,
+            'low'    => 3,
+            default  => 2,
         };
     }
 
     /**
      * ✅ Mappe la catégorie vers un type ENUM valide
      *
-     * ENUM autorisés : cost_reduction, savings_opportunity,
-     * behavioral_pattern, goal_acceleration,
-     * budget_alert, unusual_spending
+     * Plus de 'budget_alert' comme fallback par défaut :
+     * on utilise 'unusual_spending' qui est plus sémantique
      */
     private function mapType(string $category): string
     {
         return match ($category) {
-            'savings' => 'savings_opportunity',
+            'savings'  => 'savings_opportunity',
             'spending' => 'cost_reduction',
-            'goals' => 'goal_acceleration',
-            'trends' => 'behavioral_pattern',
-            default => 'budget_alert',
+            'goals'    => 'goal_acceleration',
+            'trends'   => 'behavioral_pattern',
+            default    => 'unusual_spending',
         };
     }
 
     /**
-     * ✅ Mappe la catégorie vers une icône emoji
+     * Mappe la catégorie vers une icône emoji
      */
     private function mapIcon(string $category): string
     {
         return match ($category) {
-            'savings' => '💰',
+            'savings'  => '💰',
             'spending' => '💳',
-            'goals' => '🎯',
-            'trends' => '📊',
-            default => '💡',
+            'goals'    => '🎯',
+            'trends'   => '📊',
+            default    => '💡',
         };
     }
 
@@ -187,33 +224,32 @@ class FinancialInsightService
 
         if ($rate < 10) {
             return [
-                'type' => 'warning',
-                'category' => 'savings',
-                'title' => 'Taux d\'épargne faible',
-                'message' => sprintf(
-                    'Votre taux d\'épargne est de %.1f%%. '
-                    . 'Visez au moins 10%% pour sécuriser '
-                    . 'vos finances.',
+                'type'       => 'warning',
+                'category'   => 'savings',
+                'title'      => 'Taux d\'épargne faible',
+                'message'    => sprintf(
+                    'Votre taux d\'épargne est de %.1f%%.'
+                    . ' Visez au moins 10%% pour sécuriser vos finances.',
                     $rate
                 ),
-                'priority' => 'high',
-                'action' => 'Créer un objectif d\'épargne',
-                'action_url' => '/goals/create',
-                'metadata' => ['current_rate' => $rate]
+                'priority'   => 'high',
+                'action'     => 'Créer un objectif d\'épargne',
+                'action_url' => '/goals/create', // normalisé automatiquement
+                'metadata'   => ['current_rate' => $rate],
             ];
         }
 
         if ($rate > 20) {
             return [
-                'type' => 'success',
+                'type'     => 'success',
                 'category' => 'savings',
-                'title' => 'Excellent taux d\'épargne !',
-                'message' => sprintf(
+                'title'    => 'Excellent taux d\'épargne !',
+                'message'  => sprintf(
                     'Bravo ! Vous épargnez %.1f%% de vos revenus.',
                     $rate
                 ),
                 'priority' => 'low',
-                'metadata' => ['current_rate' => $rate]
+                'metadata' => ['current_rate' => $rate],
             ];
         }
 
@@ -264,10 +300,7 @@ class FinancialInsightService
             ->where('status', 'completed')
             ->whereYear('transaction_date', $now->year)
             ->whereMonth('transaction_date', $now->month)
-            ->select(
-                'category_id',
-                DB::raw('SUM(ABS(amount)) as total')
-            )
+            ->select('category_id', DB::raw('SUM(ABS(amount)) as total'))
             ->groupBy('category_id')
             ->orderByDesc('total')
             ->with('category')
@@ -290,23 +323,22 @@ class FinancialInsightService
         }
 
         return [
-            'type' => 'warning',
-            'category' => 'spending',
-            'title' => 'Catégorie dominante',
-            'message' => sprintf(
+            'type'       => 'warning',
+            'category'   => 'spending',
+            'title'      => 'Catégorie dominante',
+            'message'    => sprintf(
                 '%s représente %.0f%% de vos dépenses.',
                 $topCategory->category->name,
                 $pct
             ),
-            'priority' => 'medium',
-            'action' => 'Voir les détails',
-            'action_url' => '/transactions?category='
-                . $topCategory->category_id,
-            'metadata' => [
-                'category' => $topCategory->category->name,
+            'priority'   => 'medium',
+            'action'     => 'Voir les détails',
+            'action_url' => '/transactions?category=' . $topCategory->category_id,
+            'metadata'   => [
+                'category'   => $topCategory->category->name,
                 'percentage' => $pct,
-                'amount' => $topCategory->total
-            ]
+                'amount'     => $topCategory->total,
+            ],
         ];
     }
 
@@ -325,46 +357,43 @@ class FinancialInsightService
 
         if ($goals->isEmpty()) {
             return [
-                'type' => 'info',
-                'category' => 'goals',
-                'title' => 'Créez votre premier objectif',
-                'message' => 'Définissez un objectif financier '
-                    . 'pour suivre votre progression.',
-                'priority' => 'high',
-                'action' => 'Créer un objectif',
+                'type'       => 'info',
+                'category'   => 'goals',
+                'title'      => 'Créez votre premier objectif',
+                'message'    => 'Définissez un objectif financier'
+                    . ' pour suivre votre progression.',
+                'priority'   => 'high',
+                'action'     => 'Créer un objectif',
                 'action_url' => '/goals/create',
-                'metadata' => []
+                'metadata'   => [],
             ];
         }
 
-        $closest = $goals->sortByDesc(function ($g) {
-            return $g->progress_percentage;
-        })->first();
+        $closest = $goals->sortByDesc(fn ($g) => $g->progress_percentage)->first();
 
         if ($closest->progress_percentage <= 80) {
             return null;
         }
 
-        $remaining = $closest->target_amount
-            - $closest->current_amount;
+        $remaining = $closest->target_amount - $closest->current_amount;
 
         return [
-            'type' => 'success',
-            'category' => 'goals',
-            'title' => 'Objectif presque atteint !',
-            'message' => sprintf(
+            'type'       => 'success',
+            'category'   => 'goals',
+            'title'      => 'Objectif presque atteint !',
+            'message'    => sprintf(
                 '%s : %.0f%% complété. Plus que %.2f€ !',
                 $closest->name,
                 $closest->progress_percentage,
                 $remaining
             ),
-            'priority' => 'medium',
-            'action' => 'Voir l\'objectif',
+            'priority'   => 'medium',
+            'action'     => 'Voir l\'objectif',
             'action_url' => '/goals/' . $closest->id,
-            'metadata' => [
-                'goal_id' => $closest->id,
-                'progress' => $closest->progress_percentage
-            ]
+            'metadata'   => [
+                'goal_id'  => $closest->id,
+                'progress' => $closest->progress_percentage,
+            ],
         ];
     }
 
@@ -377,10 +406,9 @@ class FinancialInsightService
      */
     private function analyzeTrends(): ?array
     {
-        $now = now();
-        $prev = now()->subMonth();
-
-        $current = $this->getMonthlyExpenseTotal($now);
+        $now     = now();
+        $prev    = now()->subMonth();
+        $current  = $this->getMonthlyExpenseTotal($now);
         $previous = $this->getMonthlyExpenseTotal($prev);
 
         if ($previous == 0) {
@@ -391,39 +419,38 @@ class FinancialInsightService
 
         if ($variation > 20) {
             return [
-                'type' => 'warning',
-                'category' => 'trends',
-                'title' => 'Dépenses en hausse',
-                'message' => sprintf(
-                    'Vos dépenses ont augmenté de %.0f%% '
-                    . 'ce mois-ci.',
+                'type'       => 'warning',
+                'category'   => 'trends',
+                'title'      => 'Dépenses en hausse',
+                'message'    => sprintf(
+                    'Vos dépenses ont augmenté de %.0f%% ce mois-ci.',
                     $variation
                 ),
-                'priority' => 'high',
-                'action' => 'Analyser les dépenses',
+                'priority'   => 'high',
+                'action'     => 'Analyser les dépenses',
                 'action_url' => '/transactions',
-                'metadata' => [
+                'metadata'   => [
                     'variation' => $variation,
-                    'current' => $current,
-                    'previous' => $previous
-                ]
+                    'current'   => $current,
+                    'previous'  => $previous,
+                ],
             ];
         }
 
         if ($variation < -20) {
             return [
-                'type' => 'success',
+                'type'     => 'success',
                 'category' => 'trends',
-                'title' => 'Belles économies !',
-                'message' => sprintf(
+                'title'    => 'Belles économies !',
+                'message'  => sprintf(
                     'Vous avez réduit vos dépenses de %.0f%%.',
                     abs($variation)
                 ),
                 'priority' => 'low',
                 'metadata' => [
                     'variation' => $variation,
-                    'saved' => abs($current - $previous)
-                ]
+                    'saved'     => abs($current - $previous),
+                ],
             ];
         }
 
@@ -435,7 +462,7 @@ class FinancialInsightService
     // ==========================================
 
     /**
-     * Calcule le total des dépenses pour un mois
+     * Calcule le total des dépenses pour un mois donné
      */
     private function getMonthlyExpenseTotal($date): float
     {

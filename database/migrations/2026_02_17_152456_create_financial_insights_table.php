@@ -22,7 +22,8 @@ return new class extends Migration
                 'behavioral_pattern',
                 'goal_acceleration',
                 'budget_alert',
-                'unusual_spending'
+                'unusual_spending',
+                'warning',
             ]);
 
             // Priorité (1 = critique, 5 = info)
