@@ -11,11 +11,6 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service de génération d'insights financiers intelligents
- *
- * ✅ CORRECTIONS :
- * - action_data contient désormais create_goal pour création automatique
- * - URLs normalisées via ROUTE_MAP
- * - mapType() sans valeur invalide
  */
 class FinancialInsightService
 {
@@ -99,7 +94,6 @@ class FinancialInsightService
             return $existing;
         }
 
-        // ✅ Construire action_data avec create_goal si applicable
         $actionData = $this->buildActionData($raw);
 
         return FinancialInsight::create([
@@ -119,21 +113,16 @@ class FinancialInsightService
     }
 
     /**
-     * ✅ Construit l'action_data avec le template create_goal si présent
-     *
-     * Le frontend lit action_data.create_goal pour créer automatiquement
-     * l'objectif en BDD sans passer par un formulaire.
+     * Construit l'action_data avec le template create_goal si présent
      */
     private function buildActionData(array $raw): ?array
     {
         $data = [];
 
-        // URL de navigation après action
         if (isset($raw['action_url'])) {
             $data['url'] = $this->normalizeUrl($raw['action_url']);
         }
 
-        // Template d'objectif à créer automatiquement
         if (isset($raw['create_goal'])) {
             $data['create_goal'] = $raw['create_goal'];
         }
@@ -142,7 +131,7 @@ class FinancialInsightService
     }
 
     /**
-     * ✅ Normalise les URLs vers les routes /app/...
+     * Normalise les URLs vers les routes /app/...
      */
     private function normalizeUrl(string $url): string
     {
@@ -195,45 +184,36 @@ class FinancialInsightService
             'goals'    => '🎯',
             'trends'   => '📊',
             default    => '💡',
-        };
+        ];
     }
 
     // ==========================================
     // ANALYSE : Épargne
     // ==========================================
 
-    /**
-     * ✅ Analyse le taux d'épargne et propose un objectif pré-rempli
-     *
-     * create_goal est injecté dans action_data pour que le frontend
-     * puisse créer l'objectif automatiquement en BDD.
-     */
     private function analyzeSavings(): ?array
     {
         $rate = $this->getSavingsRate();
 
         if ($rate < 10) {
-            // Calculer un montant cible intelligent (3 mois de revenus)
             $monthlyIncome = $this->getMonthlyIncome();
-            $targetAmount  = round($monthlyIncome * 3, -2); // arrondi à la centaine
-            $targetAmount  = max(500, $targetAmount);        // minimum 500€
+            $targetAmount  = max(500, round($monthlyIncome * 3, -2));
 
             return [
-                'type'       => 'warning',
-                'category'   => 'savings',
-                'title'      => 'Taux d\'épargne faible',
-                'message'    => sprintf(
+                'type'        => 'warning',
+                'category'    => 'savings',
+                'title'       => 'Taux d\'épargne faible',
+                'message'     => sprintf(
                     'Votre taux d\'épargne est de %.1f%%.'
                     . ' Visez au moins 10%% pour sécuriser vos finances.',
                     $rate
                 ),
-                'priority'   => 'high',
-                'action'     => 'Créer un objectif d\'épargne',
-                'action_url' => '/app/goals',
-                // ✅ Template pour création automatique en BDD
+                'priority'    => 'high',
+                'action'      => 'Créer un objectif d\'épargne',
+                'action_url'  => '/app/goals',
                 'create_goal' => [
                     'name'          => '🛡️ Fonds d\'urgence',
-                    'description'   => 'Objectif créé automatiquement par le Coach IA pour sécuriser vos finances.',
+                    'description'   => 'Objectif créé automatiquement par le Coach IA.',
                     'target_amount' => $targetAmount,
                     'target_date'   => now()->addMonths(12)->format('Y-m-d'),
                     'icon'          => '🛡️',
@@ -260,9 +240,6 @@ class FinancialInsightService
         return null;
     }
 
-    /**
-     * Calcule le revenu mensuel moyen
-     */
     private function getMonthlyIncome(): float
     {
         $now = now();
@@ -274,9 +251,6 @@ class FinancialInsightService
             ->sum('amount');
     }
 
-    /**
-     * Calcule le taux d'épargne mensuel
-     */
     private function getSavingsRate(): float
     {
         $now    = now();
@@ -346,7 +320,12 @@ class FinancialInsightService
     // ==========================================
 
     /**
-     * ✅ Analyse les objectifs — propose création auto si aucun objectif
+     * ✅ CORRECTION : Vérifie l'existence d'objectifs actifs EN TEMPS RÉEL
+     *
+     * Ne génère l'insight "pas d'objectif" que si l'user n'en a vraiment aucun.
+     * Si un objectif existe déjà, propose plutôt d'accélérer le plus avancé.
+     * Ainsi, après création d'un objectif via action_data.create_goal,
+     * le prochain appel à generate() ne reproduira plus cet insight.
      */
     private function analyzeGoals(): ?array
     {
@@ -354,31 +333,19 @@ class FinancialInsightService
             ->where('status', 'active')
             ->get();
 
+        // ✅ Aucun objectif actif → proposer la création
         if ($goals->isEmpty()) {
-            return [
-                'type'       => 'info',
-                'category'   => 'goals',
-                'title'      => 'Créez votre premier objectif',
-                'message'    => 'Définissez un objectif financier pour suivre votre progression.',
-                'priority'   => 'high',
-                'action'     => 'Créer un objectif',
-                'action_url' => '/app/goals',
-                // ✅ Template d'objectif générique créé automatiquement
-                'create_goal' => [
-                    'name'          => '🎯 Mon premier objectif',
-                    'description'   => 'Objectif créé automatiquement par le Coach IA.',
-                    'target_amount' => 1000,
-                    'target_date'   => now()->addMonths(6)->format('Y-m-d'),
-                    'icon'          => '🎯',
-                    'priority'      => 'medium',
-                ],
-                'metadata' => [],
-            ];
+            return $this->buildNoGoalInsight();
         }
 
-        $closest = $goals->sortByDesc(fn ($g) => $g->progress_percentage)->first();
+        // ✅ Au moins un objectif → chercher le plus proche de la completion
+        $closest = $goals
+            ->sortByDesc(fn ($g) => $g->progress_percentage)
+            ->first();
 
-        if ($closest->progress_percentage <= 80) return null;
+        if ($closest->progress_percentage <= 80) {
+            return null;
+        }
 
         $remaining = $closest->target_amount - $closest->current_amount;
 
@@ -399,6 +366,31 @@ class FinancialInsightService
                 'goal_id'  => $closest->id,
                 'progress' => $closest->progress_percentage,
             ],
+        ];
+    }
+
+    /**
+     * ✅ Construit l'insight "pas d'objectif" avec template de création auto
+     */
+    private function buildNoGoalInsight(): array
+    {
+        return [
+            'type'        => 'info',
+            'category'    => 'goals',
+            'title'       => 'Créez votre premier objectif',
+            'message'     => 'Définissez un objectif financier pour suivre votre progression.',
+            'priority'    => 'high',
+            'action'      => 'Créer un objectif',
+            'action_url'  => '/app/goals',
+            'create_goal' => [
+                'name'          => '🎯 Mon premier objectif',
+                'description'   => 'Objectif créé automatiquement par le Coach IA.',
+                'target_amount' => 1000,
+                'target_date'   => now()->addMonths(6)->format('Y-m-d'),
+                'icon'          => '🎯',
+                'priority'      => 'medium',
+            ],
+            'metadata' => [],
         ];
     }
 
