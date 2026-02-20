@@ -93,21 +93,21 @@ class FinancialGoalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'target_amount' => 'required|numeric|min:0',
-            'target_date' => 'nullable|date',
-            'priority' => 'nullable|integer|min:1|max:5',
-            'description' => 'nullable|string|max:1000',
-            'type' => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
-            'color' => 'nullable|string|max:7',
-            'icon' => 'nullable|string|max:50',
-            'monthly_target' => 'nullable|numeric|min:0',
-            'is_automatic' => 'nullable|boolean',
-            'automatic_amount' => 'nullable|numeric|min:0',
-            'automatic_frequency' => 'nullable|in:weekly,monthly,quarterly',
-            'notes' => 'nullable|string|max:2000',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
+            'name'               => 'required|string|max:255',
+            'target_amount'      => 'required|numeric|min:0',
+            'target_date'        => 'nullable|date',
+            'priority'           => 'nullable|integer|min:1|max:5',
+            'description'        => 'nullable|string|max:1000',
+            'type'               => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
+            'color'              => 'nullable|string|max:7',
+            'icon'               => 'nullable|string|max:50',
+            'monthly_target'     => 'nullable|numeric|min:0',
+            'is_automatic'       => 'nullable|boolean',
+            'automatic_amount'   => 'nullable|numeric|min:0',
+            'automatic_frequency'=> 'nullable|in:weekly,monthly,quarterly',
+            'notes'              => 'nullable|string|max:2000',
+            'tags'               => 'nullable|array',
+            'tags.*'             => 'string|max:50',
         ]);
 
         $user = Auth::user();
@@ -115,30 +115,40 @@ class FinancialGoalController extends Controller
         // Créer l'objectif via BudgetService
         $goal = $this->budgetService->createGoal($user, $data);
 
-        // Tracker l'engagement pour création d'objectif
-        $engagementResult = $this->engagementService->trackUserAction(
-            $user,
-            'goal_create',
-            'goals_page',
-            [
+        // ✅ Tracker l'engagement dans un try/catch pour ne pas crasher
+        $engagementResult = ['xp_gained' => 0, 'total_xp' => 0, 'current_level' => 1, 'achievements_unlocked' => []];
+
+        try {
+            $engagementResult = $this->engagementService->trackUserAction(
+                $user,
+                'goal_create',
+                'goals_page',
+                [
+                    'goal_id'       => $goal->id,
+                    'target_amount' => $goal->target_amount,
+                    'type'          => $goal->type,
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::warning('EngagementService error on goal_create', [
+                'error'   => $e->getMessage(),
+                'user_id' => $user->id,
                 'goal_id' => $goal->id,
-                'target_amount' => $goal->target_amount,
-                'type' => $goal->type,
-            ]
-        );
+            ]);
+        }
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'goal' => $goal->load('contributions', 'projections'),
+            'data'    => [
+                'goal'       => $goal->load('contributions', 'projections'),
                 'engagement' => [
-                    'xp_gained' => $engagementResult['xp_gained'],
-                    'total_xp' => $engagementResult['total_xp'],
-                    'current_level' => $engagementResult['current_level'],
+                    'xp_gained'             => $engagementResult['xp_gained'],
+                    'total_xp'              => $engagementResult['total_xp'],
+                    'current_level'         => $engagementResult['current_level'],
                     'achievements_unlocked' => $engagementResult['achievements_unlocked'] ?? [],
                 ],
             ],
-            'message' => 'Objectif créé avec succès ! (+'.$engagementResult['xp_gained'].' XP)',
+            'message' => 'Objectif créé avec succès ! (+' . $engagementResult['xp_gained'] . ' XP)',
         ], 201);
     }
 
