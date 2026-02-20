@@ -498,43 +498,73 @@ class BudgetService
         DB::beginTransaction();
 
         try {
-            $data['user_id'] = $user->id;
+            // ✅ Normaliser la priorité : 'low'|'medium'|'high' → 1-5
+            $data['priority'] = $this->normalizePriority($data['priority'] ?? null);
 
-            // Calculer la date de début si pas fournie
-            if (! isset($data['start_date'])) {
-                $data['start_date'] = now()->toDateString();
-            }
+            // ✅ Champs obligatoires / valeurs par défaut
+            $data['user_id']    = $user->id;
+            $data['start_date'] = $data['start_date'] ?? now()->toDateString();
 
-            // Calculer next_automatic_date si nécessaire
-            if ($data['is_automatic'] ?? false) {
+            // ✅ Filtrer uniquement les colonnes acceptées par le modèle
+            $allowed = [
+                'user_id', 'name', 'description', 'target_amount', 'current_amount',
+                'target_date', 'start_date', 'status', 'type', 'priority',
+                'color', 'icon', 'monthly_target', 'is_automatic',
+                'automatic_amount', 'automatic_frequency', 'notes', 'tags',
+            ];
+            $data = array_intersect_key($data, array_flip($allowed));
+
+            // ✅ Calculer next_automatic_date si contributions automatiques
+            if (!empty($data['is_automatic'])) {
                 $data['next_automatic_date'] = $this->calculateNextAutomaticDate(
                     $data['automatic_frequency'] ?? 'monthly'
                 );
             }
 
-            // Créer l'objectif
             $goal = FinancialGoal::create($data);
 
-            // ✅ Déclencher l'événement GoalCreated
-            event(new GoalCreated($user, $goal));
-
-            // ✅ Ajouter XP pour la création d'objectif
-            $this->gamingService->addExperience($user, 25, 'goal_created');
-
-            // ✅ Mettre à jour les séries
-            $this->gamingService->updateStreak($user, 'goal_creation');
-
-            // ✅ Vérifier les achievements
-            $this->gamingService->checkAchievements($user);
+            // ✅ Gaming (dans le try, mais erreurs non bloquantes)
+            try {
+                event(new GoalCreated($user, $goal));
+                $this->gamingService->addExperience($user, 25, 'goal_created');
+                $this->gamingService->updateStreak($user, 'goal_creation');
+                $this->gamingService->checkAchievements($user);
+            } catch (\Exception $gamingException) {
+                \Log::warning('Gaming post-goal non bloquant : ' . $gamingException->getMessage());
+            }
 
             DB::commit();
-
             return $goal;
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('BudgetService::createGoal failed', [
+                'user_id' => $user->id,
+                'data'    => $data,
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
             throw $e;
         }
+    }
+
+    /**
+     * Normalise la priorité vers un entier 1-5
+     * Accepte : 'low'|'medium'|'high'|'urgent'|int|null
+     */
+    private function normalizePriority(mixed $priority): int
+    {
+        if (is_int($priority) && $priority >= 1 && $priority <= 5) {
+            return $priority;
+        }
+
+        return match((string) $priority) {
+            'urgent', '1' => 1,
+            'high',   '2' => 2,
+            'medium', '3' => 3,
+            'low',    '4' => 4,
+            default        => 3,   // fallback medium
+        };
     }
 
     /**

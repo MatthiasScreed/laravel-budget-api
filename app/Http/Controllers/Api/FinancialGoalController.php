@@ -93,65 +93,31 @@ class FinancialGoalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'               => 'required|string|max:255',
-            'target_amount'      => 'required|numeric|min:0',
-            'target_date'        => 'nullable|date',
-            'priority'           => 'nullable|integer|min:1|max:5',
-            'description'        => 'nullable|string|max:1000',
-            'type'               => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
-            'color'              => 'nullable|string|max:7',
-            'icon'               => 'nullable|string|max:50',
-            'monthly_target'     => 'nullable|numeric|min:0',
-            'is_automatic'       => 'nullable|boolean',
-            'automatic_amount'   => 'nullable|numeric|min:0',
-            'automatic_frequency'=> 'nullable|in:weekly,monthly,quarterly',
-            'notes'              => 'nullable|string|max:2000',
-            'tags'               => 'nullable|array',
-            'tags.*'             => 'string|max:50',
+            'name'                 => 'required|string|max:255',
+            'target_amount'        => 'required|numeric|min:0',
+            'target_date'          => 'nullable|date',
+            'priority'             => 'nullable',          // ✅ pas de type strict ici, normalisé dans le service
+            'description'          => 'nullable|string|max:1000',
+            'type'                 => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
+            'color'                => 'nullable|string|max:7',
+            'icon'                 => 'nullable|string|max:50',
+            'monthly_target'       => 'nullable|numeric|min:0',
+            'is_automatic'         => 'nullable|boolean',
+            'automatic_amount'     => 'nullable|numeric|min:0',
+            'automatic_frequency'  => 'nullable|in:weekly,monthly,quarterly',
+            'notes'                => 'nullable|string|max:2000',
+            'tags'                 => 'nullable|array',
+            'tags.*'               => 'string|max:50',
+            'current_amount'       => 'nullable|numeric|min:0',  // ✅ accepter current_amount du frontend
         ]);
 
-        $user = Auth::user();
+        $goal = $this->budgetService->createGoal(Auth::user(), $data);
 
-        // Créer l'objectif via BudgetService
-        $goal = $this->budgetService->createGoal($user, $data);
-
-        // ✅ Log pour confirmer que le fix est déployé
-        Log::info('Goal créé avec succès', ['goal_id' => $goal->id, 'user_id' => $user->id]);
-
-        // ✅ Tracker l'engagement dans un try/catch pour ne pas crasher
-        $engagementResult = ['xp_gained' => 0, 'total_xp' => 0, 'current_level' => 1, 'achievements_unlocked' => []];
-
-        try {
-            $engagementResult = $this->engagementService->trackUserAction(
-                $user,
-                'goal_create',
-                'goals_page',
-                [
-                    'goal_id'       => $goal->id,
-                    'target_amount' => $goal->target_amount,
-                    'type'          => $goal->type,
-                ]
-            );
-        } catch (\Exception $e) {
-            Log::warning('EngagementService error on goal_create', [
-                'error'   => $e->getMessage(),
-                'user_id' => $user->id,
-                'goal_id' => $goal->id,
-            ]);
-        }
-
+        // ✅ Toujours retourner la structure JSON standard
         return response()->json([
             'success' => true,
-            'data'    => [
-                'goal'       => $goal->load('contributions', 'projections'),
-                'engagement' => [
-                    'xp_gained'             => $engagementResult['xp_gained'],
-                    'total_xp'              => $engagementResult['total_xp'],
-                    'current_level'         => $engagementResult['current_level'],
-                    'achievements_unlocked' => $engagementResult['achievements_unlocked'] ?? [],
-                ],
-            ],
-            'message' => 'Objectif créé avec succès ! (+' . $engagementResult['xp_gained'] . ' XP)',
+            'message' => 'Objectif créé avec succès',
+            'data'    => $goal->load('contributions', 'projections'),
         ], 201);
     }
 
@@ -412,5 +378,64 @@ class FinancialGoalController extends Controller
         if ($goal->user_id !== Auth::id()) {
             abort(403, 'Unauthorized');
         }
+    }
+
+    /**
+     * Supprime les doublons d'objectifs de l'utilisateur connecté.
+     *
+     * Logique : parmi les objectifs ayant le même (name + target_amount),
+     * on conserve le plus ancien et on supprime les suivants.
+     *
+     * DELETE /api/financial-goals/duplicates
+     *
+     * @return JsonResponse
+     */
+    public function destroyDuplicates(): JsonResponse
+    {
+        $user = Auth::user();
+
+        // 1. Charger tous les objectifs triés du plus ancien au plus récent
+        $goals = $user->financialGoals()
+            ->orderBy('created_at', 'asc')
+            ->get(['id', 'name', 'target_amount', 'created_at']);
+
+        // 2. Trouver les doublons (même name normalisé + même montant)
+        $seen     = [];
+        $toDelete = [];
+
+        foreach ($goals as $goal) {
+            $key = strtolower(trim($goal->name)) . '|' . (float) $goal->target_amount;
+
+            if (isset($seen[$key])) {
+                $toDelete[] = $goal->id;   // doublon → à supprimer
+            } else {
+                $seen[$key] = $goal->id;   // premier trouvé → à garder
+            }
+        }
+
+        // 3. Supprimer en une seule requête
+        $deletedCount = 0;
+        if (!empty($toDelete)) {
+            $deletedCount = $user->financialGoals()
+                ->whereIn('id', $toDelete)
+                ->delete();
+        }
+
+        \Log::info('Doublons objectifs nettoyés', [
+            'user_id'       => $user->id,
+            'deleted_count' => $deletedCount,
+            'deleted_ids'   => $toDelete,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $deletedCount > 0
+                ? "{$deletedCount} doublon(s) supprimé(s) avec succès."
+                : "Aucun doublon trouvé.",
+            'data' => [
+                'deleted_count' => $deletedCount,
+                'deleted_ids'   => $toDelete,
+            ],
+        ]);
     }
 }

@@ -220,6 +220,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ==========================================
     // 🎯 OBJECTIFS FINANCIERS (PROTECTED)
     // ==========================================
+    Route::delete('/financial-goals/duplicates', [FinancialGoalController::class, 'destroyDuplicates'])
+        ->name('financial-goals.destroy-duplicates');
 
     Route::apiResource('financial-goals', FinancialGoalController::class);
 
