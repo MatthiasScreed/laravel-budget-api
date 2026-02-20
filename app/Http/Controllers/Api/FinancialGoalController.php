@@ -115,6 +115,9 @@ class FinancialGoalController extends Controller
         // Créer l'objectif via BudgetService
         $goal = $this->budgetService->createGoal($user, $data);
 
+        // ✅ Log pour confirmer que le fix est déployé
+        Log::info('Goal créé avec succès', ['goal_id' => $goal->id, 'user_id' => $user->id]);
+
         // ✅ Tracker l'engagement dans un try/catch pour ne pas crasher
         $engagementResult = ['xp_gained' => 0, 'total_xp' => 0, 'current_level' => 1, 'achievements_unlocked' => []];
 
