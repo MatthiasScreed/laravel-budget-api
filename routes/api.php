@@ -231,6 +231,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('goals/active', [FinancialGoalController::class, 'active'])->name('financial-goals.active');
 
     Route::apiResource('goal-contributions', GoalContributionController::class);
+    Route::prefix('financial-goals/{financialGoal}')->group(function () {
+        Route::get('contributions', [GoalContributionController::class, 'getByGoal']);
+        Route::post('contributions', [GoalContributionController::class, 'storeForGoal']);
+    });
 
     // ==========================================
     // 📦 PROJECTS - PROJETS COMPLEXES (PROTECTED)

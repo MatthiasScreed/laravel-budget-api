@@ -54,6 +54,55 @@ class GoalContributionController extends Controller
     }
 
     /**
+     * Créer une contribution pour un objectif spécifique (route nested)
+     * POST /api/financial-goals/{financialGoal}/contributions
+     */
+    public function storeForGoal(Request $request, FinancialGoal $financialGoal): JsonResponse
+    {
+        // Vérifier l'appartenance à l'utilisateur
+        if ($financialGoal->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès non autorisé'
+            ], 403);
+        }
+
+        $data = $request->validate([
+            'amount'         => 'required|numeric|min:0.01',
+            'description'    => 'nullable|string|max:255',
+            'transaction_id' => 'nullable|exists:transactions,id',
+            'date'           => 'nullable|date',
+        ]);
+
+        // Créer la contribution
+        $contribution = $financialGoal->contributions()->create([
+            'user_id'          => auth()->id(),
+            'amount'           => $data['amount'],
+            'description'      => $data['description'] ?? null,
+            'transaction_id'   => $data['transaction_id'] ?? null,
+            'date'             => $data['date'] ?? now(),
+        ]);
+
+        // Mettre à jour current_amount de l'objectif
+        $financialGoal->increment('current_amount', $data['amount']);
+        $financialGoal->refresh();
+
+        // Marquer comme complété si atteint
+        if ($financialGoal->current_amount >= $financialGoal->target_amount) {
+            $financialGoal->update(['status' => 'completed']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'contribution' => $contribution,
+                'goal'         => $financialGoal,
+            ],
+            'message' => 'Contribution ajoutée avec succès'
+        ]);
+    }
+
+    /**
      * Display the specified resource.
      */
     public function show(GoalContribution $goalContribution): GoalContribution
