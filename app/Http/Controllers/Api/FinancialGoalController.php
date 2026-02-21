@@ -6,89 +6,67 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancialGoal;
 use App\Services\BudgetService;
 use App\Services\EngagementService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class FinancialGoalController extends Controller
 {
     protected BudgetService $budgetService;
-
     protected EngagementService $engagementService;
 
     public function __construct(
         BudgetService $budgetService,
         EngagementService $engagementService
     ) {
-        $this->budgetService = $budgetService;
+        $this->budgetService    = $budgetService;
         $this->engagementService = $engagementService;
     }
 
+    // ==========================================
+    // CRUD PRINCIPAL
+    // ==========================================
+
     /**
-     * Display a listing of the resource.
-     *
-     * ✅ CORRIGÉ : Retourne un format JSON standardisé
+     * Lister tous les objectifs de l'utilisateur connecté.
+     * FIX: cast des montants en float pour éviter NaN côté frontend.
      */
     public function index(): JsonResponse
     {
-        $goals = Auth::user()
-            ->financialGoals()
-            ->with('contributions', 'projections')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        try {
+            $goals = Auth::user()
+                ->financialGoals()
+                ->with('contributions', 'projections')
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-        // ✅ Calculer les données enrichies pour chaque objectif
-        $goalsWithProgress = $goals->map(function ($goal) {
-            return [
-                'id' => $goal->id,
-                'name' => $goal->name,
-                'description' => $goal->description,
-                'target_amount' => $goal->target_amount,
-                'current_amount' => $goal->current_amount,
-                'target_date' => $goal->target_date,
-                'priority' => $goal->priority,
-                'type' => $goal->type,
-                'color' => $goal->color,
-                'icon' => $goal->icon,
-                'status' => $goal->status,
-                'monthly_target' => $goal->monthly_target,
-                'is_automatic' => $goal->is_automatic,
-                'automatic_amount' => $goal->automatic_amount,
-                'automatic_frequency' => $goal->automatic_frequency,
-                'notes' => $goal->notes,
-                'tags' => $goal->tags,
+            $goalsWithProgress = $goals->map(fn ($goal) => $this->formatGoal($goal));
 
-                // ✅ Données calculées
-                'progress_percentage' => $this->calculateProgress($goal),
-                'is_reached' => $goal->current_amount >= $goal->target_amount,
-                'remaining_amount' => max(0, $goal->target_amount - $goal->current_amount),
-                'days_remaining' => $this->calculateDaysRemaining($goal),
-                'on_track' => $this->isOnTrack($goal),
+            return response()->json([
+                'success' => true,
+                'data'    => $goalsWithProgress,
+                'meta'    => [
+                    'total'     => $goals->count(),
+                    'active'    => $goals->where('status', 'active')->count(),
+                    'completed' => $goals->where('status', 'completed')->count(),
+                    'paused'    => $goals->where('status', 'paused')->count(),
+                ],
+            ]);
 
-                // ✅ Relations
-                'contributions_count' => $goal->contributions->count(),
-                'total_contributed' => $goal->contributions->sum('amount'),
-                'last_contribution_date' => $goal->contributions->sortByDesc('created_at')->first()?->created_at,
+        } catch (\Exception $e) {
+            Log::error('Erreur index goals', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
-                'created_at' => $goal->created_at,
-                'updated_at' => $goal->updated_at,
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'data' => $goalsWithProgress,
-            'meta' => [
-                'total' => $goals->count(),
-                'active' => $goals->where('status', 'active')->count(),
-                'completed' => $goals->where('status', 'completed')->count(),
-                'paused' => $goals->where('status', 'paused')->count(),
-            ],
-        ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du chargement des objectifs',
+            ], 500);
+        }
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Créer un nouvel objectif.
      */
     public function store(Request $request): JsonResponse
     {
@@ -96,7 +74,7 @@ class FinancialGoalController extends Controller
             'name'                 => 'required|string|max:255',
             'target_amount'        => 'required|numeric|min:0',
             'target_date'          => 'nullable|date',
-            'priority'             => 'nullable',          // ✅ pas de type strict ici, normalisé dans le service
+            'priority'             => 'nullable',
             'description'          => 'nullable|string|max:1000',
             'type'                 => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
             'color'                => 'nullable|string|max:7',
@@ -108,93 +86,68 @@ class FinancialGoalController extends Controller
             'notes'                => 'nullable|string|max:2000',
             'tags'                 => 'nullable|array',
             'tags.*'               => 'string|max:50',
-            'current_amount'       => 'nullable|numeric|min:0',  // ✅ accepter current_amount du frontend
+            'current_amount'       => 'nullable|numeric|min:0',
         ]);
 
         $goal = $this->budgetService->createGoal(Auth::user(), $data);
 
-        // ✅ Toujours retourner la structure JSON standard
         return response()->json([
             'success' => true,
             'message' => 'Objectif créé avec succès',
-            'data'    => $goal->load('contributions', 'projections'),
+            'data'    => $this->formatGoal($goal->load('contributions', 'projections')),
         ], 201);
     }
 
     /**
-     * Display the specified resource.
+     * Afficher un objectif spécifique.
      */
     public function show(FinancialGoal $financialGoal): JsonResponse
     {
         $this->authorizeAccess($financialGoal);
 
-        $goal = $financialGoal->load('contributions', 'projections');
-
         return response()->json([
             'success' => true,
-            'data' => [
-                'id' => $goal->id,
-                'name' => $goal->name,
-                'description' => $goal->description,
-                'target_amount' => $goal->target_amount,
-                'current_amount' => $goal->current_amount,
-                'target_date' => $goal->target_date,
-                'priority' => $goal->priority,
-                'type' => $goal->type,
-                'color' => $goal->color,
-                'icon' => $goal->icon,
-                'status' => $goal->status,
-                'monthly_target' => $goal->monthly_target,
-                'progress_percentage' => $this->calculateProgress($goal),
-                'is_reached' => $goal->current_amount >= $goal->target_amount,
-                'remaining_amount' => max(0, $goal->target_amount - $goal->current_amount),
-                'days_remaining' => $this->calculateDaysRemaining($goal),
-                'on_track' => $this->isOnTrack($goal),
-                'contributions' => $goal->contributions,
-                'projections' => $goal->projections,
-                'created_at' => $goal->created_at,
-                'updated_at' => $goal->updated_at,
-            ],
+            'data'    => $this->formatGoal($financialGoal->load('contributions', 'projections')),
         ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Mettre à jour un objectif.
      */
     public function update(Request $request, FinancialGoal $financialGoal): JsonResponse
     {
         $this->authorizeAccess($financialGoal);
 
         $data = $request->validate([
-            'name' => 'string|max:255',
-            'target_amount' => 'numeric|min:0',
-            'target_date' => 'nullable|date',
-            'priority' => 'integer|min:1|max:5',
-            'description' => 'nullable|string|max:1000',
-            'type' => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
-            'color' => 'nullable|string|max:7',
-            'icon' => 'nullable|string|max:50',
-            'monthly_target' => 'nullable|numeric|min:0',
-            'is_automatic' => 'nullable|boolean',
-            'automatic_amount' => 'nullable|numeric|min:0',
-            'automatic_frequency' => 'nullable|in:weekly,monthly,quarterly',
-            'notes' => 'nullable|string|max:2000',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
-            'status' => 'nullable|in:active,completed,paused,cancelled',
+            'name'                 => 'string|max:255',
+            'target_amount'        => 'numeric|min:0',
+            'target_date'          => 'nullable|date',
+            'priority'             => 'integer|min:1|max:5',
+            'description'          => 'nullable|string|max:1000',
+            'type'                 => 'nullable|in:savings,debt_payoff,investment,purchase,emergency_fund,other',
+            'color'                => 'nullable|string|max:7',
+            'icon'                 => 'nullable|string|max:50',
+            'monthly_target'       => 'nullable|numeric|min:0',
+            'is_automatic'         => 'nullable|boolean',
+            'automatic_amount'     => 'nullable|numeric|min:0',
+            'automatic_frequency'  => 'nullable|in:weekly,monthly,quarterly',
+            'notes'                => 'nullable|string|max:2000',
+            'tags'                 => 'nullable|array',
+            'tags.*'               => 'string|max:50',
+            'status'               => 'nullable|in:active,completed,paused,cancelled',
         ]);
 
         $financialGoal->update($data);
 
         return response()->json([
             'success' => true,
-            'data' => $financialGoal->fresh()->load('contributions', 'projections'),
             'message' => 'Objectif mis à jour avec succès',
+            'data'    => $this->formatGoal($financialGoal->fresh()->load('contributions', 'projections')),
         ]);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Supprimer un objectif.
      */
     public function destroy(FinancialGoal $financialGoal): JsonResponse
     {
@@ -209,159 +162,95 @@ class FinancialGoalController extends Controller
         ]);
     }
 
+    // ==========================================
+    // CONTRIBUTIONS
+    // ==========================================
+
     /**
-     * Contribuer à un objectif avec tracking
+     * Ajouter une contribution à un objectif.
+     * FIX: cette route est appelée par le frontend via
+     *   POST /api/financial-goals/{financialGoal}/contributions
      */
     public function contribute(Request $request, FinancialGoal $financialGoal): JsonResponse
     {
         $this->authorizeAccess($financialGoal);
 
         $data = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-            'description' => 'nullable|string|max:255',
+            'amount'         => 'required|numeric|min:0.01',
+            'description'    => 'nullable|string|max:255',
             'transaction_id' => 'nullable|exists:transactions,id',
         ]);
 
         $user = $request->user();
 
-        // Créer la contribution
-        $contribution = $this->budgetService->contributeToGoal($financialGoal, $data);
+        // Créer la contribution via BudgetService (gère XP + events)
+        $contribution = $this->budgetService->contributeToGoal(
+            $financialGoal,
+            $data,
+            $user
+        );
 
-        // Tracker l'engagement
-        $engagementResult = $this->engagementService->trackUserAction(
+        // Tracker l'engagement (XP gaming)
+        $engagementResult = $this->safeTrackEngagement(
             $user,
             'goal_contribute',
             'goal_details_page',
             [
-                'goal_id' => $financialGoal->id,
+                'goal_id'             => $financialGoal->id,
                 'contribution_amount' => $contribution->amount,
-                'goal_progress' => $financialGoal->fresh()->progress_percentage,
             ]
         );
 
-        // Vérifier si l'objectif est maintenant complété
-        $goalCompleted = $financialGoal->fresh()->current_amount >= $financialGoal->target_amount;
+        // Recharger l'objectif après recalcul
+        $freshGoal    = $financialGoal->fresh();
+        $goalCompleted = (float) $freshGoal->current_amount >= (float) $freshGoal->target_amount;
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'contribution' => $contribution,
-                'goal' => $financialGoal->fresh()->load('contributions', 'projections'),
+            'message' => $goalCompleted
+                ? '🎉 Objectif atteint ! Félicitations !'
+                : 'Contribution ajoutée (+' . ($engagementResult['xp_gained'] ?? 0) . ' XP)',
+            'data'    => [
+                'contribution'  => $contribution,
+                'goal'          => $this->formatGoal($freshGoal->load('contributions', 'projections')),
                 'goal_completed' => $goalCompleted,
-                'engagement' => [
-                    'xp_gained' => $engagementResult['xp_gained'],
-                    'total_xp' => $engagementResult['total_xp'],
-                    'current_level' => $engagementResult['current_level'],
+                'engagement'    => [
+                    'xp_gained'             => $engagementResult['xp_gained']          ?? 0,
+                    'total_xp'              => $engagementResult['total_xp']           ?? 0,
+                    'current_level'         => $engagementResult['current_level']      ?? 1,
                     'achievements_unlocked' => $engagementResult['achievements_unlocked'] ?? [],
                 ],
             ],
-            'message' => $goalCompleted
-                ? '🎉 Objectif atteint ! Félicitations !'
-                : 'Contribution ajoutée (+'.$engagementResult['xp_gained'].' XP)',
-        ]);
+        ], 201);
     }
 
     // ==========================================
-    // MÉTHODES PRIVÉES UTILITAIRES
+    // ROUTES SPÉCIALES
     // ==========================================
 
     /**
-     * Calculer le pourcentage de progression
+     * Retourner uniquement les objectifs actifs.
+     * Route: GET /api/financial-goals/active
      */
-    private function calculateProgress(FinancialGoal $goal): int
-    {
-        if ($goal->target_amount <= 0) {
-            return 0;
-        }
-
-        $percentage = ($goal->current_amount / $goal->target_amount) * 100;
-
-        return min(100, (int) round($percentage));
-    }
-
-    /**
-     * Calculer les jours restants
-     */
-    private function calculateDaysRemaining(FinancialGoal $goal): ?int
-    {
-        if (! $goal->target_date) {
-            return null;
-        }
-
-        $targetDate = \Carbon\Carbon::parse($goal->target_date);
-        $now = \Carbon\Carbon::now();
-
-        return max(0, $now->diffInDays($targetDate, false));
-    }
-
-    /**
-     * Vérifier si l'objectif est "on track"
-     */
-    private function isOnTrack(FinancialGoal $goal): bool
-    {
-        if (! $goal->target_date || $goal->target_amount <= 0) {
-            return true;
-        }
-
-        $targetDate = \Carbon\Carbon::parse($goal->target_date);
-        $now = \Carbon\Carbon::now();
-        $totalDays = \Carbon\Carbon::parse($goal->created_at)->diffInDays($targetDate);
-        $elapsedDays = \Carbon\Carbon::parse($goal->created_at)->diffInDays($now);
-
-        if ($totalDays <= 0) {
-            return $goal->current_amount >= $goal->target_amount;
-        }
-
-        $expectedProgress = ($elapsedDays / $totalDays) * 100;
-        $actualProgress = $this->calculateProgress($goal);
-
-        // On track si dans les 10% de marge
-        return $actualProgress >= ($expectedProgress - 10);
-    }
-
-    /**
-     * ✅ NOUVEAU: Retourne uniquement les objectifs actifs
-     * Route: GET /api/goals/active
-     */
-    public function active(Request $request): JsonResponse
+    public function active(): JsonResponse
     {
         try {
             $goals = Auth::user()
                 ->financialGoals()
                 ->where('status', 'active')
                 ->with('contributions')
-                ->orderBy('priority', 'desc')
-                ->orderBy('created_at', 'desc')
+                ->orderByDesc('priority')
+                ->orderByDesc('created_at')
                 ->get();
-
-            $goalsFormatted = $goals->map(function ($goal) {
-                return [
-                    'id' => $goal->id,
-                    'name' => $goal->name,
-                    'target_amount' => $goal->target_amount,
-                    'current_amount' => $goal->current_amount,
-                    'deadline' => $goal->target_date,
-                    'priority' => $goal->priority,
-                    'status' => $goal->status,
-                    'category' => $goal->type,
-                    'icon' => $goal->icon ?? '🎯',
-                    'progress_percentage' => $goal->target_amount > 0 ?
-                        round(($goal->current_amount / $goal->target_amount) * 100, 1) : 0,
-                    'estimated_completion_date' => $goal->target_date,
-                ];
-            });
 
             return response()->json([
                 'success' => true,
-                'data' => $goalsFormatted,
-                'count' => $goals->count(),
+                'data'    => $goals->map(fn ($goal) => $this->formatGoal($goal)),
+                'count'   => $goals->count(),
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erreur goals actifs', [
-                'error' => $e->getMessage(),
-                'user_id' => Auth::id(),
-            ]);
+            Log::error('Erreur goals actifs', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json([
                 'success' => false,
@@ -371,57 +260,34 @@ class FinancialGoalController extends Controller
     }
 
     /**
-     * Vérifier l'autorisation d'accès à un objectif
-     */
-    private function authorizeAccess(FinancialGoal $goal): void
-    {
-        if ($goal->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized');
-        }
-    }
-
-    /**
-     * Supprime les doublons d'objectifs de l'utilisateur connecté.
-     *
-     * Logique : parmi les objectifs ayant le même (name + target_amount),
-     * on conserve le plus ancien et on supprime les suivants.
-     *
-     * DELETE /api/financial-goals/duplicates
-     *
-     * @return JsonResponse
+     * Supprimer les doublons d'objectifs.
+     * Route: DELETE /api/financial-goals/duplicates
      */
     public function destroyDuplicates(): JsonResponse
     {
-        $user = Auth::user();
-
-        // 1. Charger tous les objectifs triés du plus ancien au plus récent
+        $user  = Auth::user();
         $goals = $user->financialGoals()
             ->orderBy('created_at', 'asc')
             ->get(['id', 'name', 'target_amount', 'created_at']);
 
-        // 2. Trouver les doublons (même name normalisé + même montant)
         $seen     = [];
         $toDelete = [];
 
         foreach ($goals as $goal) {
             $key = strtolower(trim($goal->name)) . '|' . (float) $goal->target_amount;
-
             if (isset($seen[$key])) {
-                $toDelete[] = $goal->id;   // doublon → à supprimer
+                $toDelete[] = $goal->id;
             } else {
-                $seen[$key] = $goal->id;   // premier trouvé → à garder
+                $seen[$key] = $goal->id;
             }
         }
 
-        // 3. Supprimer en une seule requête
         $deletedCount = 0;
-        if (!empty($toDelete)) {
-            $deletedCount = $user->financialGoals()
-                ->whereIn('id', $toDelete)
-                ->delete();
+        if (! empty($toDelete)) {
+            $deletedCount = $user->financialGoals()->whereIn('id', $toDelete)->delete();
         }
 
-        \Log::info('Doublons objectifs nettoyés', [
+        Log::info('Doublons objectifs nettoyés', [
             'user_id'       => $user->id,
             'deleted_count' => $deletedCount,
             'deleted_ids'   => $toDelete,
@@ -431,11 +297,146 @@ class FinancialGoalController extends Controller
             'success' => true,
             'message' => $deletedCount > 0
                 ? "{$deletedCount} doublon(s) supprimé(s) avec succès."
-                : "Aucun doublon trouvé.",
-            'data' => [
+                : 'Aucun doublon trouvé.',
+            'data'    => [
                 'deleted_count' => $deletedCount,
                 'deleted_ids'   => $toDelete,
             ],
         ]);
+    }
+
+    // ==========================================
+    // MÉTHODES PRIVÉES
+    // ==========================================
+
+    /**
+     * Formater un objectif avec toutes les données calculées.
+     * FIX NaN: cast explicite en float sur tous les montants.
+     */
+    private function formatGoal(FinancialGoal $goal): array
+    {
+        $currentAmount = (float) ($goal->current_amount ?? 0);
+        $targetAmount  = (float) ($goal->target_amount  ?? 0);
+
+        return [
+            'id'                    => $goal->id,
+            'name'                  => $goal->name,
+            'description'           => $goal->description,
+            'target_amount'         => $targetAmount,
+            'current_amount'        => $currentAmount,
+            'target_date'           => $goal->target_date,
+            'priority'              => $goal->priority,
+            'type'                  => $goal->type,
+            'color'                 => $goal->color,
+            'icon'                  => $goal->icon ?? '🎯',
+            'status'                => $goal->status,
+            'monthly_target'        => (float) ($goal->monthly_target ?? 0),
+            'is_automatic'          => (bool) $goal->is_automatic,
+            'automatic_amount'      => (float) ($goal->automatic_amount ?? 0),
+            'automatic_frequency'   => $goal->automatic_frequency,
+            'notes'                 => $goal->notes,
+            'tags'                  => $goal->tags ?? [],
+
+            // Données calculées
+            'progress_percentage'   => $this->calculateProgress($goal),
+            'is_reached'            => $currentAmount >= $targetAmount,
+            'remaining_amount'      => max(0.0, $targetAmount - $currentAmount),
+            'days_remaining'        => $this->calculateDaysRemaining($goal),
+            'on_track'              => $this->isOnTrack($goal),
+
+            // Contributions agrégées
+            'contributions_count'   => $goal->contributions?->count() ?? 0,
+            'total_contributed'     => (float) ($goal->contributions?->sum('amount') ?? 0),
+            'last_contribution_date'=> $goal->contributions?->sortByDesc('created_at')->first()?->created_at,
+
+            // Relations complètes si chargées
+            'contributions'         => $goal->relationLoaded('contributions')
+                ? $goal->contributions
+                : null,
+            'projections'           => $goal->relationLoaded('projections')
+                ? $goal->projections
+                : null,
+
+            'created_at'            => $goal->created_at,
+            'updated_at'            => $goal->updated_at,
+        ];
+    }
+
+    /**
+     * Calculer le pourcentage de progression (0-100).
+     */
+    private function calculateProgress(FinancialGoal $goal): int
+    {
+        $target = (float) $goal->target_amount;
+        if ($target <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(((float) $goal->current_amount / $target) * 100));
+    }
+
+    /**
+     * Calculer les jours restants avant la date cible.
+     */
+    private function calculateDaysRemaining(FinancialGoal $goal): ?int
+    {
+        if (! $goal->target_date) {
+            return null;
+        }
+
+        return max(0, (int) Carbon::now()->diffInDays(Carbon::parse($goal->target_date), false));
+    }
+
+    /**
+     * Vérifier si l'objectif est "on track".
+     */
+    private function isOnTrack(FinancialGoal $goal): bool
+    {
+        if (! $goal->target_date || (float) $goal->target_amount <= 0) {
+            return true;
+        }
+
+        $createdAt  = Carbon::parse($goal->created_at);
+        $targetDate = Carbon::parse($goal->target_date);
+        $now        = Carbon::now();
+
+        $totalDays   = $createdAt->diffInDays($targetDate);
+        $elapsedDays = $createdAt->diffInDays($now);
+
+        if ($totalDays <= 0) {
+            return (float) $goal->current_amount >= (float) $goal->target_amount;
+        }
+
+        $expectedProgress = ($elapsedDays / $totalDays) * 100;
+
+        return $this->calculateProgress($goal) >= ($expectedProgress - 10);
+    }
+
+    /**
+     * Tracker l'engagement sans bloquer la réponse en cas d'erreur.
+     */
+    private function safeTrackEngagement(
+        $user,
+        string $actionType,
+        string $context,
+        array $metadata = []
+    ): array {
+        try {
+            return $this->engagementService->trackUserAction($user, $actionType, $context, $metadata);
+        } catch (\Exception $e) {
+            Log::warning('Engagement tracking failed (non-bloquant)', ['error' => $e->getMessage()]);
+
+            return ['xp_gained' => 0, 'total_xp' => 0, 'current_level' => 1, 'achievements_unlocked' => []];
+        }
+    }
+
+    /**
+     * Vérifier que l'objectif appartient à l'utilisateur connecté.
+     */
+    private function authorizeAccess(FinancialGoal $goal): void
+    {
+        if ($goal->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized');
+        }
     }
 }
