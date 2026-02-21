@@ -224,6 +224,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->name('financial-goals.destroy-duplicates');
 
     Route::apiResource('financial-goals', FinancialGoalController::class);
+    Route::post('financial-goals/{financialGoal}/contributions', [FinancialGoalController::class, 'addContribution'])
+        ->name('financial-goals.contributions.store');
 
     // ✅ Objectifs actifs (NOUVEAU)
     Route::get('goals/active', [FinancialGoalController::class, 'active'])->name('financial-goals.active');
