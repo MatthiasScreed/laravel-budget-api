@@ -76,11 +76,11 @@ class GoalContributionController extends Controller
 
         // Créer la contribution
         $contribution = $financialGoal->contributions()->create([
-            'user_id'          => auth()->id(),
-            'amount'           => $data['amount'],
-            'description'      => $data['description'] ?? null,
-            'transaction_id'   => $data['transaction_id'] ?? null,
-            'date'             => $data['date'] ?? now(),
+            'user_id'        => auth()->id(),
+            'amount'         => $data['amount'],
+            'description'    => $data['description'] ?? null,
+            'transaction_id' => $data['transaction_id'] ?? null,
+            'date'           => $data['date'] ?? now()->toDateString(), // ✅ fallback
         ]);
 
         // Mettre à jour current_amount de l'objectif
