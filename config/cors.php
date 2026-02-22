@@ -24,8 +24,11 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://vuejs-budget-frontend-uyz0rvnb.on-forge.com',
-        'http://localhost:5173', // Pour le dev local
+        'http://localhost:3000',    // ✅ Vite dev (port actuel)
+        'http://localhost:5173',    // ✅ Vite dev (port alternatif)
+        'http://127.0.0.1:3000',   // ✅ Variante
+        'http://127.0.0.1:5173',   // ✅ Variante
+        'https://vuejs-budget-frontend-uyz0rvnb.on-forge.com', // Production
     ],
 
     'allowed_origins_patterns' => [],

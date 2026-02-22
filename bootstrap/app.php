@@ -14,32 +14,23 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,  // ✅ DOIT être en premier !
-        ]);
 
         // ==========================================
         // ✅ ORDRE CRITIQUE DES MIDDLEWARES
         // ==========================================
-        // L'ordre d'exécution est CRUCIAL pour le bon fonctionnement :
-        //
-        // 1. TrustProxies     → Détecte l'IP réelle (Expose/Nginx/Cloudflare)
-        // 2. HandleCors       → Gère les headers CORS (AVANT Sanctum!)
-        // 3. Sanctum/Auth     → Authentification (après CORS)
-        // 4. RateLimiting     → Limitation de requêtes
-        // ==========================================
 
-        // ✅ 1. TRUST PROXIES (EN PREMIER - Expose Pro / Nginx)
+        // 1. TRUST PROXIES (EN PREMIER)
         $middleware->prepend(\App\Http\Middleware\TrustProxies::class);
 
-        // ✅ 2. CORS (AVANT statefulApi)
-        // CRITIQUE: Doit être avant Sanctum pour gérer les preflight OPTIONS
+        // 2. CORS - UNE SEULE FOIS en prepend API
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
 
-        // ✅ 3. SANCTUM STATEFUL API
-        // Permet l'authentification via tokens et cookies
+        // 3. SANCTUM STATEFUL API
         $middleware->statefulApi();
 
-        // ✅ 4. RATE LIMITING
+        // 4. RATE LIMITING
         $middleware->throttleApi();
 
         // ==========================================
@@ -52,17 +43,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // GROUPES DE MIDDLEWARES PERSONNALISÉS
         // ==========================================
-
-        // Groupe admin (auth + admin check)
         $middleware->group('admin', [
             'auth:sanctum',
             'admin',
         ]);
 
-        // Groupe banking (peut avoir des règles spéciales)
         $middleware->group('banking', [
             'auth:sanctum',
-            'throttle:banking', // Rate limit spécial si configuré
+            'throttle:banking',
         ]);
 
         // ==========================================
@@ -73,18 +61,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // ==========================================
-        // MIDDLEWARES API
+        // EXCLUSIONS CSRF
         // ==========================================
-        $middleware->api(prepend: [
-            // Force Accept: application/json pour toutes les requêtes API
-            \Illuminate\Http\Middleware\HandleCors::class, // Doublon intentionnel pour sécurité
-        ]);
-
-        // ==========================================
-        // EXCLUSIONS DE MIDDLEWARES
-        // ==========================================
-
-        // Exclure CSRF pour routes API (déjà fait par défaut mais explicite)
         $middleware->validateCsrfTokens(except: [
             'api/*',
             'webhooks/*',
@@ -93,13 +71,8 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
 
-        // ==========================================
-        // GESTION GLOBALE DES ERREURS
-        // ==========================================
-
-        // ✅ 401 - AUTHENTICATION REQUIRED
+        // 401
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request) {
-            // Toujours retourner JSON pour API
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -107,25 +80,21 @@ return Application::configure(basePath: dirname(__DIR__))
                     'error_code' => 'AUTH_REQUIRED',
                 ], 401);
             }
-
-            // Redirection pour web (si besoin)
             return redirect()->guest(route('login'));
         });
 
-        // ✅ 403 - FORBIDDEN
+        // 403
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, Request $request) {
-            if ($e->getStatusCode() === 403) {
-                if ($request->is('api/*') || $request->expectsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => $e->getMessage() ?: 'Access forbidden',
-                        'error_code' => 'FORBIDDEN',
-                    ], 403);
-                }
+            if ($e->getStatusCode() === 403 && ($request->is('api/*') || $request->expectsJson())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage() ?: 'Access forbidden',
+                    'error_code' => 'FORBIDDEN',
+                ], 403);
             }
         });
 
-        // ✅ 404 - NOT FOUND
+        // 404
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
@@ -137,7 +106,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // ✅ 422 - VALIDATION ERROR
+        // 422
         $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
@@ -149,38 +118,34 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // ✅ 429 - TOO MANY REQUESTS
+        // 429
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Too many requests. Please slow down.',
+                    'message' => 'Too many requests',
                     'error_code' => 'RATE_LIMIT_EXCEEDED',
                     'retry_after' => $e->getHeaders()['Retry-After'] ?? 60,
                 ], 429);
             }
         });
 
-        // ✅ 500 - SERVER ERROR
+        // 500
         $exceptions->render(function (\Throwable $e, Request $request) {
-            // Ne gérer que les erreurs 500 non gérées
             if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
-                return null; // Laisser Laravel gérer les HttpException
+                return null;
             }
 
-            // Logger l'erreur pour debug
             if (app()->environment('production')) {
                 \Log::error('Server Error', [
                     'message' => $e->getMessage(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString(),
                     'url' => $request->fullUrl(),
                     'user_id' => auth()->id(),
                 ]);
             }
 
-            // Réponse JSON pour API
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -188,30 +153,18 @@ return Application::configure(basePath: dirname(__DIR__))
                         ? 'An unexpected error occurred'
                         : $e->getMessage(),
                     'error_code' => 'SERVER_ERROR',
-                    // Détails en dev uniquement
                     'debug' => app()->environment('local') ? [
                         'exception' => get_class($e),
                         'file' => $e->getFile(),
                         'line' => $e->getLine(),
-                        'trace' => explode("\n", $e->getTraceAsString()),
                     ] : null,
                 ], 500);
             }
         });
 
-        // ==========================================
-        // ERREURS SPÉCIFIQUES BRIDGE/BANKING
-        // ==========================================
-
-        // Erreurs de connexion bancaire
+        // Bridge errors
         $exceptions->render(function (\Exception $e, Request $request) {
             if ($request->is('api/bank/*') && str_contains($e->getMessage(), 'Bridge')) {
-                \Log::warning('Bridge API Error', [
-                    'message' => $e->getMessage(),
-                    'endpoint' => $request->path(),
-                    'user_id' => auth()->id(),
-                ]);
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Banking service temporarily unavailable',
@@ -221,39 +174,10 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // ==========================================
-        // REPORTABLE EXCEPTIONS
-        // ==========================================
-
-        // Reporter certaines erreurs à un service externe (Sentry, Bugsnag, etc.)
         $exceptions->reportable(function (\Throwable $e) {
-            // Exemples d'erreurs importantes à reporter
-            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
-                // Ne pas reporter les 401 normaux
-                return false;
-            }
-
-            if ($e instanceof \Illuminate\Validation\ValidationException) {
-                // Ne pas reporter les erreurs de validation
-                return false;
-            }
-
-            // Reporter tout le reste en production
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) return false;
+            if ($e instanceof \Illuminate\Validation\ValidationException) return false;
             return app()->environment('production');
-        });
-
-        // ==========================================
-        // THROTTLE EXCEPTIONS
-        // ==========================================
-
-        // Personnaliser le comportement des throttles
-        $exceptions->throttle(function (\Illuminate\Http\Exceptions\ThrottleRequestsException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Too many requests',
-                'error_code' => 'THROTTLED',
-                'retry_after' => $e->getHeaders()['Retry-After'] ?? 60,
-            ], 429);
         });
     })
     ->create();
