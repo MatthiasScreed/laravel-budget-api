@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancialGoal;
 use App\Services\BudgetService;
 use App\Services\EngagementService;
+use App\Services\GamingService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,12 +18,16 @@ class FinancialGoalController extends Controller
     protected BudgetService $budgetService;
     protected EngagementService $engagementService;
 
+    protected GamingService $gamingService;
+
     public function __construct(
         BudgetService $budgetService,
-        EngagementService $engagementService
+        EngagementService $engagementService,
+        GamingService $gamingService
     ) {
         $this->budgetService    = $budgetService;
         $this->engagementService = $engagementService;
+        $this->gamingService    = $gamingService;
     }
 
     // ==========================================
@@ -91,10 +96,24 @@ class FinancialGoalController extends Controller
 
         $goal = $this->budgetService->createGoal(Auth::user(), $data);
 
+        try {
+            $this->gamingService->addExperience(
+                Auth::user(),
+                25,
+                'goal_created'
+            );
+        } catch (\Exception $e) {
+            Log::warning('Gaming XP failed (non-bloquant)', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Objectif créé avec succès',
-            'data'    => $this->formatGoal($goal->load('contributions', 'projections')),
+            'data'    => $this->formatGoal(
+                $goal->load('contributions', 'projections')
+            ),
         ], 201);
     }
 
@@ -114,8 +133,10 @@ class FinancialGoalController extends Controller
     /**
      * Mettre à jour un objectif.
      */
-    public function update(Request $request, FinancialGoal $financialGoal): JsonResponse
-    {
+    public function update(
+        Request $request,
+        FinancialGoal $financialGoal
+    ): JsonResponse {
         $this->authorizeAccess($financialGoal);
 
         $data = $request->validate([
@@ -142,7 +163,9 @@ class FinancialGoalController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Objectif mis à jour avec succès',
-            'data'    => $this->formatGoal($financialGoal->fresh()->load('contributions', 'projections')),
+            'data'    => $this->formatGoal(
+                $financialGoal->fresh()->load('contributions', 'projections')
+            ),
         ]);
     }
 
@@ -168,11 +191,12 @@ class FinancialGoalController extends Controller
 
     /**
      * Ajouter une contribution à un objectif.
-     * FIX: cette route est appelée par le frontend via
-     *   POST /api/financial-goals/{financialGoal}/contributions
+     * ✅ MODIFIÉ: Ajout Gaming XP + check achievements
      */
-    public function contribute(Request $request, FinancialGoal $financialGoal): JsonResponse
-    {
+    public function contribute(
+        Request $request,
+        FinancialGoal $financialGoal
+    ): JsonResponse {
         $this->authorizeAccess($financialGoal);
 
         $data = $request->validate([
@@ -183,14 +207,39 @@ class FinancialGoalController extends Controller
 
         $user = $request->user();
 
-        // Créer la contribution via BudgetService (gère XP + events)
+        // Créer la contribution via BudgetService
         $contribution = $this->budgetService->contributeToGoal(
             $financialGoal,
             $data,
             $user
         );
 
-        // Tracker l'engagement (XP gaming)
+        // Recharger l'objectif après recalcul
+        $freshGoal    = $financialGoal->fresh();
+        $goalCompleted = (float) $freshGoal->current_amount
+            >= (float) $freshGoal->target_amount;
+
+        // ✅ Gaming: XP via GamingService (déclenche checkAchievements)
+        $gamingXp = $goalCompleted ? 200 : 15;
+        $gamingSource = $goalCompleted ? 'goal_completed' : 'goal_contribution';
+
+        try {
+            $gamingResult = $this->gamingService->addExperience(
+                $user,
+                $gamingXp,
+                $gamingSource
+            );
+
+            // Mettre à jour le streak
+            $this->gamingService->updateStreak($user, 'daily_activity');
+        } catch (\Exception $e) {
+            Log::warning('Gaming failed (non-bloquant)', [
+                'error' => $e->getMessage(),
+            ]);
+            $gamingResult = ['leveled_up' => false];
+        }
+
+        // Tracker l'engagement (séparé du gaming)
         $engagementResult = $this->safeTrackEngagement(
             $user,
             'goal_contribute',
@@ -201,24 +250,20 @@ class FinancialGoalController extends Controller
             ]
         );
 
-        // Recharger l'objectif après recalcul
-        $freshGoal    = $financialGoal->fresh();
-        $goalCompleted = (float) $freshGoal->current_amount >= (float) $freshGoal->target_amount;
-
         return response()->json([
             'success' => true,
             'message' => $goalCompleted
                 ? '🎉 Objectif atteint ! Félicitations !'
-                : 'Contribution ajoutée (+' . ($engagementResult['xp_gained'] ?? 0) . ' XP)',
+                : 'Contribution ajoutée (+' . $gamingXp . ' XP)',
             'data'    => [
-                'contribution'  => $contribution,
-                'goal'          => $this->formatGoal($freshGoal->load('contributions', 'projections')),
+                'contribution'   => $contribution,
+                'goal'           => $this->formatGoal(
+                    $freshGoal->load('contributions', 'projections')
+                ),
                 'goal_completed' => $goalCompleted,
-                'engagement'    => [
-                    'xp_gained'             => $engagementResult['xp_gained']          ?? 0,
-                    'total_xp'              => $engagementResult['total_xp']           ?? 0,
-                    'current_level'         => $engagementResult['current_level']      ?? 1,
-                    'achievements_unlocked' => $engagementResult['achievements_unlocked'] ?? [],
+                'engagement'     => [
+                    'xp_gained'    => $gamingXp,
+                    'leveled_up'   => $gamingResult['leveled_up'] ?? false,
                 ],
             ],
         ], 201);
@@ -230,7 +275,6 @@ class FinancialGoalController extends Controller
 
     /**
      * Retourner uniquement les objectifs actifs.
-     * Route: GET /api/financial-goals/active
      */
     public function active(): JsonResponse
     {
@@ -245,12 +289,17 @@ class FinancialGoalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $goals->map(fn ($goal) => $this->formatGoal($goal)),
+                'data'    => $goals->map(
+                    fn ($goal) => $this->formatGoal($goal)
+                ),
                 'count'   => $goals->count(),
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Erreur goals actifs', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+            Log::error('Erreur goals actifs', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id(),
+            ]);
 
             return response()->json([
                 'success' => false,
@@ -261,7 +310,6 @@ class FinancialGoalController extends Controller
 
     /**
      * Supprimer les doublons d'objectifs.
-     * Route: DELETE /api/financial-goals/duplicates
      */
     public function destroyDuplicates(): JsonResponse
     {
@@ -274,7 +322,9 @@ class FinancialGoalController extends Controller
         $toDelete = [];
 
         foreach ($goals as $goal) {
-            $key = strtolower(trim($goal->name)) . '|' . (float) $goal->target_amount;
+            $key = strtolower(trim($goal->name))
+                . '|' . (float) $goal->target_amount;
+
             if (isset($seen[$key])) {
                 $toDelete[] = $goal->id;
             } else {
@@ -284,19 +334,15 @@ class FinancialGoalController extends Controller
 
         $deletedCount = 0;
         if (! empty($toDelete)) {
-            $deletedCount = $user->financialGoals()->whereIn('id', $toDelete)->delete();
+            $deletedCount = $user->financialGoals()
+                ->whereIn('id', $toDelete)
+                ->delete();
         }
-
-        Log::info('Doublons objectifs nettoyés', [
-            'user_id'       => $user->id,
-            'deleted_count' => $deletedCount,
-            'deleted_ids'   => $toDelete,
-        ]);
 
         return response()->json([
             'success' => true,
             'message' => $deletedCount > 0
-                ? "{$deletedCount} doublon(s) supprimé(s) avec succès."
+                ? "{$deletedCount} doublon(s) supprimé(s)."
                 : 'Aucun doublon trouvé.',
             'data'    => [
                 'deleted_count' => $deletedCount,
@@ -310,8 +356,7 @@ class FinancialGoalController extends Controller
     // ==========================================
 
     /**
-     * Formater un objectif avec toutes les données calculées.
-     * FIX NaN: cast explicite en float sur tous les montants.
+     * Formater un objectif avec données calculées.
      */
     private function formatGoal(FinancialGoal $goal): array
     {
@@ -336,27 +381,20 @@ class FinancialGoalController extends Controller
             'automatic_frequency'   => $goal->automatic_frequency,
             'notes'                 => $goal->notes,
             'tags'                  => $goal->tags ?? [],
-
-            // Données calculées
             'progress_percentage'   => $this->calculateProgress($goal),
             'is_reached'            => $currentAmount >= $targetAmount,
             'remaining_amount'      => max(0.0, $targetAmount - $currentAmount),
             'days_remaining'        => $this->calculateDaysRemaining($goal),
             'on_track'              => $this->isOnTrack($goal),
-
-            // Contributions agrégées
             'contributions_count'   => $goal->contributions?->count() ?? 0,
             'total_contributed'     => (float) ($goal->contributions?->sum('amount') ?? 0),
-            'last_contribution_date'=> $goal->contributions?->sortByDesc('created_at')->first()?->created_at,
-
-            // Relations complètes si chargées
+            'last_contribution_date' => $goal->contributions
+                ?->sortByDesc('created_at')
+                ->first()?->created_at,
             'contributions'         => $goal->relationLoaded('contributions')
-                ? $goal->contributions
-                : null,
+                ? $goal->contributions : null,
             'projections'           => $goal->relationLoaded('projections')
-                ? $goal->projections
-                : null,
-
+                ? $goal->projections : null,
             'created_at'            => $goal->created_at,
             'updated_at'            => $goal->updated_at,
         ];
@@ -372,7 +410,10 @@ class FinancialGoalController extends Controller
             return 0;
         }
 
-        return min(100, (int) round(((float) $goal->current_amount / $target) * 100));
+        return min(
+            100,
+            (int) round(((float) $goal->current_amount / $target) * 100)
+        );
     }
 
     /**
@@ -384,15 +425,23 @@ class FinancialGoalController extends Controller
             return null;
         }
 
-        return max(0, (int) Carbon::now()->diffInDays(Carbon::parse($goal->target_date), false));
+        return max(
+            0,
+            (int) Carbon::now()->diffInDays(
+                Carbon::parse($goal->target_date),
+                false
+            )
+        );
     }
+
 
     /**
      * Vérifier si l'objectif est "on track".
      */
     private function isOnTrack(FinancialGoal $goal): bool
     {
-        if (! $goal->target_date || (float) $goal->target_amount <= 0) {
+        if (! $goal->target_date
+            || (float) $goal->target_amount <= 0) {
             return true;
         }
 
@@ -404,12 +453,14 @@ class FinancialGoalController extends Controller
         $elapsedDays = $createdAt->diffInDays($now);
 
         if ($totalDays <= 0) {
-            return (float) $goal->current_amount >= (float) $goal->target_amount;
+            return (float) $goal->current_amount
+                >= (float) $goal->target_amount;
         }
 
         $expectedProgress = ($elapsedDays / $totalDays) * 100;
 
-        return $this->calculateProgress($goal) >= ($expectedProgress - 10);
+        return $this->calculateProgress($goal)
+            >= ($expectedProgress - 10);
     }
 
     /**
@@ -422,11 +473,20 @@ class FinancialGoalController extends Controller
         array $metadata = []
     ): array {
         try {
-            return $this->engagementService->trackUserAction($user, $actionType, $context, $metadata);
+            return $this->engagementService->trackUserAction(
+                $user, $actionType, $context, $metadata
+            );
         } catch (\Exception $e) {
-            Log::warning('Engagement tracking failed (non-bloquant)', ['error' => $e->getMessage()]);
+            Log::warning('Engagement tracking failed', [
+                'error' => $e->getMessage(),
+            ]);
 
-            return ['xp_gained' => 0, 'total_xp' => 0, 'current_level' => 1, 'achievements_unlocked' => []];
+            return [
+                'xp_gained' => 0,
+                'total_xp' => 0,
+                'current_level' => 1,
+                'achievements_unlocked' => [],
+            ];
         }
     }
 

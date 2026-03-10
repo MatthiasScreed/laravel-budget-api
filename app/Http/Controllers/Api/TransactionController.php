@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
+use App\Services\GamingService;
 use App\Services\BankIntegrationService;
 use App\Services\TransactionCategorizationService;
 use Illuminate\Http\Request;
@@ -28,12 +29,16 @@ class TransactionController extends Controller
 
     protected BankIntegrationService $bankService;
 
+    protected GamingService $gamingService;
+
     public function __construct(
         TransactionCategorizationService $categorizationService,
-        BankIntegrationService $bankService
+        BankIntegrationService $bankService,
+        GamingService $gamingService
     ) {
         $this->categorizationService = $categorizationService;
         $this->bankService = $bankService;
+        $this->gamingService = $gamingService;
     }
 
     // ==========================================
@@ -140,16 +145,21 @@ class TransactionController extends Controller
 
         // Gaming: Attribuer XP
         $xp = $request->type === 'income' ? 15 : 10;
+        $gamingResult = $this->gamingService->addExperience(
+            auth()->user(),
+            $xp,
+            'transaction_created'
+        );
 
-        if (method_exists(auth()->user(), 'addXp')) {
-            auth()->user()->addXp($xp, 'transaction_created');
-        }
+        // Mettre à jour le streak de connexion
+        $this->gamingService->updateStreak(auth()->user(), 'daily_activity');
 
         return response()->json([
             'success' => true,
             'message' => 'Transaction créée avec succès',
             'data' => $transaction->load('category'),
             'xp_gained' => $xp,
+            'leveled_up' => $gamingResult['leveled_up'] ?? false,
         ], 201);
     }
 
@@ -332,11 +342,12 @@ class TransactionController extends Controller
         }
 
         // Gaming: XP pour catégorisation
-        $xp = 0;
-        if (method_exists(auth()->user(), 'addXp')) {
-            $xp = 5;
-            auth()->user()->addXp($xp, 'transaction_categorized');
-        }
+        $xp = 5;
+        $this->gamingService->addExperience(
+            auth()->user(),
+            $xp,
+            'transaction_categorized'
+        );
 
         return response()->json([
             'success' => true,
@@ -426,9 +437,13 @@ class TransactionController extends Controller
 
         // Gaming: XP pour auto-catégorisation
         $xpGained = 0;
-        if ($categorized > 0 && method_exists(auth()->user(), 'addXp')) {
+        if ($categorized > 0) {
             $xpGained = $categorized * 3;
-            auth()->user()->addXp($xpGained, 'auto_categorization');
+            $this->gamingService->addExperience(
+                auth()->user(),
+                $xpGained,
+                'auto_categorization'
+            );
         }
 
         return response()->json([
@@ -747,9 +762,13 @@ class TransactionController extends Controller
 
         // Gaming: XP
         $xpGained = 0;
-        if ($updated > 0 && method_exists(auth()->user(), 'addXp')) {
+        if ($updated > 0) {
             $xpGained = $updated * 3;
-            auth()->user()->addXp($xpGained, 'bulk_categorization');
+            $this->gamingService->addExperience(
+                auth()->user(),
+                $xpGained,
+                'bulk_categorization'
+            );
         }
 
         return response()->json([

@@ -249,17 +249,33 @@ class Achievement extends Model
      */
     public function checkCriteria(User $user): bool
     {
-        if (! $this->is_active || ! $this->criteria) {
+        $criteria = $this->criteria;
+
+        if (empty($criteria)) {
             return false;
         }
 
-        return match ($this->type) {
-            self::TYPE_TRANSACTION => $this->checkTransactionCriteria($user),
-            self::TYPE_GOAL => $this->checkGoalCriteria($user),
-            self::TYPE_MILESTONE => $this->checkMilestoneCriteria($user),
-            default => false // Types pas encore implémentés
-        };
+        if (is_string($criteria)) {
+            $criteria = json_decode($criteria, true);
+        }
+
+        if (! is_array($criteria)) {
+            return false;
+        }
+
+        // ─── FORMAT NOUVEAU : { "type": "...", "target": N } ───
+        if (isset($criteria['type'])) {
+            return $this->checkNewFormatCriteria(
+                $user,
+                $criteria['type'],
+                $criteria['target'] ?? 0
+            );
+        }
+
+        // ─── FORMAT ANCIEN : { "min_transactions": N, ... } ───
+        return $this->checkLegacyCriteria($user, $criteria);
     }
+
 
     /**
      * Vérifier les critères de transaction
@@ -439,6 +455,120 @@ class Achievement extends Model
                 'rarity' => self::RARITY_COMMON,
             ],
         ];
+    }
+
+    protected function checkNewFormatCriteria(
+        User $user,
+        string $type,
+        int $target
+    ): bool {
+        return match ($type) {
+            'transaction_count',
+            'min_transactions'
+            => $user->transactions()->count() >= $target,
+
+            'income_count'
+            => $user->transactions()
+                    ->where('type', 'income')->count() >= $target,
+
+            'expense_count'
+            => $user->transactions()
+                    ->where('type', 'expense')->count() >= $target,
+
+            'goal_count',
+            'min_goals_created'
+            => $user->financialGoals()->count() >= $target,
+
+            'goal_completed',
+            'min_goals_completed'
+            => $user->financialGoals()
+                    ->where('status', 'completed')->count() >= $target,
+
+            'contribution_count'
+            => $user->goalContributions()->count() >= $target,
+
+            'level_reached',
+            'min_level'
+            => $user->getCurrentLevel() >= $target,
+
+            'xp_total'
+            => $user->getTotalXp() >= $target,
+
+            'bank_connection'
+            => $user->bankConnections()->count() >= $target,
+
+            'categorized_count'
+            => $user->transactions()
+                    ->whereNotNull('category_id')->count() >= $target,
+
+            'streak_days'
+            => $user->getBestStreak() >= $target,
+
+            'total_saved',
+            'min_savings_amount'
+            => $user->getTotalSavings() >= $target,
+
+            'monthly_income'
+            => $user->getMonthlyIncome() >= $target,
+
+            'financial_health_score'
+            => $user->getFinancialHealthScore() >= $target,
+
+            default => false,
+        };
+    }
+
+    /**
+     * Ancien format : clés directes comme min_transactions, etc.
+     * ✅ Compatible avec les seeders existants
+     */
+    protected function checkLegacyCriteria(
+        User $user,
+        array $criteria
+    ): bool {
+        foreach ($criteria as $key => $value) {
+            $passed = match ($key) {
+                'min_transactions'
+                => $user->transactions()->count() >= $value,
+
+                'min_amount'
+                => $user->transactions()
+                        ->where('status', 'completed')
+                        ->sum('amount') >= $value,
+
+                'min_goals_created', 'min_goals'
+                => $user->financialGoals()->count() >= $value,
+
+                'min_goals_completed'
+                => $user->financialGoals()
+                        ->where('status', 'completed')
+                        ->count() >= $value,
+
+                'min_savings', 'min_savings_amount'
+                => $user->getTotalSavings() >= $value,
+
+                'min_level'
+                => $user->getCurrentLevel() >= $value,
+
+                'financial_health_score'
+                => $user->getFinancialHealthScore() >= $value,
+
+                'min_streak'
+                => $user->getBestStreak() >= $value,
+
+                'min_bank_connections'
+                => $user->bankConnections()->count() >= $value,
+
+                default => true, // Critère inconnu = ignoré
+            };
+
+            // Tous les critères doivent être remplis
+            if (! $passed) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // 🔧 AUTO-GÉNÉRER LE SLUG
