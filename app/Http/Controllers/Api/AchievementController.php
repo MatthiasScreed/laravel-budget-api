@@ -304,7 +304,9 @@ class AchievementController extends Controller
                         'rarity' => $achievement->rarity ?? 'common',
                     ],
                     'unlocked' => $isUnlocked,
-                    'unlocked_at' => $unlockedAt?->toISOString(),
+                    'unlocked_at' => $unlockedAt instanceof \Carbon\Carbon
+                        ? $unlockedAt->toISOString()
+                        : $unlockedAt,
                     'progress' => $isUnlocked ? 100 : rand(0, 80),
                 ];
             });

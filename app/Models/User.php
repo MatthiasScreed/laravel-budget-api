@@ -165,8 +165,9 @@ class User extends Authenticatable
     public function achievements(): BelongsToMany
     {
         return $this->belongsToMany(Achievement::class, 'user_achievements')
-            ->withPivot(['unlocked_at', 'metadata'])  // ✅ Maintenant cohérent avec Achievement.php
-            ->withTimestamps();
+            ->withPivot(['unlocked_at'])
+            ->withTimestamps()
+            ->withCasts(['unlocked_at' => 'datetime']);
     }
 
     // ==========================================
