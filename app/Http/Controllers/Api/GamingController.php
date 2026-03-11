@@ -205,6 +205,36 @@ class GamingController extends Controller
     }
 
     /**
+     * Résumé gaming rapide pour l'accueil ou mini-widgets
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $stats = $user->getGamingStats();
+
+        // Récupérer uniquement les informations essentielles
+        $summary = [
+            'level' => $stats['level'] ?? 1,
+            'xp' => $stats['xp'] ?? 0,
+            'xp_for_next_level' => $stats['xp_for_next_level'] ?? 1000,
+            'progress_percent' => $stats['level_progress_percent'] ?? 0,
+            'points' => $stats['points'] ?? 0,
+            'rank' => $stats['rank_name'] ?? 'Novice',
+            'active_streaks_count' => $user->streaks()->where('is_active', true)->count(),
+            'achievements_unlocked_count' => $user->achievements()->count(),
+            'recent_xp_gained' => $user->achievements()
+                ->wherePivot('unlocked_at', '>=', now()->subWeek())
+                ->sum('points'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $summary,
+            'message' => 'Résumé gaming récupéré avec succès',
+        ]);
+    }
+
+    /**
      * Dashboard gaming complet
      */
     public function dashboard(Request $request): JsonResponse

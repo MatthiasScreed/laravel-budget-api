@@ -50,24 +50,14 @@ return new class extends Migration
         Schema::table('bank_connections', function (Blueprint $table) {
             // Rendre connection_id nullable
             if (Schema::hasColumn('bank_connections', 'connection_id')) {
-                DB::statement('ALTER TABLE bank_connections MODIFY connection_id VARCHAR(255) NULL');
+                $table->string('connection_id')->nullable()->change();
             }
 
             // Rendre access_token_encrypted nullable
             if (Schema::hasColumn('bank_connections', 'access_token_encrypted')) {
-                DB::statement('ALTER TABLE bank_connections MODIFY access_token_encrypted TEXT NULL');
+                $table->text('access_token_encrypted')->nullable()->change();
             }
         });
-
-        // ✅ Ajouter l'index UNIQUEMENT s'il n'existe pas
-        $indexName = 'bank_connections_provider_connection_id_index';
-        $indexes = DB::select('SHOW INDEX FROM bank_connections WHERE Key_name = ?', [$indexName]);
-
-        if (empty($indexes)) {
-            Schema::table('bank_connections', function (Blueprint $table) {
-                $table->index('provider_connection_id', 'bank_connections_provider_connection_id_index');
-            });
-        }
     }
 
     /**

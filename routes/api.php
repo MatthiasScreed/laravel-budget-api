@@ -248,6 +248,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // --- GamingController (stats globales) ---
         Route::get('stats', [GamingController::class, 'stats'])->name('stats');
+        Route::get('summary', [GamingController::class, 'summary'])->name('summary');
         Route::get('player', [GamingController::class, 'getPlayerData'])->name('player');
         Route::put('player', [GamingController::class, 'updatePlayer'])->name('player.update');
         Route::get('leaderboard', [GamingController::class, 'getLeaderboard'])->name('leaderboard');

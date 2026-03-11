@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,12 +14,18 @@ return new class extends Migration
     public function up(): void
     {
         // ✅ Convertir ENUM en VARCHAR pour flexibilité
-        DB::statement(
-            "ALTER TABLE transactions
-            MODIFY COLUMN source VARCHAR(50)
-            DEFAULT 'manual'
-            COMMENT 'Source de la transaction : manual, bridge, bank_import, api, recurring, etc.'"
-        );
+        if (config('database.default') !== 'sqlite' && config('database.connections.testing.driver') !== 'sqlite') {
+            DB::statement(
+                "ALTER TABLE transactions
+                MODIFY COLUMN source VARCHAR(50)
+                DEFAULT 'manual'
+                COMMENT 'Source de la transaction : manual, bridge, bank_import, api, recurring, etc.'"
+            );
+        } else {
+            Schema::table('transactions', function (Blueprint $table) {
+                $table->string('source', 50)->default('manual')->change();
+            });
+        }
 
         // ✅ Nettoyer les valeurs invalides si nécessaire
         DB::table('transactions')
