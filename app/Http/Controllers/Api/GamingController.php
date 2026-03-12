@@ -204,24 +204,30 @@ class GamingController extends Controller
         return $this->dashboard($request);
     }
 
+
     /**
      * Résumé gaming rapide pour l'accueil ou mini-widgets
      */
     public function summary(Request $request): JsonResponse
     {
         $user = $request->user();
-        $stats = $user->getGamingStats();
+        $this->ensureUserLevelExists($user);
 
-        // Récupérer uniquement les informations essentielles
+        $stats = $user->getGamingStats();
+        $levelInfo = $stats['level_info'] ?? [];
+
+        // ✅ Calculer les points depuis les achievements débloqués
+        $totalPoints = $user->achievements()->sum('points');
+
         $summary = [
-            'level' => $stats['level'] ?? 1,
-            'xp' => $stats['xp'] ?? 0,
-            'xp_for_next_level' => $stats['xp_for_next_level'] ?? 1000,
-            'progress_percent' => $stats['level_progress_percent'] ?? 0,
-            'points' => $stats['points'] ?? 0,
-            'rank' => $stats['rank_name'] ?? 'Novice',
+            'level' => $levelInfo['current_level'] ?? 1,
+            'xp' => $levelInfo['total_xp'] ?? 0,
+            'xp_for_next_level' => $levelInfo['next_level_xp'] ?? 100,
+            'progress_percent' => $levelInfo['progress_percentage'] ?? 0,
+            'points' => $totalPoints,
+            'rank' => $levelInfo['title'] ?? 'Novice',
             'active_streaks_count' => $user->streaks()->where('is_active', true)->count(),
-            'achievements_unlocked_count' => $user->achievements()->count(),
+            'achievements_unlocked_count' => $stats['achievements_count'] ?? 0,
             'recent_xp_gained' => $user->achievements()
                 ->wherePivot('unlocked_at', '>=', now()->subWeek())
                 ->sum('points'),
@@ -233,6 +239,7 @@ class GamingController extends Controller
             'message' => 'Résumé gaming récupéré avec succès',
         ]);
     }
+    
 
     /**
      * Dashboard gaming complet
