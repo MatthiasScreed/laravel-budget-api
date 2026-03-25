@@ -239,7 +239,7 @@ class GamingController extends Controller
             'message' => 'Résumé gaming récupéré avec succès',
         ]);
     }
-    
+
 
     /**
      * Dashboard gaming complet
