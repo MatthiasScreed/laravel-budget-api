@@ -249,25 +249,52 @@ class GamingController extends Controller
         $user = $request->user();
         $this->ensureUserLevelExists($user);
 
-        $leaderboard = \App\Models\UserLevel::with('user:id,name,email')
+        // ✅ Récupérer les niveaux avec les utilisateurs
+        $levels = \App\Models\UserLevel::with('user')
             ->orderByDesc('total_xp')
             ->limit($limit)
-            ->get()
-            ->map(function ($level, $index) {
-                return [
-                    'rank' => $index + 1,
-                    'user_id' => $level->user_id,
-                    'name' => $this->anonymizeName($level->user->name ?? 'Joueur'),
-                    'level' => $level->level,
-                    'total_xp' => $level->total_xp,
-                    'title' => $this->getLevelTitle($level->level),
-                ];
-            });
+            ->get();
 
+        $leaderboard = $levels->map(function ($level, $index) use ($user) {
+            $userName = 'Joueur Anonyme';
+
+            if ($level->user && $level->user->name) {
+                $userName = $this->anonymizeName($level->user->name);
+            }
+
+            return [
+                'rank' => $index + 1,
+                'user_id' => $level->user_id,
+                'user_name' => $userName,
+                'level' => $level->level,
+                'total_xp' => $level->total_xp,
+                'title' => $this->getLevelTitle($level->level),
+                'is_current_user' => $level->user_id === $user->id,
+            ];
+        });
+
+        // ✅ Calculer le rang de l'utilisateur actuel
         $userRank = \App\Models\UserLevel::where('total_xp', '>', $user->level->total_xp ?? 0)
                 ->count() + 1;
 
         $totalPlayers = \App\Models\UserLevel::count();
+
+        // ✅ Vérifier si l'utilisateur est dans le top affiché
+        $userInLeaderboard = $leaderboard->contains('is_current_user', true);
+
+        // Si l'utilisateur n'est pas dans le top, l'ajouter à la fin
+        $userEntry = null;
+        if (!$userInLeaderboard) {
+            $userEntry = [
+                'rank' => $userRank,
+                'user_id' => $user->id,
+                'user_name' => $this->anonymizeName($user->name),
+                'level' => $user->level->level ?? 1,
+                'total_xp' => $user->level->total_xp ?? 0,
+                'title' => $this->getLevelTitle($user->level->level ?? 1),
+                'is_current_user' => true,
+            ];
+        }
 
         return response()->json([
             'success' => true,
@@ -275,15 +302,11 @@ class GamingController extends Controller
                 'leaderboard' => $leaderboard,
                 'user_rank' => $userRank,
                 'total_players' => $totalPlayers,
-                'user_stats' => [
-                    'rank' => $userRank,
-                    'level' => $user->level->level ?? 1,
-                    'total_xp' => $user->level->total_xp ?? 0,
-                    'name' => $user->name,
-                ],
+                'user_entry' => $userEntry,
             ],
         ]);
     }
+
 
     /**
      * ✅ Rang de l'utilisateur connecté
@@ -313,19 +336,21 @@ class GamingController extends Controller
     }
 
     /**
-     * Anonymiser le nom pour le classement public
+     * Anonymiser le nom (prénom + initiale)
      */
     protected function anonymizeName(string $name): string
     {
-        $parts = explode(' ', $name);
+        $parts = explode(' ', trim($name));
         $firstName = $parts[0] ?? 'Joueur';
-        $lastInitial = isset($parts[1]) ? strtoupper(substr($parts[1], 0, 1)) . '.' : '';
+        $lastInitial = isset($parts[1]) && strlen($parts[1]) > 0
+            ? strtoupper(substr($parts[1], 0, 1)) . '.'
+            : '';
 
         return trim($firstName . ' ' . $lastInitial);
     }
 
     /**
-     * Obtenir le titre selon le niveau
+     * Titre selon le niveau
      */
     protected function getLevelTitle(int $level): string
     {
