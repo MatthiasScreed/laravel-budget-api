@@ -240,6 +240,106 @@ class GamingController extends Controller
         ]);
     }
 
+    /**
+     * ✅ Classement des utilisateurs par points XP
+     */
+    public function getLeaderboard(Request $request): JsonResponse
+    {
+        $limit = min($request->input('limit', 10), 50);
+        $user = $request->user();
+        $this->ensureUserLevelExists($user);
+
+        $leaderboard = \App\Models\UserLevel::with('user:id,name,email')
+            ->orderByDesc('total_xp')
+            ->limit($limit)
+            ->get()
+            ->map(function ($level, $index) {
+                return [
+                    'rank' => $index + 1,
+                    'user_id' => $level->user_id,
+                    'name' => $this->anonymizeName($level->user->name ?? 'Joueur'),
+                    'level' => $level->level,
+                    'total_xp' => $level->total_xp,
+                    'title' => $this->getLevelTitle($level->level),
+                ];
+            });
+
+        $userRank = \App\Models\UserLevel::where('total_xp', '>', $user->level->total_xp ?? 0)
+                ->count() + 1;
+
+        $totalPlayers = \App\Models\UserLevel::count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'leaderboard' => $leaderboard,
+                'user_rank' => $userRank,
+                'total_players' => $totalPlayers,
+                'user_stats' => [
+                    'rank' => $userRank,
+                    'level' => $user->level->level ?? 1,
+                    'total_xp' => $user->level->total_xp ?? 0,
+                    'name' => $user->name,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * ✅ Rang de l'utilisateur connecté
+     */
+    public function getUserRanking(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $this->ensureUserLevelExists($user);
+
+        $userRank = \App\Models\UserLevel::where('total_xp', '>', $user->level->total_xp)
+                ->count() + 1;
+
+        $totalPlayers = \App\Models\UserLevel::count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'rank' => $userRank,
+                'total_players' => $totalPlayers,
+                'percentile' => $totalPlayers > 0
+                    ? round((1 - ($userRank / $totalPlayers)) * 100)
+                    : 100,
+                'level' => $user->level->level,
+                'total_xp' => $user->level->total_xp,
+            ],
+        ]);
+    }
+
+    /**
+     * Anonymiser le nom pour le classement public
+     */
+    protected function anonymizeName(string $name): string
+    {
+        $parts = explode(' ', $name);
+        $firstName = $parts[0] ?? 'Joueur';
+        $lastInitial = isset($parts[1]) ? strtoupper(substr($parts[1], 0, 1)) . '.' : '';
+
+        return trim($firstName . ' ' . $lastInitial);
+    }
+
+    /**
+     * Obtenir le titre selon le niveau
+     */
+    protected function getLevelTitle(int $level): string
+    {
+        return match (true) {
+            $level >= 50 => 'Légende',
+            $level >= 40 => 'Maître',
+            $level >= 30 => 'Expert',
+            $level >= 20 => 'Confirmé',
+            $level >= 10 => 'Avancé',
+            $level >= 5 => 'Apprenti',
+            default => 'Débutant',
+        };
+    }
+
 
     /**
      * Dashboard gaming complet

@@ -499,6 +499,147 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * ✅ Liste des utilisateurs (pour route admin.users)
+     */
+    public function listUsers(Request $request): JsonResponse
+    {
+        return $this->users($request);
+    }
+
+    /**
+     * ✅ Statistiques d'engagement utilisateurs
+     */
+    public function usersEngagement(Request $request): JsonResponse
+    {
+        try {
+            $data = [
+                'total_users' => User::count(),
+                'active_today' => User::where('last_activity_at', '>=', now()->startOfDay())->count(),
+                'active_week' => User::where('last_activity_at', '>=', now()->subDays(7))->count(),
+                'active_month' => User::where('last_activity_at', '>=', now()->subDays(30))->count(),
+                'new_this_week' => User::where('created_at', '>=', now()->subDays(7))->count(),
+                'avg_level' => round(DB::table('user_levels')->avg('level') ?? 1, 1),
+                'total_xp_distributed' => DB::table('user_levels')->sum('total_xp'),
+                'total_achievements_unlocked' => DB::table('user_achievements')->count(),
+            ];
+
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur engagement stats');
+        }
+    }
+
+    /**
+     * ✅ Statistiques système globales
+     */
+    public function systemStats(): JsonResponse
+    {
+        try {
+            $data = [
+                'users' => [
+                    'total' => User::count(),
+                    'admins' => User::where('is_admin', true)->count(),
+                ],
+                'transactions' => [
+                    'total' => DB::table('transactions')->count(),
+                    'this_month' => DB::table('transactions')
+                        ->whereMonth('created_at', now()->month)
+                        ->count(),
+                ],
+                'goals' => [
+                    'total' => DB::table('financial_goals')->count(),
+                    'active' => DB::table('financial_goals')->where('status', 'active')->count(),
+                    'completed' => DB::table('financial_goals')->where('status', 'completed')->count(),
+                ],
+                'gaming' => [
+                    'total_xp' => DB::table('user_levels')->sum('total_xp'),
+                    'achievements_unlocked' => DB::table('user_achievements')->count(),
+                    'active_streaks' => DB::table('streaks')->where('is_active', true)->count(),
+                ],
+                'insights' => [
+                    'total' => DB::table('financial_insights')->count(),
+                    'unread' => DB::table('financial_insights')->where('is_read', false)->count(),
+                ],
+            ];
+
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur system stats');
+        }
+    }
+
+    /**
+     * ✅ Envoyer une notification à tous les utilisateurs
+     */
+    public function broadcastNotification(Request $request): JsonResponse
+    {
+        $request->validate([
+            'title' => 'required|string|max:100',
+            'message' => 'required|string|max:500',
+            'type' => 'nullable|in:info,success,warning,error',
+        ]);
+
+        try {
+            $users = User::all();
+            $count = 0;
+
+            foreach ($users as $user) {
+                DB::table('user_notifications')->insert([
+                    'user_id' => $user->id,
+                    'title' => $request->input('title'),
+                    'message' => $request->input('message'),
+                    'type' => $request->input('type', 'info'),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $count++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => ['users_notified' => $count],
+                'message' => "Notification envoyée à {$count} utilisateurs",
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur broadcast notification');
+        }
+    }
+
+    /**
+     * ✅ Supprimer un utilisateur
+     */
+    public function deleteUser(User $user): JsonResponse
+    {
+        try {
+            $userName = $user->name;
+            $userId = $user->id;
+
+            // Empêcher la suppression de soi-même
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas supprimer votre propre compte',
+                ], 400);
+            }
+
+            $user->delete();
+
+            \Log::warning('Admin deleted user', [
+                'admin_id' => auth()->id(),
+                'deleted_user_id' => $userId,
+                'deleted_user_name' => $userName,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Utilisateur {$userName} supprimé",
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur suppression utilisateur');
+        }
+    }
+
     // ==========================================
     // MÉTHODES UTILITAIRES PRIVÉES
     // ==========================================

@@ -18,33 +18,27 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Vérifier que l'utilisateur est connecté
-        if (! $request->user()) {
+        if (!$request->user()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication required',
             ], 401);
         }
 
-        // Vérifier les permissions admin
-        if (! $request->user()->can('admin-access')) {
+        // ✅ Vérification simple via champ is_admin
+        if (!$request->user()->is_admin) {
             return response()->json([
                 'success' => false,
                 'message' => 'Accès administrateur requis',
             ], 403);
         }
 
-        // Log des actions admin pour audit
         \Log::info('Admin action', [
             'admin_id' => $request->user()->id,
-            'admin_name' => $request->user()->name,
             'route' => $request->route()?->getName(),
             'method' => $request->method(),
-            'url' => $request->url(),
             'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
         ]);
-
         return $next($request);
     }
 }
