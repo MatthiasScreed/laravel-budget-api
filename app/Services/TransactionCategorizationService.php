@@ -251,13 +251,12 @@ class TransactionCategorizationService
     {
         $cacheKey = "user_patterns:{$userId}";
 
-        return Cache::tags(["user:{$userId}", 'patterns'])
-            ->remember($cacheKey, 3600, function () use ($userId) {
-                return UserCategorizationPattern::where('user_id', $userId)
-                    ->with('category')
-                    ->orderBy('confidence', 'desc')
-                    ->get();
-            });
+        return Cache::remember($cacheKey, 3600, function () use ($userId) {
+            return UserCategorizationPattern::where('user_id', $userId)
+                ->with('category')
+                ->orderBy('confidence', 'desc')
+                ->get();
+        });
     }
 
     /**
@@ -315,10 +314,9 @@ class TransactionCategorizationService
      */
     protected function getCachedPatterns(): array
     {
-        return Cache::tags(['categorization', 'patterns'])
-            ->remember('categorization_patterns', 86400, function () {
-                return $this->patterns;
-            });
+        return Cache::remember('categorization_patterns', 86400, function () {
+            return $this->patterns;
+        });
     }
 
     /**
@@ -326,10 +324,9 @@ class TransactionCategorizationService
      */
     protected function getCachedCategoryMapping(): array
     {
-        return Cache::tags(['categorization', 'mapping'])
-            ->remember('category_mapping', 86400, function () {
-                return $this->categoryMapping;
-            });
+        return Cache::remember('category_mapping', 86400, function () {
+            return $this->categoryMapping;
+        });
     }
 
     /**
@@ -403,22 +400,21 @@ class TransactionCategorizationService
     ): ?Category {
         $cacheKey = "category:pattern:{$pattern}:type:{$type}";
 
-        return Cache::tags(['categories'])
-            ->remember($cacheKey, 3600, function () use ($pattern, $type) {
-                $categoryNames = $this->categoryMapping[$pattern] ?? [];
+        return Cache::remember($cacheKey, 3600, function () use ($pattern, $type) {
+            $categoryNames = $this->categoryMapping[$pattern] ?? [];
 
-                foreach ($categoryNames as $name) {
-                    $category = Category::where('name', $name)
-                        ->where('type', $type)
-                        ->first();
+            foreach ($categoryNames as $name) {
+                $category = Category::where('name', $name)
+                    ->where('type', $type)
+                    ->first();
 
-                    if ($category) {
-                        return $category;
-                    }
+                if ($category) {
+                    return $category;
                 }
+            }
 
-                return null;
-            });
+            return null;
+        });
     }
 
     /**
@@ -453,7 +449,7 @@ class TransactionCategorizationService
      */
     protected function invalidateUserCache(int $userId): void
     {
-        Cache::tags(["user:{$userId}", 'patterns'])->flush();
+        Cache::forget("user_patterns:{$userId}");
     }
 
     /**

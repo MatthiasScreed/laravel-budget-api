@@ -76,7 +76,7 @@ class AutoCategorizeTransactions implements ShouldQueue
             });
 
         // Invalider cache utilisateur
-        Cache::tags(["user:{$this->userId}"])->flush();
+        Cache::forget("user_patterns:{$this->userId}");
 
         Log::info('Auto-categorization completed', [
             'user_id' => $this->userId,

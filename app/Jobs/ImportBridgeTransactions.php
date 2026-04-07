@@ -237,7 +237,7 @@ class ImportBridgeTransactions implements ShouldQueue
      */
     protected function invalidateUserCache(): void
     {
-        Cache::tags(["user:{$this->userId}"])->flush();
+        Cache::forget("user_patterns:{$this->userId}");
     }
 
     /**
