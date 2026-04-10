@@ -390,3 +390,45 @@ Route::fallback(function () {
         'error' => 'Endpoint inexistant',
     ], 404);
 });
+
+Route::get('/debug-admin3', function () {
+    \Cache::forget('admin_dashboard');
+    auth()->loginUsingId(1);
+
+    // Tester chaque route admin directement
+    $results = [];
+
+    // Test dashboard
+    try {
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $r = $ctrl->dashboard();
+        $results['dashboard'] = json_decode($r->getContent());
+    } catch (\Exception $e) {
+        $results['dashboard_error'] = $e->getMessage().' in '.$e->getFile().':'.$e->getLine();
+    }
+
+    // Test listUsers
+    try {
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $r = $ctrl->listUsers(request());
+        $results['listUsers'] = json_decode($r->getContent())->success ?? false;
+    } catch (\Exception $e) {
+        $results['listUsers_error'] = $e->getMessage().' in '.$e->getFile().':'.$e->getLine();
+    }
+
+    // Test activityLogs
+    try {
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $r = $ctrl->activityLogs(request());
+        $results['activityLogs'] = json_decode($r->getContent())->success ?? false;
+    } catch (\Exception $e) {
+        $results['activityLogs_error'] = $e->getMessage().' in '.$e->getFile().':'.$e->getLine();
+    }
+
+    // Vérifier quel fichier AdminController est chargé
+    $reflection = new \ReflectionClass(\App\Http\Controllers\Api\AdminController::class);
+    $results['controller_file'] = $reflection->getFileName();
+    $results['controller_modified'] = date('Y-m-d H:i:s', filemtime($reflection->getFileName()));
+
+    return response()->json($results, 200, [], JSON_PRETTY_PRINT);
+});
