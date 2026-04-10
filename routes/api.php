@@ -390,3 +390,50 @@ Route::fallback(function () {
         'error' => 'Endpoint inexistant',
     ], 404);
 });
+
+Route::get('/debug-admin', function () {
+    $errors = [];
+
+    // Test 1 : GamingEvent model
+    $errors['GamingEvent'] = class_exists('App\Models\GamingEvent') ? '✅ EXISTS' : '❌ MISSING';
+
+    // Test 2 : Tables DB
+    $tables = ['user_notifications', 'notifications', 'financial_insights', 'user_actions'];
+    foreach ($tables as $table) {
+        try {
+            \DB::table($table)->limit(1)->get();
+            $errors['table_' . $table] = '✅ EXISTS';
+        } catch (\Exception $e) {
+            $errors['table_' . $table] = '❌ ' . $e->getMessage();
+        }
+    }
+
+    // Test 3 : AdminController instanciation
+    try {
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $errors['AdminController'] = '✅ OK';
+    } catch (\Exception $e) {
+        $errors['AdminController'] = '❌ ' . $e->getMessage();
+    }
+
+    // Test 4 : dashboard() method
+    try {
+        auth()->loginUsingId(1);
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $result = $ctrl->dashboard();
+        $errors['dashboard()'] = '✅ ' . substr($result->getContent(), 0, 200);
+    } catch (\Exception $e) {
+        $errors['dashboard()'] = '❌ ' . $e->getMessage();
+    }
+
+    // Test 5 : listUsers() method
+    try {
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+        $result = $ctrl->listUsers(request());
+        $errors['listUsers()'] = '✅ OK';
+    } catch (\Exception $e) {
+        $errors['listUsers()'] = '❌ ' . $e->getMessage();
+    }
+
+    return response()->json($errors, 200, [], JSON_PRETTY_PRINT);
+});
