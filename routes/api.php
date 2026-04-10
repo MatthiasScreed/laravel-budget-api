@@ -492,3 +492,11 @@ Route::get('/debug-admin5', function () {
 
     return response()->json($errors, 200, [], JSON_PRETTY_PRINT);
 });
+
+Route::get('/debug-release', function () {
+    return response()->json([
+        'release' => basename(base_path()),
+        'admin_ctrl' => date('H:i:s', filemtime(app_path('Http/Controllers/Api/AdminController.php'))),
+        'middleware' => date('H:i:s', filemtime(app_path('Http/Middleware/AdminMiddleware.php'))),
+    ]);
+});
