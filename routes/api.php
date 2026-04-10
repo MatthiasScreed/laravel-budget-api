@@ -448,3 +448,47 @@ Route::get('/debug-admin4', function () {
         'last_error'      => \Illuminate\Support\Facades\Cache::get('last_admin_error', 'none'),
     ]);
 });
+
+Route::get('/debug-admin5', function () {
+    \Cache::forget('admin_dashboard');
+    auth()->loginUsingId(1);
+
+    $errors = [];
+
+    // Simuler exactement ce que font les 3 routes qui échouent
+    $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+
+    try {
+        $r = $ctrl->dashboard();
+        $data = json_decode($r->getContent(), true);
+        $errors['dashboard'] = $data['success'] ? '✅ OK' : '❌ '.$data['message'];
+    } catch (\Throwable $e) {
+        $errors['dashboard'] = '❌ '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine();
+    }
+
+    try {
+        $r = $ctrl->listUsers(request());
+        $data = json_decode($r->getContent(), true);
+        $errors['listUsers'] = $data['success'] ? '✅ OK' : '❌ '.$data['message'];
+    } catch (\Throwable $e) {
+        $errors['listUsers'] = '❌ '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine();
+    }
+
+    try {
+        $r = $ctrl->activityLogs(request());
+        $data = json_decode($r->getContent(), true);
+        $errors['activityLogs'] = $data['success'] ? '✅ OK' : '❌ '.$data['message'];
+    } catch (\Throwable $e) {
+        $errors['activityLogs'] = '❌ '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine();
+    }
+
+    // Vérifier quel AdminController est chargé
+    $ref = new \ReflectionClass(\App\Http\Controllers\Api\AdminController::class);
+    $errors['controller_date'] = date('Y-m-d H:i:s', filemtime($ref->getFileName()));
+
+    // Dernières lignes du log
+    $logPath = storage_path('logs/laravel.log');
+    $errors['last_log_lines'] = array_slice(file($logPath), -20);
+
+    return response()->json($errors, 200, [], JSON_PRETTY_PRINT);
+});
