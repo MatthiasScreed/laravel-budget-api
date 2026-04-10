@@ -361,11 +361,22 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-        Route::get('users-engagement', [AdminController::class, 'usersEngagement'])->name('users-engagement');
+        // Dashboard
+        Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
         Route::get('system-stats', [AdminController::class, 'systemStats'])->name('system-stats');
-        Route::post('broadcast-notification', [AdminController::class, 'broadcastNotification'])->name('broadcast');
+
+        // Users
         Route::get('users', [AdminController::class, 'listUsers'])->name('users');
+        Route::get('users-engagement', [AdminController::class, 'usersEngagement'])->name('users-engagement');
+        Route::get('users/{user}', [AdminController::class, 'showUser'])->name('users.show');
         Route::delete('users/{user}', [AdminController::class, 'deleteUser'])->name('users.delete');
+        Route::post('users/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('users.toggle-admin');
+
+        // Notifications
+        Route::post('broadcast-notification', [AdminController::class, 'broadcastNotification'])->name('broadcast');
+
+        // Activity Logs
+        Route::get('activity-logs', [AdminController::class, 'activityLogs'])->name('activity-logs');
     });
 
 // ==========================================
