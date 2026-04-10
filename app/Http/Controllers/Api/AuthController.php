@@ -444,7 +444,7 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'is_admin' => $user->is_admin ?? false,
+            'is_admin' => (bool) ($user->is_admin ?? false),
             'currency' => $user->currency ?? 'EUR',
             'language' => $user->language,
             'timezone' => $user->timezone,
