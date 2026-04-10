@@ -503,3 +503,26 @@ Route::get('/clear-admin-cache', function () {
     \Cache::flush(); // vider tout le cache
     return response()->json(['success' => true, 'message' => 'Cache vidé']);
 });
+
+Route::get('/debug-admin2', function () {
+    // Tester le nouveau AdminController avec détail d'erreur forcé
+    try {
+        \Cache::forget('admin_dashboard');
+        auth()->loginUsingId(1);
+        $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
+
+        // Forcer APP_DEBUG pour voir l'erreur réelle
+        config(['app.debug' => true]);
+        $result = $ctrl->dashboard();
+        return response()->json([
+            'status' => 'dashboard_result',
+            'content' => json_decode($result->getContent())
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'file'  => $e->getFile(),
+            'line'  => $e->getLine(),
+        ]);
+    }
+});
