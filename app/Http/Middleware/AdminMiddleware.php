@@ -11,11 +11,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AdminMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         if (!$request->user()) {
@@ -25,7 +20,7 @@ class AdminMiddleware
             ], 401);
         }
 
-        // ✅ Vérification simple via champ is_admin
+        // ✅ Vérification simple via champ is_admin (pas de Gate/Policy)
         if (!$request->user()->is_admin) {
             return response()->json([
                 'success' => false,
@@ -35,10 +30,11 @@ class AdminMiddleware
 
         \Log::info('Admin action', [
             'admin_id' => $request->user()->id,
-            'route' => $request->route()?->getName(),
-            'method' => $request->method(),
-            'ip' => $request->ip(),
+            'route'    => $request->route()?->getName(),
+            'method'   => $request->method(),
+            'ip'       => $request->ip(),
         ]);
+
         return $next($request);
     }
 }
