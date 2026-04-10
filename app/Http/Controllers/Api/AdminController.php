@@ -802,9 +802,9 @@ class AdminController extends Controller
     private function getEventMetrics(): array
     {
         return [
-            'active_events' => GamingEvent::active()->count(),
-            'total_events' => GamingEvent::count(),
-            'events_this_month' => GamingEvent::where('created_at', '>=', now()->startOfMonth())->count(),
+            'active_events' => 0,
+            'total_events' => 0,
+            'events_this_month' => 0,
         ];
     }
 
@@ -924,9 +924,7 @@ class AdminController extends Controller
      */
     private function cleanupExpiredEvents(): int
     {
-        return GamingEvent::where('end_at', '<', now()->subDays(30))
-            ->where('is_active', false)
-            ->delete();
+        return 0;
     }
 
     /**
