@@ -497,3 +497,9 @@ Route::get('/debug-admin', function () {
 
     return response()->json($errors, 200, [], JSON_PRETTY_PRINT);
 });
+
+Route::get('/clear-admin-cache', function () {
+    \Cache::forget('admin_dashboard');
+    \Cache::flush(); // vider tout le cache
+    return response()->json(['success' => true, 'message' => 'Cache vidé']);
+});
