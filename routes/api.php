@@ -420,8 +420,68 @@ Route::get('/debug-admin', function () {
     try {
         auth()->loginUsingId(1);
         $ctrl = app(\App\Http\Controllers\Api\AdminController::class);
-        $result = $ctrl->dashboard();
-        $errors['dashboard()'] = '✅ ' . substr($result->getContent(), 0, 200);
+
+        // Forcer l'affichage de l'erreur réelle
+        try {
+            $metrics = [
+                'users'      => \DB::table('users')->count(),
+                'gaming'     => \DB::table('user_levels')->avg('level'),
+                'engagement' => \DB::table('user_sessions_extended')->count(),
+                'financial'  => \DB::table('transactions')->count(),
+                'events'     => class_exists('App\Models\GamingEvent')
+                    ? \App\Models\GamingEvent::count()
+                    : 'N/A',
+            ];
+            $errors['dashboard_metrics'] = $metrics;
+        } catch (\Exception $e) {
+            $errors['dashboard_metrics_error'] = '❌ ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+        }
+
+        // Tester getUserMetrics
+        try {
+            \DB::table('users')->count();
+            $errors['getUserMetrics'] = '✅ OK';
+        } catch (\Exception $e) {
+            $errors['getUserMetrics'] = '❌ ' . $e->getMessage();
+        }
+
+        // Tester getEngagementMetrics (UserSessionExtended)
+        try {
+            $count = \App\Models\UserSessionExtended::count();
+            $errors['UserSessionExtended_count'] = '✅ ' . $count;
+        } catch (\Exception $e) {
+            $errors['UserSessionExtended_count'] = '❌ ' . $e->getMessage();
+        }
+
+        // Tester active() scope
+        try {
+            $active = \App\Models\UserSessionExtended::active()->count();
+            $errors['UserSessionExtended_active'] = '✅ ' . $active;
+        } catch (\Exception $e) {
+            $errors['UserSessionExtended_active'] = '❌ ' . $e->getMessage();
+        }
+
+        // Tester getDurationInMinutes
+        try {
+            $session = \App\Models\UserSessionExtended::first();
+            if ($session) {
+                $duration = $session->getDurationInMinutes();
+                $errors['getDurationInMinutes'] = '✅ ' . $duration;
+            } else {
+                $errors['getDurationInMinutes'] = '⚠️ No sessions found';
+            }
+        } catch (\Exception $e) {
+            $errors['getDurationInMinutes'] = '❌ ' . $e->getMessage();
+        }
+
+        // Tester user_actions table
+        try {
+            \DB::table('user_actions')->where('created_at', '>=', now()->subDays(7))->count();
+            $errors['user_actions_query'] = '✅ OK';
+        } catch (\Exception $e) {
+            $errors['user_actions_query'] = '❌ ' . $e->getMessage();
+        }
+
     } catch (\Exception $e) {
         $errors['dashboard()'] = '❌ ' . $e->getMessage();
     }
