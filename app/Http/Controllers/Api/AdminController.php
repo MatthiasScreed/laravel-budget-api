@@ -27,7 +27,7 @@ class AdminController extends Controller
         $this->gamingService = $gamingService;
 
         // Middleware admin pour toutes les méthodes
-        $this->middleware('can:admin-access');
+//        $this->middleware('can:admin-access');
     }
 
     // ==========================================
@@ -637,6 +637,93 @@ class AdminController extends Controller
             ]);
         } catch (\Exception $e) {
             return $this->handleError($e, 'Erreur suppression utilisateur');
+        }
+    }
+
+    /**
+     * ✅ Récupérer les logs d'activité récents
+     */
+    public function activityLogs(Request $request): JsonResponse
+    {
+        try {
+            $limit = min($request->input('limit', 50), 200);
+
+            // Dernières transactions
+            $recentTransactions = DB::table('transactions')
+                ->join('users', 'transactions.user_id', '=', 'users.id')
+                ->orderByDesc('transactions.created_at')
+                ->limit($limit)
+                ->select([
+                    'users.name as user_name',
+                    'transactions.type',
+                    'transactions.amount',
+                    'transactions.description',
+                    'transactions.created_at',
+                ])
+                ->get()
+                ->map(fn($t) => [
+                    'type' => 'transaction',
+                    'user' => $t->user_name,
+                    'action' => "Transaction {$t->type}: {$t->amount}€",
+                    'description' => $t->description,
+                    'created_at' => $t->created_at,
+                ]);
+
+            // Derniers objectifs
+            $recentGoals = DB::table('financial_goals')
+                ->join('users', 'financial_goals.user_id', '=', 'users.id')
+                ->orderByDesc('financial_goals.created_at')
+                ->limit($limit)
+                ->select([
+                    'users.name as user_name',
+                    'financial_goals.name',
+                    'financial_goals.target_amount',
+                    'financial_goals.created_at',
+                ])
+                ->get()
+                ->map(fn($g) => [
+                    'type' => 'goal',
+                    'user' => $g->user_name,
+                    'action' => "Objectif créé: {$g->name}",
+                    'description' => "{$g->target_amount}€",
+                    'created_at' => $g->created_at,
+                ]);
+
+            // Derniers achievements débloqués
+            $recentAchievements = DB::table('user_achievements')
+                ->join('users', 'user_achievements.user_id', '=', 'users.id')
+                ->join('achievements', 'user_achievements.achievement_id', '=', 'achievements.id')
+                ->orderByDesc('user_achievements.unlocked_at')
+                ->limit($limit)
+                ->select([
+                    'users.name as user_name',
+                    'achievements.name as achievement_name',
+                    'user_achievements.unlocked_at as created_at',
+                ])
+                ->get()
+                ->map(fn($a) => [
+                    'type' => 'achievement',
+                    'user' => $a->user_name,
+                    'action' => "Achievement: {$a->achievement_name}",
+                    'description' => null,
+                    'created_at' => $a->created_at,
+                ]);
+
+            // Fusionner et trier
+            $allLogs = collect()
+                ->merge($recentTransactions)
+                ->merge($recentGoals)
+                ->merge($recentAchievements)
+                ->sortByDesc('created_at')
+                ->take($limit)
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'data' => $allLogs,
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur logs activité');
         }
     }
 
