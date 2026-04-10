@@ -510,3 +510,11 @@ Route::get('/debug-admin-middleware', function () {
         return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
     }
 })->middleware(['auth:sanctum', 'admin']);
+
+Route::get('/test-no-middleware', function () {
+    return response()->json(['works' => true, 'time' => now()]);
+});
+
+Route::get('/test-with-admin-middleware', function () {
+    return response()->json(['works' => true, 'user' => auth()->user()->email]);
+})->middleware(['auth:sanctum', 'admin']);
