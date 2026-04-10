@@ -500,3 +500,13 @@ Route::get('/debug-release', function () {
         'middleware' => date('H:i:s', filemtime(app_path('Http/Middleware/AdminMiddleware.php'))),
     ]);
 });
+
+Route::get('/debug-admin-middleware', function () {
+    // Tester le middleware manuellement
+    try {
+        $middleware = new \App\Http\Middleware\AdminMiddleware();
+        return response()->json(['middleware_loaded' => true]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+    }
+})->middleware(['auth:sanctum', 'admin']);
