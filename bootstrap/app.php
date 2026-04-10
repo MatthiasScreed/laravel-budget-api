@@ -43,10 +43,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // ==========================================
         // GROUPES DE MIDDLEWARES PERSONNALISÉS
         // ==========================================
-        $middleware->group('admin', [
-            'auth:sanctum',
-            'admin',
-        ]);
+//        $middleware->group('admin', [
+//            'auth:sanctum',
+//            'admin',
+//        ]);
 
         $middleware->group('banking', [
             'auth:sanctum',
