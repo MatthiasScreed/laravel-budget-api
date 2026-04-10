@@ -432,3 +432,19 @@ Route::get('/debug-admin3', function () {
 
     return response()->json($results, 200, [], JSON_PRETTY_PRINT);
 });
+
+Route::get('/debug-admin4', function () {
+    auth()->loginUsingId(1);
+    $user = auth()->user();
+
+    return response()->json([
+        'is_admin'        => $user->is_admin,
+        'is_admin_type'   => gettype($user->is_admin),
+        'can_admin'       => $user->can('admin-access'),
+        'middleware_file' => (new \ReflectionClass(\App\Http\Middleware\AdminMiddleware::class))->getFileName(),
+        'middleware_date' => date('Y-m-d H:i:s', filemtime(
+            (new \ReflectionClass(\App\Http\Middleware\AdminMiddleware::class))->getFileName()
+        )),
+        'last_error'      => \Illuminate\Support\Facades\Cache::get('last_admin_error', 'none'),
+    ]);
+});
