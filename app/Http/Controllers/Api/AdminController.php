@@ -280,13 +280,13 @@ class AdminController extends Controller
     private function queueBroadcastEmail(
         User $user,
         string $title,
-        string $message,
+        string $body,
         string $type,
         int &$failed
     ): void {
         try {
             Mail::to($user->email)
-                ->queue(new AdminBroadcastMail($title, $message, $type));
+                ->queue(new AdminBroadcastMail($title, $body, $type));
         } catch (\Exception $e) {
             $failed++;
             Log::error('Failed to queue broadcast email', [
