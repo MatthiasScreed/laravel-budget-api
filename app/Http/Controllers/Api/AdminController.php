@@ -234,13 +234,13 @@ class AdminController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:100',
-            'message' => 'required|string|max:500',
+            'body' => 'required|string|max:500',
             'type' => 'nullable|in:info,success,warning,error',
         ]);
 
         try {
             $title = $request->input('title');
-            $message = $request->input('message');
+            $body = $request->input('body');
             $type = $request->input('type', 'info');
 
             $users = User::all();
@@ -251,7 +251,7 @@ class AdminController extends Controller
                 DB::table('user_notifications')->insert([
                     'user_id'    => $user->id,
                     'title'      => $title,
-                    'body'       => $message,
+                    'body'       => $body,
                     'type'       => $type,
                     'channel'    => 'email',
                     'created_at' => now(),
@@ -259,7 +259,7 @@ class AdminController extends Controller
                 ]);
                 $count++;
 
-                $this->queueBroadcastEmail($user, $title, $message, $type, $failed);
+                $this->queueBroadcastEmail($user, $title, $body, $type, $failed);
             }
 
             return response()->json([
@@ -368,7 +368,7 @@ class AdminController extends Controller
     {
         $request->validate([
             'title'   => 'required|string|max:100',
-            'message' => 'required|string|max:500',
+            'body' => 'required|string|max:500',
             'type'    => 'nullable|in:info,success,warning,error',
         ]);
 
@@ -377,7 +377,7 @@ class AdminController extends Controller
             DB::table('user_notifications')->insert([
                 'user_id'    => $user->id,
                 'title'      => $request->input('title'),
-                'message'    => $request->input('message'),
+                'body'    => $request->input('body'),
                 'type'       => $request->input('type', 'info'),
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -387,7 +387,7 @@ class AdminController extends Controller
             \Mail::to($user->email)->queue(
                 new \App\Mail\AdminBroadcastMail(
                     $request->input('title'),
-                    $request->input('message'),
+                    $request->input('body'),
                     $request->input('type', 'info'),
                     $user->name
                 )
