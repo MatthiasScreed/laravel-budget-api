@@ -233,14 +233,14 @@ class AdminController extends Controller
     public function broadcastNotification(Request $request): JsonResponse
     {
         $request->validate([
-            'title' => 'required|string|max:100',
-            'body' => 'required|string|max:500',
-            'type' => 'nullable|in:info,success,warning,error',
+            'title'   => 'required|string|max:100',
+            'message' => 'required|string|max:500',
+            'type'    => 'nullable|in:info,success,warning,error',
         ]);
 
         try {
             $title = $request->input('title');
-            $body = $request->input('body');
+            $message = $request->input('message');
             $type = $request->input('type', 'info');
 
             $users = User::all();
@@ -250,16 +250,15 @@ class AdminController extends Controller
             foreach ($users as $user) {
                 DB::table('user_notifications')->insert([
                     'user_id'    => $user->id,
-                    'title'      => $title,
-                    'body'       => $body,
                     'type'       => $type,
-                    'channel'    => 'email',
+                    'title'      => $title,
+                    'body'       => $message,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
                 $count++;
 
-                $this->queueBroadcastEmail($user, $title, $body, $type, $failed);
+                $this->queueBroadcastEmail($user, $title, $message, $type, $failed);
             }
 
             return response()->json([
@@ -368,26 +367,24 @@ class AdminController extends Controller
     {
         $request->validate([
             'title'   => 'required|string|max:100',
-            'body' => 'required|string|max:500',
+            'message' => 'required|string|max:500',
             'type'    => 'nullable|in:info,success,warning,error',
         ]);
 
         try {
-            // Notification in-app
             DB::table('user_notifications')->insert([
                 'user_id'    => $user->id,
-                'title'      => $request->input('title'),
-                'body'    => $request->input('body'),
                 'type'       => $request->input('type', 'info'),
+                'title'      => $request->input('title'),
+                'body'       => $request->input('message'),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // Email
             \Mail::to($user->email)->queue(
                 new \App\Mail\AdminBroadcastMail(
                     $request->input('title'),
-                    $request->input('body'),
+                    $request->input('message'),
                     $request->input('type', 'info'),
                     $user->name
                 )
