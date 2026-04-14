@@ -377,6 +377,8 @@ Route::middleware(['auth:sanctum', 'admin'])
 
         // Activity Logs
         Route::get('activity-logs', [AdminController::class, 'activityLogs'])->name('activity-logs');
+
+        Route::post('users/{user}/notify', [AdminController::class, 'notifyUser'])->name('users.notify');
     });
 
 // ==========================================

@@ -1,0 +1,286 @@
+/* src/assets/main.css */
+
+/* ===== FONTS IMPORTS ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/* ===== TAILWIND V4 SYNTAX ===== */
+@import "tailwindcss";
+
+/* ===== DESIGN TOKENS GAMING POUR COINQUEST ===== */
+@theme {
+  --font-display: "Orbitron", "system-ui", "sans-serif";
+  --font-body: "Inter", "system-ui", "sans-serif";
+
+  /* Gaming Colors */
+  --color-neon-blue: oklch(0.7 0.3 240);
+  --color-neon-purple: oklch(0.6 0.35 280);
+  --color-cyber-green: oklch(0.8 0.25 130);
+  --color-gaming-dark: oklch(0.15 0.02 240);
+  --color-gold: oklch(0.75 0.15 85);
+
+  /* Extended Spacing */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+}
+
+/* ===== UTILITIES PERSONNALISÉES GAMING ===== */
+@utility glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@utility neon-glow {
+  box-shadow:
+    0 0 20px var(--color-neon-blue),
+    inset 0 0 20px rgba(59, 130, 246, 0.1);
+}
+
+@utility gaming-border {
+  border: 2px solid;
+  border-image: linear-gradient(45deg, var(--color-neon-blue), var(--color-neon-purple)) 1;
+}
+
+/* ===== BASE STYLES ===== */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  color: #e2e8f0;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ===== SCROLLBAR PERSONNALISÉE ===== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 15, 35, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* ===== COMPOSANTS GAMING - SANS @APPLY ===== */
+
+/* Cards gaming avec glassmorphism */
+.gaming-card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+  padding: 1.5rem;
+  backdrop-filter: blur(16px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gaming-card:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
+}
+
+/* Boutons gaming */
+.gaming-button {
+  background: linear-gradient(to right, rgb(147 51 234), rgb(168 85 247));
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gaming-button:hover {
+  background: linear-gradient(to right, rgb(126 34 206), rgb(147 51 234));
+  transform: translateY(-1px);
+}
+
+.gaming-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.gaming-button:hover::before {
+  left: 100%;
+}
+
+/* Stat cards */
+.stat-card {
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+  transition: box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Badges de niveau */
+.level-badge {
+  background: linear-gradient(to right, rgb(251 191 36), rgb(245 158 11));
+  color: rgb(17 24 39);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* Barres de progression */
+.progress-bar {
+  background-color: rgb(229 231 235);
+  border-radius: 9999px;
+  height: 0.5rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, rgb(34 197 94), rgb(59 130 246));
+  transition: all 0.5s;
+}
+
+/* ===== ANIMATIONS GAMING ===== */
+@keyframes success-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.success-animation {
+  animation: success-pulse 0.6s ease-in-out;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.achievement-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.achievement-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shine 2s infinite;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px var(--color-neon-blue);
+  }
+  to {
+    box-shadow: 0 0 30px var(--color-neon-purple), 0 0 40px var(--color-cyber-green);
+  }
+}
+
+/* Animation de brillance globale */
+.animate-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+/* ===== BOUTONS D'ACTION POUR GOALS.VUE ===== */
+
+/* Boutons d'action - Primary */
+.action-btn-primary {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  background-color: rgb(37 99 235);
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+.action-btn-primary:hover {
+  background-color: rgb(29 78 216);
+}
+
+/* Boutons d'action - Secondary */
+.action-btn-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  background-color: rgb(243 244 246);
+  color: rgb(55 65 81);
+  cursor: pointer;
+  border: none;
+}
+
+.action-btn-secondary:hover {
+  background-color: rgb(229 231 235);
+}
+
+/* Boutons d'action - Success */
+.action-btn-success {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  background-color: rgb(220 252 231);
+  color: rgb(21 128 61);
+  cursor: pointer;
+  border: none;
+}
+
+.action-btn-success:hover {
+  background-color: rgb(187 247 208);
+}
+
+/* État actif pour les boutons d'action */
+.action-btn-active {
+  background-color: rgb(22 163 74) !important;
+  color: white !important;
+}

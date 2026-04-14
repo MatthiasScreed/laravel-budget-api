@@ -364,6 +364,50 @@ class AdminController extends Controller
         }
     }
 
+    public function notifyUser(Request $request, User $user): JsonResponse
+    {
+        $request->validate([
+            'title'   => 'required|string|max:100',
+            'message' => 'required|string|max:500',
+            'type'    => 'nullable|in:info,success,warning,error',
+        ]);
+
+        try {
+            // Notification in-app
+            DB::table('user_notifications')->insert([
+                'user_id'    => $user->id,
+                'title'      => $request->input('title'),
+                'message'    => $request->input('message'),
+                'type'       => $request->input('type', 'info'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Email
+            \Mail::to($user->email)->queue(
+                new \App\Mail\AdminBroadcastMail(
+                    $request->input('title'),
+                    $request->input('message'),
+                    $request->input('type', 'info'),
+                    $user->name
+                )
+            );
+
+            \Log::info('Admin notified user', [
+                'admin_id' => auth()->id(),
+                'user_id'  => $user->id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Notification envoyée à {$user->name}",
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur envoi notification individuelle');
+        }
+    }
+
     // ==========================================
     // MÉTHODES PRIVÉES
     // ==========================================

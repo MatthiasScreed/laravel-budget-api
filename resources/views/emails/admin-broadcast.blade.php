@@ -26,8 +26,9 @@
 <body>
     <div class="wrapper">
         <div class="header">
-            <span>🪙</span>
-            <h1>CoinQuest</h1>
+            <span>
+                <img src="{{ asset('images/logo/logo.svg') }}" alt="Logo">
+            </span>
         </div>
 
         <div class="body">
