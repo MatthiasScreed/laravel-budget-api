@@ -29,6 +29,8 @@ return [
         'http://127.0.0.1:3000',   // ✅ Variante
         'http://127.0.0.1:5173',   // ✅ Variante
         'https://vuejs-budget-frontend-uyz0rvnb.on-forge.com', // Production
+        'https://coinquest.fr',
+        'https://www.coinquest.fr',
     ],
 
     'allowed_origins_patterns' => [],
