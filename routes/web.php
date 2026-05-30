@@ -323,9 +323,4 @@ Route::get('/debug/routes', function () {
     ], 200, [], JSON_PRETTY_PRINT);
 })->name('debug.routes');
 
-Route::get('/debug-users', function () {
-    return response()->json([
-        'users_count' => DB::table('users')->count(),
-        'users_list' => DB::table('users')->select('id', 'email', 'name', 'created_at', 'deleted_at')->get(),
-    ]);
-});
+
