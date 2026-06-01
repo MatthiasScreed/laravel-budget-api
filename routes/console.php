@@ -16,3 +16,9 @@ Schedule::job(new GenerateDailyInsightsJob())
     ->appendOutputTo(
         storage_path('logs/insights-job.log')
     );
+
+// Rappel matin — 9h, seulement aux utilisateurs qui n'ont pas encore agi
+Schedule::command('quest:notify')->dailyAt('09:00');
+
+// Alerte série soir — 20h, seulement aux séries en danger
+Schedule::command('quest:notify --streak')->dailyAt('20:00');
