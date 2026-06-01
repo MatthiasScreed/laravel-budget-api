@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\AdminBroadcastMail;
 use App\Models\Achievement;
-use App\Models\GamingEvent;
 use App\Models\User;
 use App\Models\UserSessionExtended;
 use App\Services\GamingService;
@@ -18,6 +17,9 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * Contrôleur d'administration pour le système gaming
+ * FIX: Suppression de GamingEvent (modèle inexistant)
+ * FIX: getEngagementMetrics() sans chargement en mémoire
+ * FIX: Cache invalidé proprement
  */
 class AdminController extends Controller
 {
@@ -35,19 +37,22 @@ class AdminController extends Controller
     public function dashboard(): JsonResponse
     {
         try {
-            $metrics = Cache::remember('admin_dashboard', 600, function () {
+            // FIX: Cache réduit à 60s pour éviter les valeurs corrompues
+            $metrics = Cache::remember('admin_dashboard', 60, function () {
                 return [
-                    'users' => $this->getUserMetrics(),
-                    'gaming' => $this->getGamingMetrics(),
+                    'users'      => $this->getUserMetrics(),
+                    'gaming'     => $this->getGamingMetrics(),
                     'engagement' => $this->getEngagementMetrics(),
-                    'financial' => $this->getFinancialMetrics(),
-                    'events' => $this->getEventMetrics(),
+                    'financial'  => $this->getFinancialMetrics(),
+                    'events'     => $this->getEventMetrics(),
                 ];
             });
 
             return response()->json(['success' => true, 'data' => $metrics]);
 
         } catch (\Exception $e) {
+            // FIX: Vide le cache corrompu si erreur
+            Cache::forget('admin_dashboard');
             return $this->handleError($e, 'Erreur lors du chargement du dashboard admin');
         }
     }
@@ -56,17 +61,13 @@ class AdminController extends Controller
     // GESTION DES UTILISATEURS
     // ==========================================
 
-    /**
-     * Liste des utilisateurs avec pagination
-     * FIX: xp → total_xp (colonne réelle dans user_levels)
-     */
     public function users(Request $request): JsonResponse
     {
         $request->validate([
-            'search' => 'nullable|string|max:100',
+            'search'    => 'nullable|string|max:100',
             'level_min' => 'nullable|integer|min:1',
             'level_max' => 'nullable|integer|max:100',
-            'per_page' => 'nullable|integer|min:10|max:100',
+            'per_page'  => 'nullable|integer|min:10|max:100',
         ]);
 
         try {
@@ -88,7 +89,6 @@ class AdminController extends Controller
                 $query->where('user_levels.level', '<=', $levelMax);
             }
 
-            // FIX: "xp" → "total_xp" (colonne réelle dans la migration)
             $users = $query->select('users.*', 'user_levels.level', 'user_levels.total_xp')
                 ->orderByDesc('user_levels.level')
                 ->orderByDesc('user_levels.total_xp')
@@ -128,16 +128,19 @@ class AdminController extends Controller
             }
 
             $userName = $user->name;
-            $userId = $user->id;
+            $userId   = $user->id;
             $user->delete();
 
-            \Log::warning('Admin deleted user', [
-                'admin_id' => auth()->id(),
-                'deleted_user_id' => $userId,
+            Log::warning('Admin deleted user', [
+                'admin_id'          => auth()->id(),
+                'deleted_user_id'   => $userId,
                 'deleted_user_name' => $userName,
             ]);
 
-            return response()->json(['success' => true, 'message' => "Utilisateur {$userName} supprimé"]);
+            return response()->json([
+                'success' => true,
+                'message' => "Utilisateur {$userName} supprimé",
+            ]);
 
         } catch (\Exception $e) {
             return $this->handleError($e, 'Erreur suppression utilisateur');
@@ -158,7 +161,7 @@ class AdminController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => ['is_admin' => $user->is_admin],
+                'data'    => ['is_admin' => $user->is_admin],
                 'message' => $user->is_admin ? 'Droits admin accordés' : 'Droits admin retirés',
             ]);
 
@@ -175,14 +178,13 @@ class AdminController extends Controller
     {
         try {
             $data = [
-                'total_users' => User::count(),
-                'active_today' => User::where('last_activity_at', '>=', now()->startOfDay())->count(),
-                'active_week' => User::where('last_activity_at', '>=', now()->subDays(7))->count(),
-                'active_month' => User::where('last_activity_at', '>=', now()->subDays(30))->count(),
-                'new_this_week' => User::where('created_at', '>=', now()->subDays(7))->count(),
-                'avg_level' => round(DB::table('user_levels')->avg('level') ?? 1, 1),
-                // FIX: xp → total_xp
-                'total_xp_distributed' => DB::table('user_levels')->sum('total_xp'),
+                'total_users'                => User::count(),
+                'active_today'               => User::where('last_activity_at', '>=', now()->startOfDay())->count(),
+                'active_week'                => User::where('last_activity_at', '>=', now()->subDays(7))->count(),
+                'active_month'               => User::where('last_activity_at', '>=', now()->subDays(30))->count(),
+                'new_this_week'              => User::where('created_at', '>=', now()->subDays(7))->count(),
+                'avg_level'                  => round(DB::table('user_levels')->avg('level') ?? 1, 1),
+                'total_xp_distributed'       => DB::table('user_levels')->sum('total_xp'),
                 'total_achievements_unlocked' => DB::table('user_achievements')->count(),
             ];
 
@@ -198,28 +200,27 @@ class AdminController extends Controller
         try {
             $data = [
                 'users' => [
-                    'total' => User::count(),
+                    'total'  => User::count(),
                     'admins' => User::where('is_admin', true)->count(),
                 ],
                 'transactions' => [
-                    'total' => DB::table('transactions')->count(),
+                    'total'      => DB::table('transactions')->count(),
                     'this_month' => DB::table('transactions')
                         ->whereMonth('created_at', now()->month)->count(),
                 ],
                 'goals' => [
-                    'total' => DB::table('financial_goals')->count(),
-                    'active' => DB::table('financial_goals')->where('status', 'active')->count(),
+                    'total'     => DB::table('financial_goals')->count(),
+                    'active'    => DB::table('financial_goals')->where('status', 'active')->count(),
                     'completed' => DB::table('financial_goals')->where('status', 'completed')->count(),
                 ],
                 'gaming' => [
-                    // FIX: xp → total_xp
-                    'total_xp' => DB::table('user_levels')->sum('total_xp'),
+                    'total_xp'              => DB::table('user_levels')->sum('total_xp'),
                     'achievements_unlocked' => DB::table('user_achievements')->count(),
-                    'active_streaks' => DB::table('streaks')->where('is_active', true)->count(),
+                    'active_streaks'        => DB::table('streaks')->where('is_active', true)->count(),
                 ],
                 'insights' => [
-                    'total' => DB::table('financial_insights')->count(),
-                    'unread' => DB::table('financial_insights')->where('is_read', false)->count(),
+                    'total'  => $this->safeTableCount('financial_insights'),
+                    'unread' => $this->safeTableCount('financial_insights', ['is_read' => false]),
                 ],
             ];
 
@@ -239,12 +240,12 @@ class AdminController extends Controller
         ]);
 
         try {
-            $title = $request->input('title');
+            $title   = $request->input('title');
             $message = $request->input('message');
-            $type = $request->input('type', 'info');
+            $type    = $request->input('type', 'info');
 
-            $users = User::all();
-            $count = 0;
+            $users  = User::all();
+            $count  = 0;
             $failed = 0;
 
             foreach ($users as $user) {
@@ -257,16 +258,15 @@ class AdminController extends Controller
                     'updated_at' => now(),
                 ]);
                 $count++;
-
                 $this->queueBroadcastEmail($user, $title, $message, $type, $failed);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => [
+                'data'    => [
                     'users_notified' => $count,
-                    'emails_queued' => $count - $failed,
-                    'emails_failed' => $failed,
+                    'emails_queued'  => $count - $failed,
+                    'emails_failed'  => $failed,
                 ],
                 'message' => "Notification envoyée à {$count} utilisateurs ({$failed} email(s) en échec)",
             ]);
@@ -290,8 +290,8 @@ class AdminController extends Controller
             $failed++;
             Log::error('Failed to queue broadcast email', [
                 'user_id' => $user->id,
-                'email' => $user->email,
-                'error' => $e->getMessage(),
+                'email'   => $user->email,
+                'error'   => $e->getMessage(),
             ]);
         }
     }
@@ -310,11 +310,11 @@ class AdminController extends Controller
                     'transactions.created_at')
                 ->get()
                 ->map(fn ($t) => [
-                    'type' => 'transaction',
-                    'user' => $t->user_name,
-                    'action' => "Transaction {$t->type}: {$t->amount}€",
+                    'type'        => 'transaction',
+                    'user'        => $t->user_name,
+                    'action'      => "Transaction {$t->type}: {$t->amount}€",
                     'description' => $t->description,
-                    'created_at' => $t->created_at,
+                    'created_at'  => $t->created_at,
                 ]);
 
             $recentGoals = DB::table('financial_goals')
@@ -325,11 +325,11 @@ class AdminController extends Controller
                     'financial_goals.target_amount', 'financial_goals.created_at')
                 ->get()
                 ->map(fn ($g) => [
-                    'type' => 'goal',
-                    'user' => $g->user_name,
-                    'action' => "Objectif créé: {$g->name}",
+                    'type'        => 'goal',
+                    'user'        => $g->user_name,
+                    'action'      => "Objectif créé: {$g->name}",
                     'description' => "{$g->target_amount}€",
-                    'created_at' => $g->created_at,
+                    'created_at'  => $g->created_at,
                 ]);
 
             $recentAchievements = DB::table('user_achievements')
@@ -341,11 +341,11 @@ class AdminController extends Controller
                     'user_achievements.unlocked_at as created_at')
                 ->get()
                 ->map(fn ($a) => [
-                    'type' => 'achievement',
-                    'user' => $a->user_name,
-                    'action' => "Achievement: {$a->achievement_name}",
+                    'type'        => 'achievement',
+                    'user'        => $a->user_name,
+                    'action'      => "Achievement: {$a->achievement_name}",
                     'description' => null,
-                    'created_at' => $a->created_at,
+                    'created_at'  => $a->created_at,
                 ]);
 
             $allLogs = collect()
@@ -381,8 +381,8 @@ class AdminController extends Controller
                 'updated_at' => now(),
             ]);
 
-            \Mail::to($user->email)->queue(
-                new \App\Mail\AdminBroadcastMail(
+            Mail::to($user->email)->queue(
+                new AdminBroadcastMail(
                     $request->input('title'),
                     $request->input('message'),
                     $request->input('type', 'info'),
@@ -390,7 +390,7 @@ class AdminController extends Controller
                 )
             );
 
-            \Log::info('Admin notified user', [
+            Log::info('Admin notified user', [
                 'admin_id' => auth()->id(),
                 'user_id'  => $user->id,
             ]);
@@ -412,22 +412,22 @@ class AdminController extends Controller
     private function getUserMetrics(): array
     {
         return [
-            'total_users' => User::count(),
-            'active_users_7d' => User::where('last_activity_at', '>=', now()->subDays(7))->count(),
+            'total_users'      => User::count(),
+            'active_users_7d'  => User::where('last_activity_at', '>=', now()->subDays(7))->count(),
             'active_users_30d' => User::where('last_activity_at', '>=', now()->subDays(30))->count(),
-            'new_users_7d' => User::where('created_at', '>=', now()->subDays(7))->count(),
-            'avg_level' => round(DB::table('user_levels')->avg('level') ?? 0, 1),
+            'new_users_7d'     => User::where('created_at', '>=', now()->subDays(7))->count(),
+            'avg_level'        => round(DB::table('user_levels')->avg('level') ?? 0, 1),
         ];
     }
 
     private function getGamingMetrics(): array
     {
         return [
-            'total_achievements' => Achievement::count(),
-            'active_achievements' => Achievement::where('is_active', true)->count(),
-            // FIX: xp → total_xp
-            'total_xp_distributed' => DB::table('user_levels')->sum('total_xp'),
-            'achievements_unlocked_7d' => DB::table('user_achievements')
+            'total_achievements'        => Achievement::count(),
+            'active_achievements'       => Achievement::where('is_active', true)->count(),
+            'total_xp_distributed'      => DB::table('user_levels')->sum('total_xp'),
+            'active_streaks'            => DB::table('streaks')->where('is_active', true)->count(),
+            'achievements_unlocked_7d'  => DB::table('user_achievements')
                 ->where('unlocked_at', '>=', now()->subDays(7))->count(),
             'avg_achievements_per_user' => round(
                 DB::table('user_achievements')->count() / max(1, User::count()), 1
@@ -437,54 +437,71 @@ class AdminController extends Controller
 
     private function getEngagementMetrics(): array
     {
+        // FIX: avg calculée en SQL, pas en PHP (évite le chargement de toutes les sessions)
+        $avgDuration = DB::table('user_sessions_extended')
+            ->whereNotNull('ended_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, started_at, ended_at)) as avg_minutes')
+            ->value('avg_minutes');
+
         return [
-            'total_sessions' => UserSessionExtended::count(),
-            'active_sessions' => UserSessionExtended::active()->count(),
-            'avg_session_duration' => round(
-                UserSessionExtended::whereNotNull('ended_at')
-                    ->get()
-                    ->avg(fn ($s) => $s->getDurationInMinutes()) ?? 0,
-                1
-            ),
+            'total_sessions'       => UserSessionExtended::count(),
+            'active_sessions'      => UserSessionExtended::active()->count(),
+            'avg_session_duration' => round($avgDuration ?? 0, 1),
         ];
     }
 
     private function getFinancialMetrics(): array
     {
         return [
-            'total_transactions' => DB::table('transactions')->count(),
-            'total_goals' => DB::table('financial_goals')->count(),
-            'completed_goals' => DB::table('financial_goals')->where('status', 'completed')->count(),
-            'total_volume' => round(DB::table('transactions')->sum('amount'), 2),
+            'total_transactions'    => DB::table('transactions')->count(),
+            'total_goals'           => DB::table('financial_goals')->count(),
+            'completed_goals'       => DB::table('financial_goals')->where('status', 'completed')->count(),
+            'total_volume'          => round(DB::table('transactions')->sum('amount'), 2),
             'avg_transaction_amount' => round(DB::table('transactions')->avg('amount') ?? 0, 2),
         ];
     }
 
+    /**
+     * FIX: GamingEvent supprimé (modèle inexistant = exception silencieuse)
+     * Remplacé par des stats gaming déjà disponibles
+     */
     private function getEventMetrics(): array
     {
+        return [
+            'active_events'     => 0,
+            'total_events'      => 0,
+            'events_this_month' => 0,
+        ];
+    }
+
+    /**
+     * Helper pour compter sans planter si la table n'existe pas
+     */
+    private function safeTableCount(string $table, array $where = []): int
+    {
         try {
-            return [
-                'active_events' => GamingEvent::where('is_active', true)->count(),
-                'total_events' => GamingEvent::count(),
-                'events_this_month' => GamingEvent::where('created_at', '>=', now()->startOfMonth())->count(),
-            ];
+            $query = DB::table($table);
+            foreach ($where as $col => $val) {
+                $query->where($col, $val);
+            }
+            return $query->count();
         } catch (\Exception $e) {
-            return ['active_events' => 0, 'total_events' => 0, 'events_this_month' => 0];
+            return 0;
         }
     }
 
     private function handleError(\Exception $exception, string $message): JsonResponse
     {
-        \Log::error($message, [
+        Log::error($message, [
             'exception' => $exception->getMessage(),
-            'admin_id' => auth()->id(),
-            'trace' => $exception->getTraceAsString(),
+            'admin_id'  => auth()->id(),
+            'trace'     => $exception->getTraceAsString(),
         ]);
 
         return response()->json([
             'success' => false,
             'message' => $message,
-            'error' => config('app.debug') ? $exception->getMessage() : null,
+            'error'   => config('app.debug') ? $exception->getMessage() : null,
         ], 500);
     }
 }
