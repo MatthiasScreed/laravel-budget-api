@@ -366,3 +366,29 @@ Route::fallback(function () {
         'error'   => 'Endpoint inexistant',
     ], 404);
 });
+
+Route::get('/debug-mail', function () {
+    try {
+        \Mail::raw('Test CoinQuest - SMTP fonctionne !', function ($msg) {
+            $msg->to('christopher.massamba@gmail.com')
+                ->subject('✅ Test SMTP CoinQuest');
+        });
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'Mail envoyé !',
+            'driver'   => config('mail.default'),
+            'host'     => config('mail.mailers.smtp.host'),
+            'port'     => config('mail.mailers.smtp.port'),
+            'from'     => config('mail.from.address'),
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error'   => $e->getMessage(),
+            'driver'  => config('mail.default'),
+            'host'    => config('mail.mailers.smtp.host'),
+        ]);
+    }
+});
