@@ -3,88 +3,67 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\HtmlString;
 
-class ResetPasswordNotification extends Notification
+/**
+ * Notification de réinitialisation de mot de passe.
+ * FIX: Implémente ShouldQueue pour envoi asynchrone.
+ * FIX: URL pointe vers le frontend (coinquest.fr) et non l'API.
+ */
+class ResetPasswordNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    /**
-     * Le token de réinitialisation
-     */
-    public string $token;
+    public function __construct(public string $token) {}
 
-    /**
-     * Create a new notification instance.
-     */
-    public function __construct(string $token)
-    {
-        $this->token = $token;
-    }
-
-    /**
-     * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
-     */
     public function via(object $notifiable): array
     {
         return ['mail'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
     public function toMail(object $notifiable): MailMessage
     {
         $resetUrl = $this->buildResetUrl($notifiable);
-        $appName = config('app.name', 'Budget Gaming API');
-        $validityHours = 24;
+        $appName  = config('app.name', 'CoinQuest');
 
         return (new MailMessage)
-            ->subject("Réinitialisation de votre mot de passe - {$appName}")
-            ->greeting("Bonjour {$notifiable->name},")
-            ->line('Vous recevez cet email car nous avons reçu une demande de réinitialisation de mot de passe pour votre compte.')
-            ->line('Cliquez sur le bouton ci-dessous pour réinitialiser votre mot de passe :')
-            ->action('Réinitialiser le mot de passe', $resetUrl)
-            ->line(new HtmlString("Ce lien de réinitialisation expirera dans <strong>{$validityHours} heures</strong>."))
-            ->line('Si vous n\'avez pas demandé de réinitialisation de mot de passe, aucune action n\'est requise de votre part.')
-            ->line('Pour votre sécurité, ne partagez jamais ce lien avec personne d\'autre.')
-            ->salutation(new HtmlString("Cordialement,<br>L'équipe {$appName}"))
-            ->with([
-                'actionText' => 'Réinitialiser le mot de passe',
-                'actionUrl' => $resetUrl,
-                'displayableActionUrl' => $resetUrl,
-            ]);
+            ->subject("🔐 Réinitialise ton mot de passe - {$appName}")
+            ->greeting("Bonjour {$notifiable->name} !")
+            ->line('Tu as demandé à réinitialiser ton mot de passe.')
+            ->line('Clique sur le bouton ci-dessous pour choisir un nouveau mot de passe :')
+            ->action('Réinitialiser mon mot de passe', $resetUrl)
+            ->line(new HtmlString('Ce lien est valable <strong>24 heures</strong>.'))
+            ->line('Si tu n\'as pas fait cette demande, ignore simplement cet email.')
+            ->salutation(new HtmlString("L'équipe {$appName} 🪙"));
     }
 
     /**
-     * Construire l'URL de réinitialisation
+     * ✅ FIX: Utilise APP_FRONTEND_URL (coinquest.fr) et non APP_URL (api.coinquest.fr)
      */
     protected function buildResetUrl(object $notifiable): string
     {
-        // URL du frontend avec le token
-        $frontendUrl = config('app.frontend_url', config('app.url'));
+        // APP_FRONTEND_URL=https://coinquest.fr dans .env
+        // Fallback sur APP_URL si non défini
+        $frontendUrl = rtrim(
+            config('app.frontend_url', 'https://coinquest.fr'),
+            '/'
+        );
 
-        return "{$frontendUrl}/reset-password?".http_build_query([
-            'token' => $this->token,
-            'email' => $notifiable->getEmailForPasswordReset(),
-        ], '', '&', PHP_QUERY_RFC3986);
+        return $frontendUrl . '/reset-password?' . http_build_query([
+                'token' => $this->token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], '', '&', PHP_QUERY_RFC3986);
     }
 
-    /**
-     * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(object $notifiable): array
     {
         return [
-            'token' => $this->token,
-            'email' => $notifiable->getEmailForPasswordReset(),
-            'expires_at' => now()->addHours(24),
+            'token'      => $this->token,
+            'email'      => $notifiable->getEmailForPasswordReset(),
+            'expires_at' => now()->addHours(24)->toISOString(),
         ];
     }
 }
