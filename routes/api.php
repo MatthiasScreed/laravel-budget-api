@@ -392,3 +392,7 @@ Route::get('/debug-mail', function () {
         ]);
     }
 });
+
+Route::get('/debug-emails', function () {
+    return App\Models\User::select('name', 'email', 'created_at')->get();
+});
