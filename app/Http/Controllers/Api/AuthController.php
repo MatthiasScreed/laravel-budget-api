@@ -43,12 +43,15 @@ class AuthController extends Controller
                 'email_verified_at' => now(),
             ]);
 
-            $user->level()->create([
-                'level'            => 1,
-                'total_xp'         => 0,
-                'current_level_xp' => 0,
-                'next_level_xp'    => 100,
-            ]);
+            $user->level()->firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'level'            => 1,
+                    'total_xp'         => 0,
+                    'current_level_xp' => 0,
+                    'next_level_xp'    => 100,
+                ]
+            );
 
             $token = $user->createToken('auth_token', ['*'], now()->addDays(30));
 
