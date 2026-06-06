@@ -257,4 +257,49 @@ class GamingActionController extends Controller
         // - Mettre à jour sa streak quotidienne
         // - Donner des bonus XP pour les longues streaks
     }
+
+    /**
+     * 📱 Récompense pour installation PWA — 100 XP, une seule fois
+     */
+    public function pwaInstalled(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Vérifier que la récompense n'a pas déjà été donnée
+        $prefs         = $user->preferences ?? [];
+        $alreadyClaimed = $prefs['pwa_installed'] ?? false;
+
+        if ($alreadyClaimed) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Récompense déjà réclamée',
+                'data'    => ['already_claimed' => true],
+            ]);
+        }
+
+        // Donner 100 XP
+        $xpReward      = 100;
+        $levelUpResult = $user->addXp($xpReward);
+
+        // Marquer dans les préférences (idempotent)
+        $prefs['pwa_installed'] = now()->toISOString();
+        $user->update(['preferences' => $prefs]);
+
+        \Log::info('Récompense PWA attribuée', [
+            'user_id'   => $user->id,
+            'xp_earned' => $xpReward,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "🎉 Merci d'avoir installé CoinQuest !",
+            'data'    => [
+                'xp_earned'     => $xpReward,
+                'leveled_up'    => $levelUpResult['leveled_up'] ?? false,
+                'levels_gained' => $levelUpResult['levels_gained'] ?? 0,
+                'new_total_xp'  => $user->fresh()->getTotalXp(),
+            ],
+        ]);
+    }
+
 }

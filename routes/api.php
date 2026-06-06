@@ -286,6 +286,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('actions',       [GamingActionController::class, 'store'])->name('actions.store');
         Route::get('actions/recent', [GamingActionController::class, 'recent'])->name('actions.recent');
 
+        // 📱 PWA INSTALL REWARD
+        Route::post('pwa-installed', [GamingActionController::class, 'pwaInstalled'])->name('pwa.installed');
+
         // StreakController
         Route::prefix('streaks')->name('streaks.')->group(function () {
             Route::get('/',               [StreakController::class, 'index'])->name('index');
