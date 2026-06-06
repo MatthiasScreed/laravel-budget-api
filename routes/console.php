@@ -11,25 +11,26 @@ Artisan::command('inspire', function () {
 
 Schedule::job(new GenerateDailyInsightsJob())
     ->dailyAt('08:00')
+    ->name('generate-daily-insights')
     ->withoutOverlapping()
     ->onOneServer()
-    ->appendOutputTo(
-        storage_path('logs/insights-job.log')
-    );
+    ->appendOutputTo(storage_path('logs/insights-job.log'));
 
-// Rappel matin — 9h, seulement aux utilisateurs qui n'ont pas encore agi
-Schedule::command('quest:notify')->dailyAt('09:00');
+// Rappel matin — 9h
+Schedule::command('quest:notify')
+    ->dailyAt('09:00');
 
-// Alerte série soir — 20h, seulement aux séries en danger
-Schedule::command('quest:notify --streak')->dailyAt('20:00');
+// Alerte série soir — 20h
+Schedule::command('quest:notify --streak')
+    ->dailyAt('20:00');
 
 // ==========================================
 // STREAK DANGER — chaque jour à 18h (Paris)
 // ==========================================
-// Envoie un email aux users dont la série expire ce soir
 Schedule::command('coinquest:streak-danger')
     ->dailyAt('18:00')
     ->timezone('Europe/Paris')
+    ->name('streak-danger-emails')
     ->withoutOverlapping()
     ->onFailure(function () {
         \Log::error('coinquest:streak-danger a échoué');
@@ -38,7 +39,6 @@ Schedule::command('coinquest:streak-danger')
 // ==========================================
 // NETTOYAGE DES STREAKS EXPIRÉES — 00:05
 // ==========================================
-// Brise les streaks non mises à jour depuis >1 jour
 Schedule::call(function () {
     \App\Models\Streak::where('is_active', true)
         ->whereDate('last_activity_date', '<', now()->subDay()->toDateString())
@@ -46,6 +46,5 @@ Schedule::call(function () {
 })
     ->dailyAt('00:05')
     ->timezone('Europe/Paris')
-    ->withoutOverlapping()
-    ->name('streak-expiry-check');
-
+    ->name('streak-expiry-check')
+    ->withoutOverlapping();
