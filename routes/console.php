@@ -25,6 +25,18 @@ Schedule::command('quest:notify --streak')
     ->dailyAt('20:00');
 
 // ==========================================
+// RÉSUMÉ HEBDOMADAIRE — lundi à 8h (Paris)
+// ==========================================
+Schedule::command('coinquest:weekly-report')
+    ->weeklyOn(1, '08:00')
+    ->timezone('Europe/Paris')
+    ->name('weekly-report-emails')
+    ->withoutOverlapping()
+    ->onFailure(function () {
+        \Log::error('coinquest:weekly-report a échoué');
+    });
+
+// ==========================================
 // STREAK DANGER — chaque jour à 18h (Paris)
 // ==========================================
 Schedule::command('coinquest:streak-danger')
