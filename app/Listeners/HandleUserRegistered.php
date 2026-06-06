@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\UserRegistered;
 use App\Notifications\WelcomeNotification;
 use App\Services\GamingService;
+use App\Services\StreakService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -13,18 +14,14 @@ class HandleUserRegistered implements ShouldQueue
     use InteractsWithQueue;
 
     protected GamingService $gamingService;
+    protected StreakService $streakService;
 
-    /**
-     * Create the event listener.
-     */
-    public function __construct(GamingService $gamingService)
+    public function __construct(GamingService $gamingService, StreakService $streakService)
     {
         $this->gamingService = $gamingService;
+        $this->streakService = $streakService;
     }
 
-    /**
-     * Handle the event.
-     */
     public function handle(UserRegistered $event): void
     {
         $user = $event->user;
@@ -38,61 +35,61 @@ class HandleUserRegistered implements ShouldQueue
             if ($welcomeAchievement) {
                 $user->achievements()->attach($welcomeAchievement->id, [
                     'unlocked_at' => now(),
-                    'progress' => 100,
+                    'progress'    => 100,
                 ]);
             }
 
             // 3. Initialiser les streaks de base
             $this->initializeUserStreaks($user);
 
-            // 4. Envoyer la notification de bienvenue
+            // 4. 🧊 Freeze de bienvenue (1 offert)
+            $this->streakService->awardFreeze($user, 'welcome_gift');
+
+            // 5. Envoyer la notification de bienvenue
             $user->notify(new WelcomeNotification);
 
-            // 5. Envoyer un email de bienvenue (si configuré)
+            // 6. Envoyer un email de bienvenue (si configuré)
             if (config('app.send_welcome_emails', true)) {
                 \Mail::to($user->email)->send(new \App\Mail\WelcomeEmail($user));
             }
 
-            // 6. Log pour analytics
+            // 7. Log pour analytics
             \Log::info('Nouvel utilisateur enregistré', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'currency' => $user->currency,
-                'language' => $user->language,
+                'user_id'           => $user->id,
+                'email'             => $user->email,
+                'currency'          => $user->currency,
+                'language'          => $user->language,
+                'streak_freezes'    => 1,
                 'registration_date' => now(),
             ]);
 
         } catch (\Exception $e) {
-            // Log l'erreur mais ne pas faire échouer l'inscription
             \Log::error("Erreur lors du traitement de l'inscription", [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ]);
         }
     }
 
-    /**
-     * Initialize basic streaks for new user
-     */
     private function initializeUserStreaks($user): void
     {
         $basicStreaks = [
             'daily_login' => [
-                'type' => 'daily_login',
-                'name' => 'Connexion quotidienne',
-                'description' => 'Se connecter chaque jour',
-                'current_count' => 1, // Premier login
-                'best_count' => 1,
-                'is_active' => true,
+                'type'               => 'daily_login',
+                'name'               => 'Connexion quotidienne',
+                'description'        => 'Se connecter chaque jour',
+                'current_count'      => 1,
+                'best_count'         => 1,
+                'is_active'          => true,
                 'last_activity_date' => now(),
             ],
             'daily_transaction' => [
-                'type' => 'daily_transaction',
-                'name' => 'Transaction quotidienne',
-                'description' => 'Enregistrer au moins une transaction par jour',
-                'current_count' => 0,
-                'best_count' => 0,
-                'is_active' => true,
+                'type'               => 'daily_transaction',
+                'name'               => 'Transaction quotidienne',
+                'description'        => 'Enregistrer au moins une transaction par jour',
+                'current_count'      => 0,
+                'best_count'         => 0,
+                'is_active'          => true,
                 'last_activity_date' => null,
             ],
         ];
@@ -103,14 +100,11 @@ class HandleUserRegistered implements ShouldQueue
         }
     }
 
-    /**
-     * Handle a job failure.
-     */
     public function failed(UserRegistered $event, \Throwable $exception): void
     {
         \Log::error('Échec du traitement UserRegistered', [
             'user_id' => $event->user->id,
-            'error' => $exception->getMessage(),
+            'error'   => $exception->getMessage(),
         ]);
     }
 }
