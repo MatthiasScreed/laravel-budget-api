@@ -115,4 +115,12 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Feedback Recipient
+    |--------------------------------------------------------------------------
+    | Adresse qui reçoit les feedbacks utilisateurs de l'app.
+    */
+    'feedback_to' => env('MAIL_FEEDBACK_TO', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+
 ];

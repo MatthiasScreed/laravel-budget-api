@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\UserLevelController;
 use App\Http\Controllers\Api\ReferralController;
+use App\Http\Controllers\Api\FeedbackController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -340,6 +341,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // 🎁 PARRAINAGE
     Route::get('referral', [ReferralController::class, 'index'])->name('referral.index');
+
+    // 💬 FEEDBACK
+    Route::post('feedback', [FeedbackController::class, 'store'])->name('feedback.store');
 
 }); // FIN du middleware auth:sanctum
 
