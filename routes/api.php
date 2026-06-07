@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\StreakController;
 use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\UserLevelController;
+use App\Http\Controllers\Api\ReferralController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -72,6 +73,7 @@ Route::get('/health', [HealthController::class, 'health'])->name('api.health');
 
 Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/register',        [AuthController::class, 'register'])->name('register');
+    Route::post('/referral/validate', [ReferralController::class, 'validate'])->name('referral.validate');
     Route::post('/login',           [AuthController::class, 'login'])->name('login');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
     Route::post('/reset-password',  [AuthController::class, 'resetPassword'])->name('reset-password');
@@ -335,6 +337,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // SUGGESTIONS
     Route::get('suggestions', [SuggestionController::class, 'index'])->name('suggestions.index');
+
+    // 🎁 PARRAINAGE
+    Route::get('referral', [ReferralController::class, 'index'])->name('referral.index');
 
 }); // FIN du middleware auth:sanctum
 

@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Carbon\Carbon;
+use App\Services\ReferralService;
 
 class AuthController extends Controller
 {
@@ -42,6 +43,12 @@ class AuthController extends Controller
                 'timezone'          => $validatedData['timezone'] ?? 'Europe/Paris',
                 'email_verified_at' => now(),
             ]);
+
+            // 🎁 Parrainage — appliquer le code si fourni
+            $referralCode = $validatedData['referral_code'] ?? $request->query('ref');
+            if ($referralCode) {
+                app(ReferralService::class)->applyReferral($user, $referralCode);
+            }
 
             $user->level()->firstOrCreate(
                 ['user_id' => $user->id],
