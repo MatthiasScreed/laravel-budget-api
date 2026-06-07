@@ -45,13 +45,9 @@ class HandleUserRegistered implements ShouldQueue
             // 4. 🧊 Freeze de bienvenue (1 offert)
             $this->streakService->awardFreeze($user, 'welcome_gift');
 
-            // 5. Envoyer la notification de bienvenue
+            // 5. Envoyer la notification + email de bienvenue
+            // WelcomeNotification gère mail + database en un seul appel
             $user->notify(new WelcomeNotification);
-
-            // 6. Envoyer un email de bienvenue (si configuré)
-            if (config('app.send_welcome_emails', true)) {
-                \Mail::to($user->email)->send(new \App\Mail\WelcomeEmail($user));
-            }
 
             // 7. Log pour analytics
             \Log::info('Nouvel utilisateur enregistré', [
