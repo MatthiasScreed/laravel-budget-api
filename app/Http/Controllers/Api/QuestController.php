@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Quest;
 use App\Services\GamingService;
+use App\Services\ProjectionCalculator;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class QuestController extends Controller
                 ->orderByDesc('is_main')
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(fn($q) => $q->toApiArray());
+                ->map(fn ($q) => $q->toApiArray());
 
             return $this->successResponse($quests, 'Quêtes récupérées');
 
@@ -57,7 +58,7 @@ class QuestController extends Controller
                 ->main()
                 ->first();
 
-            if (!$quest) {
+            if (! $quest) {
                 return $this->successResponse(null, 'Aucune quête active');
             }
 
@@ -79,33 +80,33 @@ class QuestController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name'          => 'required|string|max:100',
+            'name' => 'required|string|max:100',
             'target_amount' => 'required|numeric|min:1|max:999999',
-            'target_date'   => 'nullable|date|after:today',
-            'emoji'         => 'nullable|string|max:10',
+            'target_date' => 'nullable|date|after:today',
+            'emoji' => 'nullable|string|max:10',
         ]);
 
         try {
             $user = $request->user();
 
             // Si c'est la première quête, elle devient automatiquement principale
-            $isFirst = !Quest::where('user_id', $user->id)->exists();
+            $isFirst = ! Quest::where('user_id', $user->id)->exists();
 
             $quest = Quest::create([
-                'user_id'        => $user->id,
-                'name'           => $validated['name'],
-                'target_amount'  => $validated['target_amount'],
-                'target_date'    => $validated['target_date'] ?? null,
-                'emoji'          => $validated['emoji'] ?? '🎯',
+                'user_id' => $user->id,
+                'name' => $validated['name'],
+                'target_amount' => $validated['target_amount'],
+                'target_date' => $validated['target_date'] ?? null,
+                'emoji' => $validated['emoji'] ?? '🎯',
                 'current_amount' => 0,
-                'status'         => 'active',
-                'is_main'        => $isFirst,
+                'status' => 'active',
+                'is_main' => $isFirst,
             ]);
 
             // XP pour création de quête
             $this->gamingService->addExperience($user, 15, 'quest_created');
 
-            Log::info("Quest created", ['user_id' => $user->id, 'quest_id' => $quest->id]);
+            Log::info('Quest created', ['user_id' => $user->id, 'quest_id' => $quest->id]);
 
             return $this->createdResponse($quest->toApiArray(), 'Quête créée ! +15 XP');
 
@@ -137,10 +138,10 @@ class QuestController extends Controller
         }
 
         $validated = $request->validate([
-            'name'          => 'sometimes|string|max:100',
+            'name' => 'sometimes|string|max:100',
             'target_amount' => 'sometimes|numeric|min:1|max:999999',
-            'target_date'   => 'nullable|date',
-            'emoji'         => 'nullable|string|max:10',
+            'target_date' => 'nullable|date',
+            'emoji' => 'nullable|string|max:10',
         ]);
 
         try {
@@ -201,6 +202,48 @@ class QuestController extends Controller
         }
     }
 
+    /**
+     * GET /api/quests/{quest}/projection-impact
+     * Impact (en jours) d'un montant simulé sur la projection réaliste de la quête.
+     */
+    public function projectionImpact(Request $request, Quest $quest): JsonResponse
+    {
+        if ($quest->user_id !== $request->user()->id) {
+            return $this->unauthorizedResponse();
+        }
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01|max:99999',
+            'type' => 'required|in:save,spend',
+        ]);
+
+        try {
+            $currentProjection = (new ProjectionCalculator($quest))->calculate('realistic');
+
+            $simulatedQuest = clone $quest;
+            $simulatedQuest->current_amount = $validated['type'] === 'save'
+                ? $quest->current_amount + $validated['amount']
+                : max(0, $quest->current_amount - $validated['amount']);
+
+            $simulatedProjection = (new ProjectionCalculator($simulatedQuest))->calculate('realistic');
+
+            $daysSaved = (int) round(
+                ($currentProjection['projected_date']->timestamp - $simulatedProjection['projected_date']->timestamp) / 86400
+            );
+
+            return $this->successResponse([
+                'amount' => $validated['amount'],
+                'type' => $validated['type'],
+                'current_projected_date' => $currentProjection['projected_date']->format('Y-m-d'),
+                'simulated_projected_date' => $simulatedProjection['projected_date']->format('Y-m-d'),
+                'days_saved' => $daysSaved,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur calcul impact projection');
+        }
+    }
+
     // ==========================================
     // HELPER
     // ==========================================
@@ -208,7 +251,7 @@ class QuestController extends Controller
     private function handleError(\Exception $e, string $message): JsonResponse
     {
         Log::error($message, [
-            'error'   => $e->getMessage(),
+            'error' => $e->getMessage(),
             'user_id' => auth()->id(),
         ]);
 

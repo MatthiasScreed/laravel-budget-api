@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 /**
  * Modèle DailyAction — Action quotidienne du MVP.
@@ -28,28 +27,29 @@ class DailyAction extends Model
     ];
 
     protected $casts = [
-        'amount'      => 'float',
-        'xp_earned'   => 'integer',
+        'amount' => 'float',
+        'xp_earned' => 'integer',
         'action_date' => 'date',
     ];
 
     // XP par type d'action
-    const XP_SAVE  = 10;
+    const XP_SAVE = 10;
+
     const XP_SPEND = 3;
 
     // Raisons prédéfinies par type
     const PRESETS_SAVE = [
-        'cooked'    => 'J\'ai cuisiné',
-        'avoided'   => 'J\'ai évité un achat',
+        'cooked' => 'J\'ai cuisiné',
+        'avoided' => 'J\'ai évité un achat',
         'transport' => 'J\'ai pris les transports',
-        'other_save'=> 'Autre économie',
+        'other_save' => 'Autre économie',
     ];
 
     const PRESETS_SPEND = [
-        'food'         => 'Nourriture / restaurant',
-        'shopping'     => 'Shopping',
+        'food' => 'Nourriture / restaurant',
+        'shopping' => 'Shopping',
         'subscription' => 'Abonnement',
-        'other_spend'  => 'Autre dépense',
+        'other_spend' => 'Autre dépense',
     ];
 
     // ==========================================
@@ -85,6 +85,11 @@ class DailyAction extends Model
         return $query->whereDate('action_date', today());
     }
 
+    public function scopeYesterday($query)
+    {
+        return $query->whereDate('action_date', today()->subDay());
+    }
+
     public function scopeThisMonth($query)
     {
         return $query->whereYear('action_date', now()->year)
@@ -107,6 +112,7 @@ class DailyAction extends Model
     {
         if ($this->reason_preset) {
             $allPresets = array_merge(self::PRESETS_SAVE, self::PRESETS_SPEND);
+
             return $allPresets[$this->reason_preset] ?? $this->reason ?? '';
         }
 
@@ -141,16 +147,16 @@ class DailyAction extends Model
     public function toApiArray(): array
     {
         return [
-            'id'           => $this->id,
-            'type'         => $this->type,
-            'amount'       => $this->amount,
-            'reason'       => $this->reason,
-            'reason_preset'=> $this->reason_preset,
+            'id' => $this->id,
+            'type' => $this->type,
+            'amount' => $this->amount,
+            'reason' => $this->reason,
+            'reason_preset' => $this->reason_preset,
             'reason_label' => $this->reason_label,
-            'xp_earned'    => $this->xp_earned,
-            'quest_id'     => $this->quest_id,
-            'action_date'  => $this->action_date->toDateString(),
-            'created_at'   => $this->created_at->toISOString(),
+            'xp_earned' => $this->xp_earned,
+            'quest_id' => $this->quest_id,
+            'action_date' => $this->action_date->toDateString(),
+            'created_at' => $this->created_at->toISOString(),
         ];
     }
 }

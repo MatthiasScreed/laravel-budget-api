@@ -24,7 +24,7 @@ class DailyActionController extends Controller
 
     public function __construct(
         private GamingService $gamingService,
-        private StreakService  $streakService,
+        private StreakService $streakService,
     ) {}
 
     // ==========================================
@@ -39,32 +39,32 @@ class DailyActionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'type'          => 'required|in:save,spend',
-            'amount'        => 'required|numeric|min:0.01|max:99999',
-            'reason'        => 'nullable|string|max:100',
+            'type' => 'required|in:save,spend',
+            'amount' => 'required|numeric|min:0.01|max:99999',
+            'reason' => 'nullable|string|max:100',
             'reason_preset' => 'nullable|in:cooked,avoided,transport,other_save,food,shopping,subscription,other_spend',
-            'quest_id'      => 'nullable|integer|exists:quests,id',
-            'action_date'   => 'nullable|date|before_or_equal:today',
+            'quest_id' => 'nullable|integer|exists:quests,id',
+            'action_date' => 'nullable|date|before_or_equal:today',
         ]);
 
         try {
-            $user      = $request->user();
-            $xp        = DailyAction::calculateXp($validated['type']);
-            $questId   = $validated['quest_id'] ?? $this->getMainQuestId($user->id);
+            $user = $request->user();
+            $xp = DailyAction::calculateXp($validated['type']);
+            $questId = $validated['quest_id'] ?? $this->getMainQuestId($user->id);
             $actionDate = $validated['action_date'] ?? today()->toDateString();
 
             DB::beginTransaction();
 
             // 1. Créer l'action
             $action = DailyAction::create([
-                'user_id'       => $user->id,
-                'quest_id'      => $questId,
-                'type'          => $validated['type'],
-                'amount'        => $validated['amount'],
-                'reason'        => $validated['reason'] ?? null,
+                'user_id' => $user->id,
+                'quest_id' => $questId,
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'reason' => $validated['reason'] ?? null,
                 'reason_preset' => $validated['reason_preset'] ?? null,
-                'xp_earned'     => $xp,
-                'action_date'   => $actionDate,
+                'xp_earned' => $xp,
+                'action_date' => $actionDate,
             ]);
 
             // 2. Mettre à jour le montant de la quête
@@ -85,6 +85,7 @@ class DailyActionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->handleError($e, 'Erreur enregistrement action');
         }
     }
@@ -100,13 +101,13 @@ class DailyActionController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $days    = min($request->integer('days', 30), 365);
+            $days = min($request->integer('days', 30), 365);
             $actions = DailyAction::where('user_id', $request->user()->id)
                 ->where('action_date', '>=', now()->subDays($days)->toDateString())
                 ->orderByDesc('action_date')
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(fn($a) => $a->toApiArray());
+                ->map(fn ($a) => $a->toApiArray());
 
             return $this->successResponse($actions);
 
@@ -122,27 +123,58 @@ class DailyActionController extends Controller
     public function today(Request $request): JsonResponse
     {
         try {
-            $userId  = $request->user()->id;
+            $userId = $request->user()->id;
             $actions = DailyAction::where('user_id', $userId)
                 ->today()
                 ->orderByDesc('created_at')
                 ->get();
 
             $summary = [
-                'total_saved'  => $actions->where('type', 'save')->sum('amount'),
-                'total_spent'  => $actions->where('type', 'spend')->sum('amount'),
-                'total_xp'     => $actions->sum('xp_earned'),
-                'actions_count'=> $actions->count(),
-                'has_acted'    => $actions->isNotEmpty(),
+                'total_saved' => $actions->where('type', 'save')->sum('amount'),
+                'total_spent' => $actions->where('type', 'spend')->sum('amount'),
+                'total_xp' => $actions->sum('xp_earned'),
+                'actions_count' => $actions->count(),
+                'has_acted' => $actions->isNotEmpty(),
             ];
 
             return $this->successResponse([
-                'actions' => $actions->map(fn($a) => $a->toApiArray()),
+                'actions' => $actions->map(fn ($a) => $a->toApiArray()),
                 'summary' => $summary,
             ]);
 
         } catch (\Exception $e) {
             return $this->handleError($e, 'Erreur récupération actions du jour');
+        }
+    }
+
+    /**
+     * GET /api/daily-actions/yesterday
+     * Actions d'hier + résumé
+     */
+    public function yesterday(Request $request): JsonResponse
+    {
+        try {
+            $userId = $request->user()->id;
+            $actions = DailyAction::where('user_id', $userId)
+                ->yesterday()
+                ->orderByDesc('created_at')
+                ->get();
+
+            $summary = [
+                'total_saved' => $actions->where('type', 'save')->sum('amount'),
+                'total_spent' => $actions->where('type', 'spend')->sum('amount'),
+                'total_xp' => $actions->sum('xp_earned'),
+                'actions_count' => $actions->count(),
+                'has_acted' => $actions->isNotEmpty(),
+            ];
+
+            return $this->successResponse([
+                'actions' => $actions->map(fn ($a) => $a->toApiArray()),
+                'summary' => $summary,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->handleError($e, 'Erreur récupération actions d\'hier');
         }
     }
 
@@ -165,17 +197,17 @@ class DailyActionController extends Controller
 
             return $this->successResponse([
                 'week' => [
-                    'saved'        => round($weekActions->where('type', 'save')->sum('amount'), 2),
-                    'spent'        => round($weekActions->where('type', 'spend')->sum('amount'), 2),
-                    'xp_earned'    => $weekActions->sum('xp_earned'),
-                    'actions_count'=> $weekActions->count(),
+                    'saved' => round($weekActions->where('type', 'save')->sum('amount'), 2),
+                    'spent' => round($weekActions->where('type', 'spend')->sum('amount'), 2),
+                    'xp_earned' => $weekActions->sum('xp_earned'),
+                    'actions_count' => $weekActions->count(),
                 ],
                 'month' => [
-                    'saved'        => round($monthActions->where('type', 'save')->sum('amount'), 2),
-                    'spent'        => round($monthActions->where('type', 'spend')->sum('amount'), 2),
-                    'xp_earned'    => $monthActions->sum('xp_earned'),
-                    'actions_count'=> $monthActions->count(),
-                    'save_days'    => $monthActions->where('type', 'save')
+                    'saved' => round($monthActions->where('type', 'save')->sum('amount'), 2),
+                    'spent' => round($monthActions->where('type', 'spend')->sum('amount'), 2),
+                    'xp_earned' => $monthActions->sum('xp_earned'),
+                    'actions_count' => $monthActions->count(),
+                    'save_days' => $monthActions->where('type', 'save')
                         ->unique('action_date')->count(),
                 ],
                 'has_acted_today' => DailyAction::hasActedToday($userId),
@@ -212,6 +244,7 @@ class DailyActionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->handleError($e, 'Erreur suppression action');
         }
     }
@@ -236,12 +269,12 @@ class DailyActionController extends Controller
      */
     private function updateQuestAmount(?int $questId, string $type, float $amount): ?Quest
     {
-        if (!$questId) {
+        if (! $questId) {
             return null;
         }
 
         $quest = Quest::find($questId);
-        if (!$quest) {
+        if (! $quest) {
             return null;
         }
 
@@ -264,21 +297,21 @@ class DailyActionController extends Controller
         ?Quest $quest
     ): array {
         return [
-            'action'  => $action->toApiArray(),
-            'gaming'  => [
-                'xp_earned'   => $action->xp_earned,
-                'total_xp'    => $xpResult['total_xp'] ?? 0,
-                'level'       => $xpResult['level'] ?? 1,
-                'leveled_up'  => $xpResult['leveled_up'] ?? false,
-                'new_level'   => $xpResult['new_level'] ?? null,
+            'action' => $action->toApiArray(),
+            'gaming' => [
+                'xp_earned' => $action->xp_earned,
+                'total_xp' => $xpResult['total_xp'] ?? 0,
+                'level' => $xpResult['level'] ?? 1,
+                'leveled_up' => $xpResult['leveled_up'] ?? false,
+                'new_level' => $xpResult['new_level'] ?? null,
             ],
-            'streak'  => [
-                'current'      => $streakResult['streak']['current_count'] ?? 0,
-                'best'         => $streakResult['streak']['best_count'] ?? 0,
-                'bonus_xp'     => $streakResult['bonus_xp'] ?? 0,
+            'streak' => [
+                'current' => $streakResult['streak']['current_count'] ?? 0,
+                'best' => $streakResult['streak']['best_count'] ?? 0,
+                'bonus_xp' => $streakResult['bonus_xp'] ?? 0,
                 'is_milestone' => $streakResult['is_milestone'] ?? false,
             ],
-            'quest'   => $quest?->toApiArray(),
+            'quest' => $quest?->toApiArray(),
         ];
     }
 
@@ -287,9 +320,9 @@ class DailyActionController extends Controller
      */
     private function buildSuccessMessage(string $type, int $xp, array $streakResult): string
     {
-        $base    = $type === 'save' ? 'Économie enregistrée' : 'Dépense enregistrée';
-        $xpMsg   = "+{$xp} XP";
-        $streak  = $streakResult['streak']['current_count'] ?? 0;
+        $base = $type === 'save' ? 'Économie enregistrée' : 'Dépense enregistrée';
+        $xpMsg = "+{$xp} XP";
+        $streak = $streakResult['streak']['current_count'] ?? 0;
         $streakMsg = $streak > 1 ? " 🔥 {$streak} jours de série" : '';
 
         return "{$base} ! {$xpMsg}{$streakMsg}";
@@ -298,7 +331,7 @@ class DailyActionController extends Controller
     private function handleError(\Exception $e, string $message): JsonResponse
     {
         Log::error($message, [
-            'error'   => $e->getMessage(),
+            'error' => $e->getMessage(),
             'user_id' => auth()->id(),
         ]);
 

@@ -3,15 +3,16 @@
 namespace App\Services;
 
 use App\Models\FinancialGoal;
+use App\Models\Quest;
 use Carbon\Carbon;
 
 class ProjectionCalculator
 {
-    private FinancialGoal $goal;
+    private FinancialGoal|Quest $goal;
 
     private array $historicalData;
 
-    public function __construct(FinancialGoal $goal)
+    public function __construct(FinancialGoal|Quest $goal)
     {
         $this->goal = $goal;
         $this->loadHistoricalData();
@@ -159,6 +160,23 @@ class ProjectionCalculator
      */
     private function loadHistoricalData(): void
     {
+        if ($this->goal instanceof Quest) {
+            $this->historicalData = $this->goal->dailyActions()
+                ->where('type', 'save')
+                ->where('action_date', '>=', now()->subMonths(12))
+                ->orderBy('action_date')
+                ->get()
+                ->groupBy(function ($action) {
+                    return $action->action_date->format('Y-m');
+                })
+                ->map(function ($actions) {
+                    return $actions->sum('amount');
+                })
+                ->toArray();
+
+            return;
+        }
+
         $this->historicalData = $this->goal->contributions()
             ->where('date', '>=', now()->subMonths(12))
             ->orderBy('date')
