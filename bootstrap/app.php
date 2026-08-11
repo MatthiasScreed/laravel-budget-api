@@ -33,6 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // 4. RATE LIMITING
         $middleware->throttleApi();
 
+        // 5. SUIVI D'ACTIVITÉ (last_activity_at, daily_login)
+        $middleware->api(append: [
+            \App\Http\Middleware\ActivityUpdateMiddleware::class,
+        ]);
+
         // ==========================================
         // MIDDLEWARE ALIASES
         // ==========================================
